@@ -20,6 +20,17 @@ local function cloneTowerConfig(config)
     return newConfig
 end
 
+local function updateTowerAttributes(towerModel, towerData)
+    if not towerModel then
+        return
+    end
+
+    towerModel:SetAttribute("TowerType", towerData.Type)
+    towerModel:SetAttribute("Level", towerData.Level)
+    towerModel:SetAttribute("Range", towerData.Config.Range or 0)
+    towerModel:SetAttribute("OwnerUserId", towerData.Player and towerData.Player.UserId or 0)
+end
+
 function TowerService.new(mapModel, waveService, remotes)
     local self = setmetatable({}, TowerService)
     self.MapModel = mapModel
@@ -177,24 +188,34 @@ function TowerService:AddTower(player, towerType, position)
     }
 
     self.Towers[towerModel] = towerData
+    updateTowerAttributes(towerModel, towerData)
     return towerModel
 end
 
-local function getClosestEnemyInRange(towerPosition, range, enemies)
-    local closestEnemy
-    local closestDist = math.huge
+local function getFarthestEnemyInRange(towerPosition, range, enemies)
+    if not range or range <= 0 then
+        return nil
+    end
+
+    local farthestEnemy
+    local highestProgress = -math.huge
+    local fallbackDistance = -math.huge
 
     for enemyModel, enemyData in pairs(enemies) do
         if enemyModel and enemyModel.PrimaryPart and enemyData.Health > 0 then
             local distance = (towerPosition - enemyModel.PrimaryPart.Position).Magnitude
-            if distance <= range and distance < closestDist then
-                closestDist = distance
-                closestEnemy = enemyModel
+            if distance <= range then
+                local progress = enemyData.Progress or 0
+                if progress > highestProgress or (progress == highestProgress and distance > fallbackDistance) then
+                    highestProgress = progress
+                    fallbackDistance = distance
+                    farthestEnemy = enemyModel
+                end
             end
         end
     end
 
-    return closestEnemy
+    return farthestEnemy
 end
 
 function TowerService:SpawnProjectile(towerData, target)
@@ -251,7 +272,7 @@ function TowerService:Tick(dt)
                     towerData.Head = head
                 end
                 if head then
-                    local target = getClosestEnemyInRange(
+                    local target = getFarthestEnemyInRange(
                         head.Position,
                         towerData.Config.Range,
                         self.WaveService.Enemies
@@ -290,7 +311,8 @@ function TowerService:UpgradeTower(player, towerModel)
         return false, "No upgrade available"
     end
 
-    if self.WaveService:GetPlayerStats(player).Money < nextUpgrade.Cost then
+    local stats = self.WaveService:GetPlayerStats(player)
+    if not stats or stats.Money < nextUpgrade.Cost then
         return false, "Not enough money"
     end
 
@@ -303,6 +325,7 @@ function TowerService:UpgradeTower(player, towerModel)
     end
 
     towerData.Level += 1
+    updateTowerAttributes(towerModel, towerData)
 
     self.Remotes.TowerUpgraded:FireClient(player, towerModel, towerData.Level)
     return true

@@ -15,8 +15,34 @@ local previewPart
 local placementValid = false
 local hoverBillboard
 local hoverLabel
+local selectedTower
+local rangeAdornment
+local selectedTowerConnections = {}
+local currentMoney = 0
+
+local towerDetailsFrame
+local towerNameLabel
+local towerLevelLabel
+local towerStatsLabel
+local ownershipLabel
+local upgradeDescriptionLabel
+local upgradeButton
 
 local PREVIEW_SIZE = Vector3.new(4, 1, 4)
+
+local function disconnectSelectedConnections()
+    for _, conn in ipairs(selectedTowerConnections) do
+        conn:Disconnect()
+    end
+    selectedTowerConnections = {}
+end
+
+local function destroyRangeIndicator()
+    if rangeAdornment then
+        rangeAdornment:Destroy()
+        rangeAdornment = nil
+    end
+end
 
 local function createRaycastParams()
     local params = RaycastParams.new()
@@ -53,6 +79,27 @@ local function getEnemyModelFromInstance(instance)
     return nil
 end
 
+local function getTowerModelFromInstance(instance)
+    if not instance then
+        return nil
+    end
+
+    local towersFolder = workspace:FindFirstChild("Towers")
+    if not towersFolder then
+        return nil
+    end
+
+    local ancestor = instance
+    while ancestor and ancestor ~= workspace do
+        if ancestor:IsA("Model") and ancestor.Parent == towersFolder then
+            return ancestor
+        end
+        ancestor = ancestor.Parent
+    end
+
+    return nil
+end
+
 local function ensureHoverBillboard()
     if hoverBillboard then
         return hoverBillboard
@@ -76,6 +123,195 @@ local function ensureHoverBillboard()
     hoverLabel.Parent = hoverBillboard
 
     return hoverBillboard
+end
+
+local function cloneStats(config)
+    local stats = {}
+    for key, value in pairs(config) do
+        if key ~= "Upgrades" then
+            stats[key] = value
+        end
+    end
+    return stats
+end
+
+local function applyUpgrade(stats, upgrade)
+    if not upgrade then
+        return
+    end
+    for key, value in pairs(upgrade) do
+        if key ~= "Cost" and key ~= "Description" then
+            stats[key] = value
+        end
+    end
+end
+
+local function getTowerStatsForLevel(towerType, level)
+    local config = towerConfigs[towerType]
+    if not config then
+        return nil
+    end
+
+    local stats = cloneStats(config)
+    if config.Upgrades then
+        for i = 1, math.max(0, (level or 1) - 1) do
+            applyUpgrade(stats, config.Upgrades[i])
+        end
+    end
+
+    return stats
+end
+
+local function getNextUpgrade(towerType, level)
+    local config = towerConfigs[towerType]
+    if not config or not config.Upgrades then
+        return nil
+    end
+    return config.Upgrades[level or 1]
+end
+
+local function resolveTowerType(towerModel)
+    local towerType = towerModel:GetAttribute("TowerType")
+    if towerType then
+        return towerType
+    end
+
+    for key, config in pairs(towerConfigs) do
+        if config.Name == towerModel.Name then
+            return key
+        end
+    end
+
+    return nil
+end
+
+local function showRangeIndicator(towerModel, range)
+    destroyRangeIndicator()
+    if not range then
+        return
+    end
+
+    local base = towerModel.PrimaryPart or towerModel:FindFirstChild("Base")
+    if not base then
+        return
+    end
+
+    rangeAdornment = Instance.new("CylinderHandleAdornment")
+    rangeAdornment.Name = "TowerRangeIndicator"
+    rangeAdornment.Adornee = base
+    rangeAdornment.Color3 = Color3.fromRGB(80, 200, 255)
+    rangeAdornment.Transparency = 0.25
+    rangeAdornment.AlwaysOnTop = true
+    rangeAdornment.ZIndex = 2
+    rangeAdornment.Height = 0.15
+    rangeAdornment.Radius = range
+    rangeAdornment.Parent = towerModel
+end
+
+local function updateUpgradeButton(towerType, level, ownerUserId)
+    if not upgradeButton then
+        return
+    end
+
+    local nextUpgrade = getNextUpgrade(towerType, level)
+
+    if upgradeDescriptionLabel then
+        if nextUpgrade and nextUpgrade.Description then
+            upgradeDescriptionLabel.Text = nextUpgrade.Description
+        else
+            upgradeDescriptionLabel.Text = "Fully upgraded"
+        end
+    end
+
+    if not nextUpgrade then
+        upgradeButton.Text = "Max Level"
+        upgradeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        upgradeButton.AutoButtonColor = false
+        upgradeButton.Active = false
+        upgradeButton.Visible = true
+        return
+    end
+
+    if ownerUserId ~= player.UserId then
+        upgradeButton.Text = "Not your tower"
+        upgradeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        upgradeButton.AutoButtonColor = false
+        upgradeButton.Active = false
+        upgradeButton.Visible = true
+        return
+    end
+
+    local affordable = currentMoney >= nextUpgrade.Cost
+    upgradeButton.Text = string.format("Upgrade ($%d)", nextUpgrade.Cost)
+    upgradeButton.BackgroundColor3 = affordable and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(120, 70, 70)
+    upgradeButton.AutoButtonColor = affordable
+    upgradeButton.Active = affordable
+    upgradeButton.Visible = true
+end
+
+local function updateTowerDetails(towerModel)
+    if not towerDetailsFrame or not towerModel then
+        return
+    end
+
+    local towerType = resolveTowerType(towerModel)
+    if not towerType then
+        towerDetailsFrame.Visible = false
+        destroyRangeIndicator()
+        return
+    end
+
+    local level = towerModel:GetAttribute("Level") or 1
+    local ownerUserId = towerModel:GetAttribute("OwnerUserId") or 0
+    local ownerText = "Unknown"
+    if ownerUserId == player.UserId then
+        ownerText = "You"
+    else
+        local ownerPlayer = Players:GetPlayerByUserId(ownerUserId)
+        if ownerPlayer then
+            ownerText = ownerPlayer.DisplayName or ownerPlayer.Name
+        end
+    end
+
+    local config = towerConfigs[towerType]
+    if towerNameLabel then
+        local displayName = config and config.Name or towerModel.Name
+        towerNameLabel.Text = displayName
+    end
+    if towerLevelLabel then
+        towerLevelLabel.Text = string.format("Level: %d", level)
+    end
+
+    local stats = getTowerStatsForLevel(towerType, level)
+    if stats and towerStatsLabel then
+        local lines = {}
+        if stats.Range then
+            table.insert(lines, string.format("Range: %.1f", stats.Range))
+        end
+        if stats.Damage then
+            table.insert(lines, string.format("Damage: %d", stats.Damage))
+        end
+        if stats.FireRate then
+            table.insert(lines, string.format("Fire Rate: %.2fs", stats.FireRate))
+        end
+        if stats.SplashRadius then
+            table.insert(lines, string.format("Splash Radius: %.1f", stats.SplashRadius))
+        end
+        if stats.SlowPercent then
+            table.insert(lines, string.format("Slow: %d%% for %.1fs", math.floor(stats.SlowPercent * 100 + 0.5), stats.SlowDuration or 0))
+        end
+        towerStatsLabel.Text = table.concat(lines, "\n")
+    elseif towerStatsLabel then
+        towerStatsLabel.Text = ""
+    end
+
+    if ownershipLabel then
+        ownershipLabel.Text = string.format("Owner: %s", ownerText)
+    end
+
+    towerDetailsFrame.Visible = true
+    showRangeIndicator(towerModel, stats and stats.Range)
+    updateUpgradeButton(towerType, level, ownerUserId)
 end
 
 local function createGui()
@@ -134,6 +370,15 @@ local function createGui()
                 previewPart.Parent = workspace
             end
             placementValid = false
+            selectedTower = nil
+            disconnectSelectedConnections()
+            destroyRangeIndicator()
+            if towerDetailsFrame then
+                towerDetailsFrame.Visible = false
+            end
+            if upgradeDescriptionLabel then
+                upgradeDescriptionLabel.Text = ""
+            end
         end)
     end
 
@@ -201,7 +446,11 @@ local function createGui()
     end)
 
     remotes.MoneyChanged.OnClientEvent:Connect(function(money)
+        currentMoney = money
         moneyLabel.Text = string.format("$%d", money)
+        if selectedTower then
+            updateTowerDetails(selectedTower)
+        end
     end)
 
     remotes.LivesChanged.OnClientEvent:Connect(function(lives)
@@ -217,10 +466,145 @@ local function createGui()
         startButton.BackgroundColor3 = victory and Color3.fromRGB(120, 255, 120) or Color3.fromRGB(255, 120, 120)
     end)
 
+    towerDetailsFrame = Instance.new("Frame")
+    towerDetailsFrame.Name = "TowerDetails"
+    towerDetailsFrame.Size = UDim2.new(0, 220, 0, 190)
+    towerDetailsFrame.Position = UDim2.new(1, -240, 0, 160)
+    towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    towerDetailsFrame.BackgroundTransparency = 0.2
+    towerDetailsFrame.BorderSizePixel = 0
+    towerDetailsFrame.Visible = false
+    towerDetailsFrame.Parent = screenGui
+
+    local detailLayout = Instance.new("UIListLayout")
+    detailLayout.Padding = UDim.new(0, 4)
+    detailLayout.FillDirection = Enum.FillDirection.Vertical
+    detailLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    detailLayout.Parent = towerDetailsFrame
+
+    towerNameLabel = Instance.new("TextLabel")
+    towerNameLabel.BackgroundTransparency = 1
+    towerNameLabel.Font = Enum.Font.GothamBold
+    towerNameLabel.TextSize = 18
+    towerNameLabel.TextColor3 = Color3.new(1, 1, 1)
+    towerNameLabel.Text = ""
+    towerNameLabel.Size = UDim2.new(1, -10, 0, 24)
+    towerNameLabel.Position = UDim2.new(0, 5, 0, 0)
+    towerNameLabel.Parent = towerDetailsFrame
+
+    towerLevelLabel = Instance.new("TextLabel")
+    towerLevelLabel.BackgroundTransparency = 1
+    towerLevelLabel.Font = Enum.Font.Gotham
+    towerLevelLabel.TextSize = 16
+    towerLevelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    towerLevelLabel.Text = ""
+    towerLevelLabel.Size = UDim2.new(1, -10, 0, 20)
+    towerLevelLabel.Position = UDim2.new(0, 5, 0, 28)
+    towerLevelLabel.Parent = towerDetailsFrame
+
+    towerStatsLabel = Instance.new("TextLabel")
+    towerStatsLabel.BackgroundTransparency = 1
+    towerStatsLabel.Font = Enum.Font.Gotham
+    towerStatsLabel.TextSize = 15
+    towerStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    towerStatsLabel.Text = ""
+    towerStatsLabel.TextWrapped = true
+    towerStatsLabel.Size = UDim2.new(1, -10, 0, 70)
+    towerStatsLabel.Position = UDim2.new(0, 5, 0, 52)
+    towerStatsLabel.Parent = towerDetailsFrame
+
+    ownershipLabel = Instance.new("TextLabel")
+    ownershipLabel.BackgroundTransparency = 1
+    ownershipLabel.Font = Enum.Font.Gotham
+    ownershipLabel.TextSize = 14
+    ownershipLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
+    ownershipLabel.Text = ""
+    ownershipLabel.Size = UDim2.new(1, -10, 0, 20)
+    ownershipLabel.Position = UDim2.new(0, 5, 0, 124)
+    ownershipLabel.Parent = towerDetailsFrame
+
+    upgradeDescriptionLabel = Instance.new("TextLabel")
+    upgradeDescriptionLabel.BackgroundTransparency = 1
+    upgradeDescriptionLabel.Font = Enum.Font.Gotham
+    upgradeDescriptionLabel.TextSize = 14
+    upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(180, 220, 255)
+    upgradeDescriptionLabel.TextWrapped = true
+    upgradeDescriptionLabel.Text = ""
+    upgradeDescriptionLabel.Size = UDim2.new(1, -10, 0, 40)
+    upgradeDescriptionLabel.Position = UDim2.new(0, 5, 0, 146)
+    upgradeDescriptionLabel.Parent = towerDetailsFrame
+
+    upgradeButton = Instance.new("TextButton")
+    upgradeButton.Name = "UpgradeButton"
+    upgradeButton.Size = UDim2.new(1, -10, 0, 32)
+    upgradeButton.Position = UDim2.new(0, 5, 1, -36)
+    upgradeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    upgradeButton.TextColor3 = Color3.new(1, 1, 1)
+    upgradeButton.Font = Enum.Font.GothamBold
+    upgradeButton.TextSize = 16
+    upgradeButton.Text = "Upgrade"
+    upgradeButton.AutoButtonColor = false
+    upgradeButton.Visible = false
+    upgradeButton.Parent = towerDetailsFrame
+    upgradeButton.MouseButton1Click:Connect(function()
+        if selectedTower then
+            remotes.TowerUpgradeRequested:FireServer(selectedTower)
+        end
+    end)
+
     return screenGui
 end
 
-createGui()
+local function clearSelection()
+    selectedTower = nil
+    disconnectSelectedConnections()
+    destroyRangeIndicator()
+    if towerDetailsFrame then
+        towerDetailsFrame.Visible = false
+    end
+    if upgradeDescriptionLabel then
+        upgradeDescriptionLabel.Text = ""
+    end
+end
+
+local function selectTower(towerModel)
+    if not towerModel then
+        clearSelection()
+        return
+    end
+
+    if selectedTower == towerModel then
+        updateTowerDetails(towerModel)
+        return
+    end
+
+    clearSelection()
+    selectedTower = towerModel
+    updateTowerDetails(towerModel)
+
+    selectedTowerConnections = {
+        towerModel.AncestryChanged:Connect(function(_, parent)
+            if not parent then
+                clearSelection()
+            end
+        end),
+        towerModel:GetAttributeChangedSignal("Level"):Connect(function()
+            if selectedTower == towerModel then
+                updateTowerDetails(towerModel)
+            end
+        end),
+        towerModel:GetAttributeChangedSignal("Range"):Connect(function()
+            if selectedTower == towerModel then
+                updateTowerDetails(towerModel)
+            end
+        end),
+        towerModel:GetAttributeChangedSignal("OwnerUserId"):Connect(function()
+            if selectedTower == towerModel then
+                updateTowerDetails(towerModel)
+            end
+        end)
+    }
+end
 
 local function cancelPlacement()
     placingTowerType = nil
@@ -230,6 +614,8 @@ local function cancelPlacement()
     end
     placementValid = false
 end
+
+createGui()
 
 local function isOnBuildableGround(hitInstance)
     if not hitInstance then
@@ -342,20 +728,39 @@ UserInputService.InputBegan:Connect(function(input, processed)
         return
     end
 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 and placingTowerType then
-        local unitRay = mouse.UnitRay
-        local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
-        if rayResult and computePlacementValidity(rayResult.Position, rayResult.Instance) then
-            remotes.TowerPlaced:FireServer(placingTowerType, rayResult.Position)
-            cancelPlacement()
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if placingTowerType then
+            local unitRay = mouse.UnitRay
+            local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
+            if rayResult and computePlacementValidity(rayResult.Position, rayResult.Instance) then
+                remotes.TowerPlaced:FireServer(placingTowerType, rayResult.Position)
+                cancelPlacement()
+            end
+        else
+            local towerModel = getTowerModelFromInstance(mouse.Target)
+            if towerModel then
+                selectTower(towerModel)
+            else
+                clearSelection()
+            end
         end
     elseif input.KeyCode == Enum.KeyCode.R then
         cancelPlacement()
     end
 end)
 
+remotes.TowerUpgraded.OnClientEvent:Connect(function(towerModel)
+    if selectedTower and towerModel == selectedTower then
+        updateTowerDetails(towerModel)
+    end
+end)
+
 RunService.RenderStepped:Connect(function()
     updatePreview()
     updateEnemyHover()
+
+    if selectedTower and (not selectedTower.Parent) then
+        clearSelection()
+    end
 end)
 
