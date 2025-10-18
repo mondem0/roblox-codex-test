@@ -324,7 +324,7 @@ local function updateUpgradeButton(towerType, level, ownerUserId)
     if upgradeDescriptionLabel then
         if nextUpgrade and nextUpgrade.Description then
             if ownerUserId == player.UserId then
-                upgradeDescriptionLabel.Text = string.format("%s\nPress U to upgrade.", nextUpgrade.Description)
+                upgradeDescriptionLabel.Text = string.format("%s\nPress E to upgrade.", nextUpgrade.Description)
             else
                 upgradeDescriptionLabel.Text = nextUpgrade.Description
             end
@@ -356,7 +356,7 @@ local function updateUpgradeButton(towerType, level, ownerUserId)
     end
 
     local affordable = currentMoney >= nextUpgrade.Cost
-    upgradeButton.Text = string.format("Upgrade (U) - $%d", nextUpgrade.Cost)
+    upgradeButton.Text = string.format("Upgrade (E) - $%d", nextUpgrade.Cost)
     upgradeButton.BackgroundColor3 = affordable and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(120, 70, 70)
     upgradeButton.AutoButtonColor = affordable
     upgradeButton.Active = affordable
@@ -449,7 +449,7 @@ local function updateTowerDetails(towerModel)
 
     if ownershipLabel then
         if ownerUserId == player.UserId then
-            ownershipLabel.Text = "Owner: You (U to upgrade, X to sell)"
+            ownershipLabel.Text = "Owner: You (E to upgrade, X to sell)"
         else
             ownershipLabel.Text = string.format("Owner: %s", ownerText)
         end
@@ -769,7 +769,7 @@ local function createGui()
     upgradeButton.TextColor3 = Color3.new(1, 1, 1)
     upgradeButton.Font = Enum.Font.GothamBold
     upgradeButton.TextSize = 16
-    upgradeButton.Text = "Upgrade (U)"
+    upgradeButton.Text = "Upgrade (E)"
     upgradeButton.AutoButtonColor = false
     upgradeButton.Visible = false
     upgradeButton.Parent = towerDetailsFrame
@@ -1016,7 +1016,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
                 remotes.TowerSellRequested:FireServer(selectedTower)
             end
         end
-    elseif input.KeyCode == Enum.KeyCode.U then
+    elseif input.KeyCode == Enum.KeyCode.E then
         if not placingTowerType and selectedTower then
             local ownerId = selectedTower:GetAttribute("OwnerUserId")
             if ownerId == player.UserId and not gameEnded then

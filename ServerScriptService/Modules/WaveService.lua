@@ -97,6 +97,7 @@ function WaveService.new(mapModel, remotes)
     self.BaseHealth = 30
     self.PlayerStats = {}
     self.LastTick = tick()
+    self.GameEnded = false
 
     local towersFolder = Instance.new("Folder")
     towersFolder.Name = "Towers"
@@ -159,6 +160,7 @@ end
 
 function WaveService:GameOver()
     self.IsSpawning = false
+    self.GameEnded = true
     for enemyModel in pairs(self.Enemies) do
         if enemyModel then
             enemyModel:Destroy()
@@ -170,6 +172,7 @@ end
 
 function WaveService:WinGame()
     self.IsSpawning = false
+    self.GameEnded = true
     self.Remotes.GameEnded:FireAllClients(true)
 end
 
@@ -229,12 +232,15 @@ function WaveService:KillEnemy(enemyModel, enemyData)
         enemyModel:Destroy()
     end
     self.Enemies[enemyModel] = nil
-    if self:IsWaveComplete() then
+    if not self.GameEnded and self:IsWaveComplete() then
         self:BeginNextWave()
     end
 end
 
 function WaveService:IsWaveComplete()
+    if self.GameEnded then
+        return false
+    end
     if self.IsSpawning then
         return false
     end
@@ -247,6 +253,9 @@ function WaveService:IsWaveComplete()
 end
 
 function WaveService:BeginNextWave()
+    if self.GameEnded then
+        return
+    end
     if self.ActiveWave >= #waves then
         self:WinGame()
         return
@@ -259,7 +268,7 @@ function WaveService:BeginNextWave()
     task.spawn(function()
         self:SpawnWave(self.ActiveWave)
         self.IsSpawning = false
-        if self:IsWaveComplete() then
+        if not self.GameEnded and self:IsWaveComplete() then
             self:BeginNextWave()
         end
     end)
@@ -272,9 +281,15 @@ function WaveService:SpawnWave(waveNumber)
     end
 
     for _, group in ipairs(wave) do
+        if self.GameEnded then
+            return
+        end
         local config = EnemyConfigs[group.Type]
         if config then
             for _ = 1, group.Count do
+                if self.GameEnded then
+                    return
+                end
                 self:SpawnEnemy(group.Type, config)
                 task.wait(group.Delay)
             end
@@ -381,6 +396,7 @@ end
 
 function WaveService:ResetGame()
     self.IsSpawning = false
+    self.GameEnded = false
     for enemyModel in pairs(self.Enemies) do
         if enemyModel then
             enemyModel:Destroy()
@@ -409,6 +425,9 @@ function WaveService:MoveEnemy(enemyModel)
     local headOffset = enemyData.HeadOffset
 
     while enemyModel.Parent and enemyData.Health > 0 do
+        if self.GameEnded then
+            return
+        end
         local index = math.floor(enemyData.Progress)
         local nextIndex = index + 1
         local startPos = waypoints[index]

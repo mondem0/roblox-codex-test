@@ -80,11 +80,11 @@ local function buildTowerModel(towerType)
             if base then
                 base.CanCollide = false
             end
-            if head then
+            if head and head:IsA("BasePart") then
                 head.Anchored = true
                 head.CanCollide = false
             end
-            if barrel then
+            if barrel and barrel:IsA("BasePart") then
                 barrel.Anchored = true
                 barrel.CanCollide = false
             end

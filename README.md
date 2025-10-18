@@ -64,7 +64,7 @@ You can replace the minimalist placeholder geometry with your own creations with
 * **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP). Defeating enemies awards cash for all players.
 * **Waves**: Five handcrafted waves. The system automatically starts the next wave when the current one clears. Players can also press the `Start` button before wave 1.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
-* **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`U`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
+* **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 
 ## Testing Checklist
 
@@ -74,6 +74,6 @@ You can replace the minimalist placeholder geometry with your own creations with
 4. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers.
 5. Press **`X`** while aiming the preview to cancel placement without spending money.
 6. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
-7. With one of your towers selected, press **`U`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.
+7. With one of your towers selected, press **`E`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.
 
 Enjoy customizing the visuals, adding sound effects, or expanding with new towers and waves!
