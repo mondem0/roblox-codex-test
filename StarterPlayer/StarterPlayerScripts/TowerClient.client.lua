@@ -39,6 +39,7 @@ local lastVictoryState
 local shopButtonConnections = {}
 local shopSlotButtons = {}
 local shopSlotOriginalText = {}
+local shopSlotPriceLabels = {}
 local beginPlacement
 
 local towerDetailsFrame
@@ -586,12 +587,17 @@ local function applyLoadoutToShop()
     for slotIndex, button in pairs(shopSlotButtons) do
         if button and button:IsA("GuiButton") then
             local towerType = loadoutSelection[slotIndex]
+            local priceLabel = shopSlotPriceLabels[slotIndex]
             if towerType and towerConfigs[towerType] then
                 disconnectShopButton(button)
                 button:SetAttribute("TowerType", towerType)
+                local config = towerConfigs[towerType]
                 if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
-                    local config = towerConfigs[towerType]
-                    button.Text = string.format("%s | $%d", config.Name or towerType, config.Cost or 0)
+                    button.Text = config.Name or towerType
+                end
+                if priceLabel and priceLabel:IsA("TextLabel") then
+                    priceLabel.Text = string.format("$%d", config.Cost or 0)
+                    priceLabel.Visible = true
                 end
                 button.Active = true
                 button.Visible = true
@@ -604,6 +610,10 @@ local function applyLoadoutToShop()
                     if defaultText then
                         button.Text = defaultText
                     end
+                end
+                if priceLabel and priceLabel:IsA("TextLabel") then
+                    priceLabel.Text = ""
+                    priceLabel.Visible = false
                 end
                 button.Active = false
             end
@@ -1204,7 +1214,7 @@ local function createGui()
 
     shopFrame = Instance.new("Frame")
     shopFrame.Name = "Shop"
-    shopFrame.Size = UDim2.fromOffset(420, 120)
+    shopFrame.Size = UDim2.fromOffset(420, 140)
     shopFrame.Position = UDim2.fromOffset(0, 0)
     shopFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     shopFrame.BackgroundTransparency = 0.1
@@ -1219,15 +1229,42 @@ local function createGui()
     slotLayout.FillDirection = Enum.FillDirection.Horizontal
     slotLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     slotLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    slotLayout.SortOrder = Enum.SortOrder.LayoutOrder
     slotLayout.Padding = UDim.new(0, 12)
     slotLayout.Parent = shopFrame
 
     shopSlotButtons = {}
     shopSlotOriginalText = {}
     for i = 1, 3 do
+        local slotContainer = Instance.new("Frame")
+        slotContainer.Name = string.format("ShopSlotContainer%d", i)
+        slotContainer.Size = UDim2.fromOffset(120, 108)
+        slotContainer.BackgroundTransparency = 1
+        slotContainer.BorderSizePixel = 0
+        slotContainer.LayoutOrder = i
+        slotContainer.Parent = shopFrame
+
+        local priceLabel = Instance.new("TextLabel")
+        priceLabel.Name = "PriceLabel"
+        priceLabel.BackgroundTransparency = 1
+        priceLabel.Size = UDim2.fromOffset(120, 22)
+        priceLabel.Position = UDim2.fromOffset(0, 0)
+        priceLabel.Font = Enum.Font.Gotham
+        priceLabel.TextSize = 18
+        priceLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
+        priceLabel.Text = ""
+        priceLabel.TextXAlignment = Enum.TextXAlignment.Center
+        priceLabel.TextYAlignment = Enum.TextYAlignment.Center
+        priceLabel.TextWrapped = true
+        priceLabel.TextScaled = false
+        priceLabel.Visible = false
+        priceLabel.Parent = slotContainer
+        shopSlotPriceLabels[i] = priceLabel
+
         local button = Instance.new("TextButton")
         button.Name = string.format("ShopSlot%d", i)
-        button.Size = UDim2.fromOffset(120, 72)
+        button.Size = UDim2.fromOffset(120, 80)
+        button.Position = UDim2.fromOffset(0, 24)
         button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
         button.BorderSizePixel = 0
         button.Font = Enum.Font.Gotham
@@ -1235,7 +1272,7 @@ local function createGui()
         button.TextColor3 = Color3.new(1, 1, 1)
         button.Text = string.format("Slot %d", i)
         button.AutoButtonColor = true
-        button.Parent = shopFrame
+        button.Parent = slotContainer
         button:SetAttribute("SlotIndex", i)
         shopSlotButtons[i] = button
         shopSlotOriginalText[i] = button.Text
@@ -1243,7 +1280,7 @@ local function createGui()
 
     statusFrame = Instance.new("Frame")
     statusFrame.Name = "Status"
-    statusFrame.Size = UDim2.fromOffset(220, 120)
+    statusFrame.Size = UDim2.fromOffset(260, 160)
     statusFrame.Position = UDim2.fromOffset(0, 0)
     statusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     statusFrame.BackgroundTransparency = 0.1
@@ -1258,7 +1295,7 @@ local function createGui()
     moneyLabel.Name = "MoneyLabel"
     moneyLabel.BackgroundTransparency = 1
     moneyLabel.Position = UDim2.new(0, 12, 0, 12)
-    moneyLabel.Size = UDim2.fromOffset(196, 24)
+    moneyLabel.Size = UDim2.fromOffset(236, 24)
     moneyLabel.Font = Enum.Font.GothamBold
     moneyLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
     moneyLabel.TextSize = 20
@@ -1269,8 +1306,8 @@ local function createGui()
     livesLabel = Instance.new("TextLabel")
     livesLabel.Name = "LivesLabel"
     livesLabel.BackgroundTransparency = 1
-    livesLabel.Position = UDim2.new(0, 12, 0, 40)
-    livesLabel.Size = UDim2.fromOffset(196, 24)
+    livesLabel.Position = UDim2.new(0, 12, 0, 44)
+    livesLabel.Size = UDim2.fromOffset(236, 24)
     livesLabel.Font = Enum.Font.Gotham
     livesLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
     livesLabel.TextSize = 18
@@ -1281,8 +1318,8 @@ local function createGui()
     waveLabel = Instance.new("TextLabel")
     waveLabel.Name = "WaveLabel"
     waveLabel.BackgroundTransparency = 1
-    waveLabel.Position = UDim2.new(0, 12, 0, 68)
-    waveLabel.Size = UDim2.fromOffset(196, 24)
+    waveLabel.Position = UDim2.new(0, 12, 0, 76)
+    waveLabel.Size = UDim2.fromOffset(236, 24)
     waveLabel.Font = Enum.Font.Gotham
     waveLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
     waveLabel.TextSize = 18
@@ -1292,8 +1329,8 @@ local function createGui()
 
     startButton = Instance.new("TextButton")
     startButton.Name = "StartButton"
-    startButton.Size = UDim2.fromOffset(196, 32)
-    startButton.Position = UDim2.new(0, 12, 0, 88)
+    startButton.Size = UDim2.fromOffset(236, 32)
+    startButton.Position = UDim2.new(0, 12, 0, 108)
     startButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
     startButton.BorderSizePixel = 0
     startButton.Font = Enum.Font.GothamBold
@@ -1313,7 +1350,7 @@ local function createGui()
 
     towerDetailsFrame = Instance.new("Frame")
     towerDetailsFrame.Name = "TowerDetails"
-    towerDetailsFrame.Size = UDim2.fromOffset(260, 200)
+    towerDetailsFrame.Size = UDim2.fromOffset(320, 240)
     towerDetailsFrame.Position = UDim2.fromOffset(0, 0)
     towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     towerDetailsFrame.BackgroundTransparency = 0.1
@@ -1328,8 +1365,8 @@ local function createGui()
     towerNameLabel = Instance.new("TextLabel")
     towerNameLabel.Name = "TowerNameLabel"
     towerNameLabel.BackgroundTransparency = 1
-    towerNameLabel.Position = UDim2.new(0, 12, 0, 12)
-    towerNameLabel.Size = UDim2.fromOffset(236, 24)
+    towerNameLabel.Position = UDim2.new(0, 16, 0, 16)
+    towerNameLabel.Size = UDim2.fromOffset(288, 26)
     towerNameLabel.Font = Enum.Font.GothamBold
     towerNameLabel.TextColor3 = Color3.new(1, 1, 1)
     towerNameLabel.TextSize = 20
@@ -1340,8 +1377,8 @@ local function createGui()
     towerLevelLabel = Instance.new("TextLabel")
     towerLevelLabel.Name = "TowerLevelLabel"
     towerLevelLabel.BackgroundTransparency = 1
-    towerLevelLabel.Position = UDim2.new(0, 12, 0, 40)
-    towerLevelLabel.Size = UDim2.fromOffset(236, 20)
+    towerLevelLabel.Position = UDim2.new(0, 16, 0, 48)
+    towerLevelLabel.Size = UDim2.fromOffset(288, 20)
     towerLevelLabel.Font = Enum.Font.Gotham
     towerLevelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     towerLevelLabel.TextSize = 16
@@ -1352,8 +1389,8 @@ local function createGui()
     towerStatsLabel = Instance.new("TextLabel")
     towerStatsLabel.Name = "TowerStatsLabel"
     towerStatsLabel.BackgroundTransparency = 1
-    towerStatsLabel.Position = UDim2.new(0, 12, 0, 64)
-    towerStatsLabel.Size = UDim2.fromOffset(236, 60)
+    towerStatsLabel.Position = UDim2.new(0, 16, 0, 72)
+    towerStatsLabel.Size = UDim2.fromOffset(288, 72)
     towerStatsLabel.Font = Enum.Font.Gotham
     towerStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     towerStatsLabel.TextSize = 16
@@ -1366,8 +1403,8 @@ local function createGui()
     ownershipLabel = Instance.new("TextLabel")
     ownershipLabel.Name = "OwnershipLabel"
     ownershipLabel.BackgroundTransparency = 1
-    ownershipLabel.Position = UDim2.new(0, 12, 0, 128)
-    ownershipLabel.Size = UDim2.fromOffset(236, 20)
+    ownershipLabel.Position = UDim2.new(0, 16, 0, 140)
+    ownershipLabel.Size = UDim2.fromOffset(288, 20)
     ownershipLabel.Font = Enum.Font.Gotham
     ownershipLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     ownershipLabel.TextSize = 16
@@ -1378,8 +1415,8 @@ local function createGui()
     upgradeDescriptionLabel = Instance.new("TextLabel")
     upgradeDescriptionLabel.Name = "UpgradeDescriptionLabel"
     upgradeDescriptionLabel.BackgroundTransparency = 1
-    upgradeDescriptionLabel.Position = UDim2.new(0, 12, 0, 150)
-    upgradeDescriptionLabel.Size = UDim2.fromOffset(236, 36)
+    upgradeDescriptionLabel.Position = UDim2.new(0, 16, 0, 164)
+    upgradeDescriptionLabel.Size = UDim2.fromOffset(288, 28)
     upgradeDescriptionLabel.Font = Enum.Font.Gotham
     upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     upgradeDescriptionLabel.TextSize = 14
@@ -1391,8 +1428,8 @@ local function createGui()
 
     upgradeButton = Instance.new("TextButton")
     upgradeButton.Name = "UpgradeButton"
-    upgradeButton.Size = UDim2.fromOffset(115, 32)
-    upgradeButton.Position = UDim2.new(0, 12, 0, 160)
+    upgradeButton.Size = UDim2.fromOffset(140, 34)
+    upgradeButton.Position = UDim2.new(0, 16, 0, 198)
     upgradeButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
     upgradeButton.BorderSizePixel = 0
     upgradeButton.Font = Enum.Font.GothamBold
@@ -1417,8 +1454,8 @@ local function createGui()
 
     sellButton = Instance.new("TextButton")
     sellButton.Name = "SellButton"
-    sellButton.Size = UDim2.fromOffset(115, 32)
-    sellButton.Position = UDim2.new(0, 133, 0, 160)
+    sellButton.Size = UDim2.fromOffset(140, 34)
+    sellButton.Position = UDim2.new(0, 164, 0, 198)
     sellButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
     sellButton.BorderSizePixel = 0
     sellButton.Font = Enum.Font.GothamBold
@@ -1439,8 +1476,8 @@ local function createGui()
 
     priceLabelContainer = Instance.new("Frame")
     priceLabelContainer.Name = "PlayerTowerPriceLabels"
-    priceLabelContainer.Size = UDim2.fromOffset(180, 48)
-    priceLabelContainer.Position = UDim2.new(0, 130, 0, -60)
+    priceLabelContainer.Size = UDim2.fromOffset(200, 52)
+    priceLabelContainer.Position = UDim2.new(0, 160, 0, -72)
     priceLabelContainer.AnchorPoint = Vector2.new(0.5, 1)
     priceLabelContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     priceLabelContainer.BackgroundTransparency = 0.2
