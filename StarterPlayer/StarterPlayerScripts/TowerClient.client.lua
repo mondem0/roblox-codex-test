@@ -15,7 +15,8 @@ local enemiesFolder = workspace:WaitForChild("Enemies")
 local placingTowerType
 local previewPart
 local placementValid = false
-local hoverBillboard
+local hoverGuiContainer
+local hoverGui
 local hoverNameLabel
 local hoverHealthLabel
 local hoverCombinedLabel
@@ -47,6 +48,18 @@ local ownershipLabel
 local upgradeDescriptionLabel
 local upgradeButton
 local sellButton
+local priceLabelContainer
+local upgradePriceLabel
+local sellPriceLabel
+
+local upgradeButtonOriginalColor
+local upgradeButtonOriginalTextColor
+local upgradeButtonOriginalBackgroundTransparency
+local upgradeButtonOriginalTextTransparency
+local upgradeButtonOriginalAutoButtonColor
+local sellButtonOriginalAutoButtonColor
+local priceLabelsCanShow = false
+local GREY_COLOR = Color3.new(0.5, 0.5, 0.5)
 
 local DEFAULT_PREVIEW_SIZE = Vector3.new(4, 1, 4)
 local DEFAULT_PREVIEW_RADIUS = math.max(DEFAULT_PREVIEW_SIZE.X, DEFAULT_PREVIEW_SIZE.Z) / 2
@@ -277,6 +290,10 @@ function beginPlacement(towerType)
     if upgradeDescriptionLabel then
         upgradeDescriptionLabel.Text = ""
     end
+    priceLabelsCanShow = false
+    if priceLabelContainer then
+        priceLabelContainer.Visible = false
+    end
 end
 
 local function updateStartButtonVisual()
@@ -289,64 +306,21 @@ local function updateStartButtonVisual()
 
     if gameEnded then
         local text = "Restart"
-        local background = Color3.fromRGB(120, 120, 255)
         if lastVictoryState == true then
             text = "Victory! Restart"
-            background = Color3.fromRGB(120, 255, 120)
         elseif lastVictoryState == false then
             text = "Defeat! Restart"
-            background = Color3.fromRGB(255, 120, 120)
         end
 
         if autoText ~= false then
             startButton.Text = text
         end
-        if autoStyle ~= false then
-            startButton.BackgroundColor3 = background
-        end
     else
         if autoText ~= false then
             startButton.Text = "Start"
         end
-        if autoStyle ~= false then
-            startButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        end
     end
 end
-
-local function applyEnemyBillboardState(enemyModel)
-    local display = enemyModel:FindFirstChild("HealthDisplay")
-    if display and display:IsA("BillboardGui") then
-        display.Enabled = true
-    end
-end
-
-local function watchEnemy(enemyModel)
-    if not enemyModel or not enemyModel:IsA("Model") then
-        return
-    end
-
-    applyEnemyBillboardState(enemyModel)
-    enemyModel.ChildAdded:Connect(function(child)
-        if child.Name == "HealthDisplay" and child:IsA("BillboardGui") then
-            child.Enabled = true
-        end
-    end)
-end
-
-local function updateAllEnemyBillboards()
-    for _, enemy in ipairs(enemiesFolder:GetChildren()) do
-        applyEnemyBillboardState(enemy)
-    end
-end
-
-for _, enemy in ipairs(enemiesFolder:GetChildren()) do
-    watchEnemy(enemy)
-end
-
-enemiesFolder.ChildAdded:Connect(function(enemy)
-    watchEnemy(enemy)
-end)
 
 local function createRaycastParams()
     local params = RaycastParams.new()
@@ -464,74 +438,58 @@ local function connectShopButton(button)
     end)
 end
 
-local function ensureHoverBillboard()
-    if hoverBillboard then
-        return hoverBillboard
+local function ensureHoverGui()
+    if hoverGui then
+        return hoverGui
     end
 
     local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
     local uiFolder = assetsFolder and assetsFolder:FindFirstChild("UI")
     local template = uiFolder and uiFolder:FindFirstChild("EnemyHoverTemplate")
 
-    if template and template:IsA("BillboardGui") then
-        hoverBillboard = template:Clone()
-        hoverBillboard.Enabled = false
-        hoverBillboard.Parent = playerGui
-        hoverNameLabel = hoverBillboard:FindFirstChild("NameLabel", true)
-        hoverHealthLabel = hoverBillboard:FindFirstChild("HealthLabel", true)
-        hoverCombinedLabel = hoverBillboard:FindFirstChild("InfoLabel", true)
-    else
-        hoverBillboard = Instance.new("BillboardGui")
-        hoverBillboard.Name = "EnemyHoverInfo"
-        hoverBillboard.Size = UDim2.new(0, 160, 0, 48)
-        hoverBillboard.AlwaysOnTop = true
-        hoverBillboard.Enabled = false
-        hoverBillboard.ExtentsOffsetWorldSpace = Vector3.new(0, 2.5, 0)
-        hoverBillboard.Parent = playerGui
-
-        local background = Instance.new("Frame")
-        background.BackgroundTransparency = 0.2
-        background.BackgroundColor3 = Color3.new(0, 0, 0)
-        background.Size = UDim2.fromScale(1, 1)
-        background.Name = "Container"
-        background.Parent = hoverBillboard
-
-        hoverNameLabel = Instance.new("TextLabel")
-        hoverNameLabel.Name = "NameLabel"
-        hoverNameLabel.BackgroundTransparency = 1
-        hoverNameLabel.Position = UDim2.new(0, 4, 0, 0)
-        hoverNameLabel.Size = UDim2.new(1, -8, 0.5, 0)
-        hoverNameLabel.Font = Enum.Font.GothamBold
-        hoverNameLabel.TextScaled = true
-        hoverNameLabel.TextColor3 = Color3.new(1, 1, 1)
-        hoverNameLabel.TextStrokeTransparency = 0.3
-        hoverNameLabel.Parent = background
-
-        hoverHealthLabel = Instance.new("TextLabel")
-        hoverHealthLabel.Name = "HealthLabel"
-        hoverHealthLabel.BackgroundTransparency = 1
-        hoverHealthLabel.Position = UDim2.new(0, 4, 0.5, 0)
-        hoverHealthLabel.Size = UDim2.new(1, -8, 0.5, 0)
-        hoverHealthLabel.Font = Enum.Font.Gotham
-        hoverHealthLabel.TextScaled = true
-        hoverHealthLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
-        hoverHealthLabel.TextStrokeTransparency = 0.3
-        hoverHealthLabel.Parent = background
+    if not template then
+        warn("TowerClient: EnemyHoverTemplate was not found under ReplicatedStorage/Assets/UI.")
+        return nil
     end
+
+    if template:IsA("ScreenGui") then
+        hoverGuiContainer = template:Clone()
+        hoverGuiContainer.ResetOnSpawn = false
+        hoverGuiContainer.IgnoreGuiInset = true
+        hoverGuiContainer.Enabled = true
+        hoverGuiContainer.Parent = playerGui
+        hoverGui = hoverGuiContainer:FindFirstChildWhichIsA("GuiObject", true)
+        if not hoverGui then
+            warn("TowerClient: EnemyHoverTemplate ScreenGui does not contain any GuiObjects to display.")
+            return nil
+        end
+    elseif template:IsA("GuiObject") then
+        hoverGuiContainer = Instance.new("ScreenGui")
+        hoverGuiContainer.Name = "EnemyHoverUI"
+        hoverGuiContainer.ResetOnSpawn = false
+        hoverGuiContainer.IgnoreGuiInset = true
+        hoverGuiContainer.Parent = playerGui
+
+        hoverGui = template:Clone()
+        hoverGui.Parent = hoverGuiContainer
+    else
+        warn("TowerClient: EnemyHoverTemplate must be a GuiObject or ScreenGui.")
+        return nil
+    end
+
+    if hoverGui:IsA("GuiObject") then
+        hoverGui.Visible = false
+    end
+
+    hoverNameLabel = hoverGui:FindFirstChild("NameLabel", true)
+    hoverHealthLabel = hoverGui:FindFirstChild("HealthLabel", true)
+    hoverCombinedLabel = hoverGui:FindFirstChild("InfoLabel", true)
 
     if not hoverNameLabel and not hoverHealthLabel and not hoverCombinedLabel then
-        hoverCombinedLabel = Instance.new("TextLabel")
-        hoverCombinedLabel.Name = "InfoLabel"
-        hoverCombinedLabel.BackgroundTransparency = 1
-        hoverCombinedLabel.Size = UDim2.fromScale(1, 1)
-        hoverCombinedLabel.Font = Enum.Font.GothamBold
-        hoverCombinedLabel.TextScaled = true
-        hoverCombinedLabel.TextColor3 = Color3.new(1, 1, 1)
-        hoverCombinedLabel.TextStrokeTransparency = 0.3
-        hoverCombinedLabel.Parent = hoverBillboard
+        warn("TowerClient: EnemyHoverTemplate is missing NameLabel/HealthLabel/InfoLabel text objects.")
     end
 
-    return hoverBillboard
+    return hoverGui
 end
 
 local function cloneStats(config)
@@ -610,6 +568,48 @@ local function showRangeIndicator(towerModel, range)
     updateRangeRing(rangeRing, rangeRingAdornment, range, Vector3.new(base.Position.X, groundY, base.Position.Z))
 end
 
+local function applyUpgradeButtonStyle(disabled)
+    if not upgradeButton then
+        return
+    end
+
+    if not upgradeButtonOriginalColor then
+        upgradeButtonOriginalColor = upgradeButton.BackgroundColor3
+    end
+    if not upgradeButtonOriginalTextColor then
+        upgradeButtonOriginalTextColor = upgradeButton.TextColor3
+    end
+    if upgradeButtonOriginalBackgroundTransparency == nil then
+        upgradeButtonOriginalBackgroundTransparency = upgradeButton.BackgroundTransparency
+    end
+    if upgradeButtonOriginalTextTransparency == nil then
+        upgradeButtonOriginalTextTransparency = upgradeButton.TextTransparency
+    end
+
+    if disabled then
+        if upgradeButtonOriginalColor then
+            upgradeButton.BackgroundColor3 = upgradeButtonOriginalColor:Lerp(GREY_COLOR, 0.2)
+        end
+        if upgradeButtonOriginalTextColor then
+            upgradeButton.TextColor3 = upgradeButtonOriginalTextColor:Lerp(GREY_COLOR, 0.2)
+        end
+    else
+        if upgradeButtonOriginalColor then
+            upgradeButton.BackgroundColor3 = upgradeButtonOriginalColor
+        end
+        if upgradeButtonOriginalTextColor then
+            upgradeButton.TextColor3 = upgradeButtonOriginalTextColor
+        end
+    end
+
+    if upgradeButtonOriginalBackgroundTransparency ~= nil then
+        upgradeButton.BackgroundTransparency = upgradeButtonOriginalBackgroundTransparency
+    end
+    if upgradeButtonOriginalTextTransparency ~= nil then
+        upgradeButton.TextTransparency = upgradeButtonOriginalTextTransparency
+    end
+end
+
 local function updateUpgradeButton(towerType, level, ownerUserId)
     if not upgradeButton then
         return
@@ -635,27 +635,30 @@ local function updateUpgradeButton(towerType, level, ownerUserId)
 
     if not nextUpgrade then
         upgradeButton.Text = "Max Level"
-        upgradeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
         upgradeButton.AutoButtonColor = false
         upgradeButton.Active = false
+        applyUpgradeButtonStyle(true)
         upgradeButton.Visible = true
         return
     end
 
     if ownerUserId ~= player.UserId then
         upgradeButton.Text = "Not your tower"
-        upgradeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
         upgradeButton.AutoButtonColor = false
         upgradeButton.Active = false
+        applyUpgradeButtonStyle(true)
         upgradeButton.Visible = true
         return
     end
 
     local affordable = currentMoney >= nextUpgrade.Cost
+    if upgradeButtonOriginalAutoButtonColor == nil then
+        upgradeButtonOriginalAutoButtonColor = upgradeButton.AutoButtonColor
+    end
     upgradeButton.Text = string.format("Upgrade (E) - $%d", nextUpgrade.Cost)
-    upgradeButton.BackgroundColor3 = affordable and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(120, 70, 70)
-    upgradeButton.AutoButtonColor = affordable
     upgradeButton.Active = affordable
+    upgradeButton.AutoButtonColor = affordable and upgradeButtonOriginalAutoButtonColor or false
+    applyUpgradeButtonStyle(not affordable)
     upgradeButton.Visible = true
 end
 
@@ -681,10 +684,44 @@ local function updateSellButton(towerModel, ownerUserId)
 
     local isOwner = ownerUserId == player.UserId
     local active = isOwner and not gameEnded
-    sellButton.AutoButtonColor = active
+    if sellButtonOriginalAutoButtonColor == nil then
+        sellButtonOriginalAutoButtonColor = sellButton.AutoButtonColor
+    end
+    sellButton.AutoButtonColor = active and sellButtonOriginalAutoButtonColor or false
     sellButton.Active = active
-    sellButton.BackgroundColor3 = active and Color3.fromRGB(220, 120, 120) or Color3.fromRGB(70, 70, 70)
-    sellButton.TextColor3 = active and Color3.new(0, 0, 0) or Color3.fromRGB(200, 200, 200)
+    sellButton.Selectable = active
+end
+
+local function updateTowerPriceLabels(towerModel, towerType, level, ownerUserId)
+    if not priceLabelContainer then
+        priceLabelsCanShow = false
+        return
+    end
+
+    local isOwner = ownerUserId == player.UserId
+    priceLabelsCanShow = isOwner
+    if not isOwner then
+        priceLabelContainer.Visible = false
+        return
+    end
+
+    local nextUpgrade = getNextUpgrade(towerType, level)
+    if upgradePriceLabel then
+        if nextUpgrade then
+            upgradePriceLabel.Text = string.format("Upgrade: $%d", nextUpgrade.Cost)
+        else
+            upgradePriceLabel.Text = "Upgrade: Max"
+        end
+    end
+
+    if sellPriceLabel then
+        local sellValue = towerModel and towerModel:GetAttribute("SellValue")
+        if typeof(sellValue) == "number" and sellValue > 0 then
+            sellPriceLabel.Text = string.format("Sell: +$%d", math.floor(sellValue + 0.5))
+        else
+            sellPriceLabel.Text = "Sell: N/A"
+        end
+    end
 end
 
 local function updateTowerDetails(towerModel)
@@ -755,6 +792,7 @@ local function updateTowerDetails(towerModel)
     showRangeIndicator(towerModel, stats and stats.Range)
     updateUpgradeButton(towerType, level, ownerUserId)
     updateSellButton(towerModel, ownerUserId)
+    updateTowerPriceLabels(towerModel, towerType, level, ownerUserId)
 end
 
 local function createGui()
@@ -766,217 +804,17 @@ local function createGui()
     local uiFolder = assetsFolder and assetsFolder:FindFirstChild("UI")
     local template = uiFolder and uiFolder:FindFirstChild("TowerHUD")
 
-    if template and template:IsA("ScreenGui") then
-        screenGui = template:Clone()
-        screenGui.ResetOnSpawn = false
-        screenGui.IgnoreGuiInset = true
-        screenGui.Parent = playerGui
-    else
-        screenGui = Instance.new("ScreenGui")
-        screenGui.Name = "TowerDefenseUI"
-        screenGui.ResetOnSpawn = false
-        screenGui.IgnoreGuiInset = true
-        screenGui.Parent = playerGui
-
-        shopFrame = Instance.new("Frame")
-        shopFrame.Name = "Shop"
-        shopFrame.Size = UDim2.new(0, 250, 0, 200)
-        shopFrame.Position = UDim2.new(0, 20, 1, -210)
-        shopFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-        shopFrame.BackgroundTransparency = 0.2
-        shopFrame.BorderSizePixel = 0
-        shopFrame.Parent = screenGui
-
-        local uiList = Instance.new("UIListLayout")
-        uiList.Padding = UDim.new(0, 6)
-        uiList.FillDirection = Enum.FillDirection.Vertical
-        uiList.SortOrder = Enum.SortOrder.LayoutOrder
-        uiList.Parent = shopFrame
-
-        local title = Instance.new("TextLabel")
-        title.Name = "Title"
-        title.Size = UDim2.new(1, 0, 0, 24)
-        title.Text = "TOWERS"
-        title.TextColor3 = Color3.new(1, 1, 1)
-        title.BackgroundTransparency = 1
-        title.Font = Enum.Font.GothamBold
-        title.TextSize = 18
-        title.Parent = shopFrame
-
-        for key, config in pairs(towerConfigs) do
-            local button = Instance.new("TextButton")
-            button.Name = key
-            button.Size = UDim2.new(1, -10, 0, 30)
-            button.Position = UDim2.new(0, 5, 0, 0)
-            button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-            button.TextColor3 = Color3.new(1, 1, 1)
-            button.Font = Enum.Font.Gotham
-            button.TextSize = 16
-            button.Text = string.format("%s | $%d", config.Name, config.Cost)
-            button:SetAttribute("TowerType", key)
-            button.Parent = shopFrame
-        end
-
-        statusFrame = Instance.new("Frame")
-        statusFrame.Name = "Status"
-        statusFrame.Size = UDim2.new(0, 220, 0, 130)
-        statusFrame.Position = UDim2.new(1, -240, 0, 20)
-        statusFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-        statusFrame.BackgroundTransparency = 0.2
-        statusFrame.BorderSizePixel = 0
-        statusFrame.Parent = screenGui
-
-        local statusLayout = Instance.new("UIListLayout")
-        statusLayout.Padding = UDim.new(0, 4)
-        statusLayout.FillDirection = Enum.FillDirection.Vertical
-        statusLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        statusLayout.Parent = statusFrame
-
-        moneyLabel = Instance.new("TextLabel")
-        moneyLabel.Name = "MoneyLabel"
-        moneyLabel.Size = UDim2.new(1, -10, 0, 24)
-        moneyLabel.Position = UDim2.new(0, 5, 0, 0)
-        moneyLabel.BackgroundTransparency = 1
-        moneyLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-        moneyLabel.Font = Enum.Font.GothamBold
-        moneyLabel.TextSize = 18
-        moneyLabel.Text = "$0"
-        moneyLabel.Parent = statusFrame
-
-        livesLabel = Instance.new("TextLabel")
-        livesLabel.Name = "LivesLabel"
-        livesLabel.Size = UDim2.new(1, -10, 0, 24)
-        livesLabel.Position = UDim2.new(0, 5, 0, 30)
-        livesLabel.BackgroundTransparency = 1
-        livesLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        livesLabel.Font = Enum.Font.GothamBold
-        livesLabel.TextSize = 18
-        livesLabel.Text = "Lives: 0"
-        livesLabel.Parent = statusFrame
-
-        waveLabel = Instance.new("TextLabel")
-        waveLabel.Name = "WaveLabel"
-        waveLabel.Size = UDim2.new(1, -10, 0, 24)
-        waveLabel.Position = UDim2.new(0, 5, 0, 56)
-        waveLabel.BackgroundTransparency = 1
-        waveLabel.TextColor3 = Color3.fromRGB(180, 180, 255)
-        waveLabel.Font = Enum.Font.GothamBold
-        waveLabel.TextSize = 18
-        waveLabel.Text = "Wave: 0"
-        waveLabel.Parent = statusFrame
-
-        startButton = Instance.new("TextButton")
-        startButton.Name = "StartButton"
-        startButton.Size = UDim2.new(0, 180, 0, 36)
-        startButton.Position = UDim2.new(0.5, -90, 0, 86)
-        startButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        startButton.TextColor3 = Color3.new(0, 0, 0)
-        startButton.Font = Enum.Font.GothamBlack
-        startButton.TextSize = 18
-        startButton.Text = "Start"
-        startButton.Parent = statusFrame
-
-        towerDetailsFrame = Instance.new("Frame")
-        towerDetailsFrame.Name = "TowerDetails"
-        towerDetailsFrame.Size = UDim2.new(0, 220, 0, 260)
-        towerDetailsFrame.Position = UDim2.new(1, -240, 0, 160)
-        towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        towerDetailsFrame.BackgroundTransparency = 0.2
-        towerDetailsFrame.BorderSizePixel = 0
-        towerDetailsFrame.Visible = false
-        towerDetailsFrame.Parent = screenGui
-
-        local detailLayout = Instance.new("UIListLayout")
-        detailLayout.Padding = UDim.new(0, 4)
-        detailLayout.FillDirection = Enum.FillDirection.Vertical
-        detailLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        detailLayout.Parent = towerDetailsFrame
-
-        towerNameLabel = Instance.new("TextLabel")
-        towerNameLabel.Name = "TowerNameLabel"
-        towerNameLabel.BackgroundTransparency = 1
-        towerNameLabel.Font = Enum.Font.GothamBold
-        towerNameLabel.TextSize = 18
-        towerNameLabel.TextColor3 = Color3.new(1, 1, 1)
-        towerNameLabel.Text = ""
-        towerNameLabel.Size = UDim2.new(1, -10, 0, 24)
-        towerNameLabel.Position = UDim2.new(0, 5, 0, 0)
-        towerNameLabel.Parent = towerDetailsFrame
-
-        towerLevelLabel = Instance.new("TextLabel")
-        towerLevelLabel.Name = "TowerLevelLabel"
-        towerLevelLabel.BackgroundTransparency = 1
-        towerLevelLabel.Font = Enum.Font.Gotham
-        towerLevelLabel.TextSize = 16
-        towerLevelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        towerLevelLabel.Text = ""
-        towerLevelLabel.Size = UDim2.new(1, -10, 0, 20)
-        towerLevelLabel.Position = UDim2.new(0, 5, 0, 28)
-        towerLevelLabel.Parent = towerDetailsFrame
-
-        towerStatsLabel = Instance.new("TextLabel")
-        towerStatsLabel.Name = "TowerStatsLabel"
-        towerStatsLabel.BackgroundTransparency = 1
-        towerStatsLabel.Font = Enum.Font.Gotham
-        towerStatsLabel.TextSize = 15
-        towerStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        towerStatsLabel.Text = ""
-        towerStatsLabel.TextWrapped = true
-        towerStatsLabel.Size = UDim2.new(1, -10, 0, 70)
-        towerStatsLabel.Position = UDim2.new(0, 5, 0, 52)
-        towerStatsLabel.Parent = towerDetailsFrame
-
-        ownershipLabel = Instance.new("TextLabel")
-        ownershipLabel.Name = "OwnershipLabel"
-        ownershipLabel.BackgroundTransparency = 1
-        ownershipLabel.Font = Enum.Font.Gotham
-        ownershipLabel.TextSize = 14
-        ownershipLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
-        ownershipLabel.Text = ""
-        ownershipLabel.Size = UDim2.new(1, -10, 0, 20)
-        ownershipLabel.Position = UDim2.new(0, 5, 0, 124)
-        ownershipLabel.Parent = towerDetailsFrame
-
-        upgradeDescriptionLabel = Instance.new("TextLabel")
-        upgradeDescriptionLabel.Name = "UpgradeDescriptionLabel"
-        upgradeDescriptionLabel.BackgroundTransparency = 1
-        upgradeDescriptionLabel.Font = Enum.Font.Gotham
-        upgradeDescriptionLabel.TextSize = 14
-        upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(180, 220, 255)
-        upgradeDescriptionLabel.TextWrapped = true
-        upgradeDescriptionLabel.Text = ""
-        upgradeDescriptionLabel.Size = UDim2.new(1, -10, 0, 40)
-        upgradeDescriptionLabel.Position = UDim2.new(0, 5, 0, 146)
-        upgradeDescriptionLabel.Parent = towerDetailsFrame
-
-        upgradeButton = Instance.new("TextButton")
-        upgradeButton.Name = "UpgradeButton"
-        upgradeButton.Size = UDim2.new(1, -10, 0, 32)
-        upgradeButton.Position = UDim2.new(0, 5, 0, 190)
-        upgradeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-        upgradeButton.TextColor3 = Color3.new(1, 1, 1)
-        upgradeButton.Font = Enum.Font.GothamBold
-        upgradeButton.TextSize = 16
-        upgradeButton.Text = "Upgrade (E)"
-        upgradeButton.AutoButtonColor = false
-        upgradeButton.Visible = false
-        upgradeButton.Parent = towerDetailsFrame
-
-        sellButton = Instance.new("TextButton")
-        sellButton.Name = "SellButton"
-        sellButton.Size = UDim2.new(1, -10, 0, 32)
-        sellButton.Position = UDim2.new(0, 5, 0, 228)
-        sellButton.BackgroundColor3 = Color3.fromRGB(220, 120, 120)
-        sellButton.TextColor3 = Color3.new(0, 0, 0)
-        sellButton.Font = Enum.Font.GothamBold
-        sellButton.TextSize = 16
-        sellButton.Text = "Sell (X)"
-        sellButton.AutoButtonColor = true
-        sellButton.Visible = false
-        sellButton.Parent = towerDetailsFrame
+    if not (template and template:IsA("ScreenGui")) then
+        warn("TowerClient: Provide a ScreenGui named 'TowerHUD' under ReplicatedStorage/Assets/UI.")
+        return nil
     end
 
-    shopFrame = shopFrame or screenGui:FindFirstChild("Shop")
+    screenGui = template:Clone()
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.Parent = playerGui
+
+    shopFrame = screenGui:FindFirstChild("Shop", true)
     if shopFrame then
         for _, descendant in ipairs(shopFrame:GetDescendants()) do
             if descendant:IsA("TextButton") then
@@ -995,220 +833,133 @@ local function createGui()
         warn("TowerClient: Shop frame named 'Shop' was not found inside the Tower HUD. Add one to enable tower placement buttons.")
     end
 
-    statusFrame = statusFrame or screenGui:FindFirstChild("Status")
+    statusFrame = screenGui:FindFirstChild("Status", true)
     if statusFrame then
-        moneyLabel = moneyLabel or statusFrame:FindFirstChild("MoneyLabel")
+        moneyLabel = statusFrame:FindFirstChild("MoneyLabel", true)
         if not moneyLabel then
-            moneyLabel = Instance.new("TextLabel")
-            moneyLabel.Name = "MoneyLabel"
-            moneyLabel.Size = UDim2.new(1, -10, 0, 24)
-            moneyLabel.Position = UDim2.new(0, 5, 0, 0)
-            moneyLabel.BackgroundTransparency = 1
-            moneyLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-            moneyLabel.Font = Enum.Font.GothamBold
-            moneyLabel.TextSize = 18
-            moneyLabel.Text = "$0"
-            moneyLabel.Parent = statusFrame
+            warn("TowerClient: MoneyLabel was not found inside the Status frame.")
         end
 
-        livesLabel = livesLabel or statusFrame:FindFirstChild("LivesLabel")
+        livesLabel = statusFrame:FindFirstChild("LivesLabel", true)
         if not livesLabel then
-            livesLabel = Instance.new("TextLabel")
-            livesLabel.Name = "LivesLabel"
-            livesLabel.Size = UDim2.new(1, -10, 0, 24)
-            livesLabel.Position = UDim2.new(0, 5, 0, 30)
-            livesLabel.BackgroundTransparency = 1
-            livesLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-            livesLabel.Font = Enum.Font.GothamBold
-            livesLabel.TextSize = 18
-            livesLabel.Text = "Lives: 0"
-            livesLabel.Parent = statusFrame
+            warn("TowerClient: LivesLabel was not found inside the Status frame.")
         end
 
-        waveLabel = waveLabel or statusFrame:FindFirstChild("WaveLabel")
+        waveLabel = statusFrame:FindFirstChild("WaveLabel", true)
         if not waveLabel then
-            waveLabel = Instance.new("TextLabel")
-            waveLabel.Name = "WaveLabel"
-            waveLabel.Size = UDim2.new(1, -10, 0, 24)
-            waveLabel.Position = UDim2.new(0, 5, 0, 56)
-            waveLabel.BackgroundTransparency = 1
-            waveLabel.TextColor3 = Color3.fromRGB(180, 180, 255)
-            waveLabel.Font = Enum.Font.GothamBold
-            waveLabel.TextSize = 18
-            waveLabel.Text = "Wave: 0"
-            waveLabel.Parent = statusFrame
+            warn("TowerClient: WaveLabel was not found inside the Status frame.")
         end
 
-        startButton = startButton or statusFrame:FindFirstChild("StartButton")
-        if not (startButton and startButton:IsA("TextButton")) then
-            startButton = Instance.new("TextButton")
-            startButton.Name = "StartButton"
-            startButton.Size = UDim2.new(0, 180, 0, 36)
-            startButton.Position = UDim2.new(0.5, -90, 0, 86)
-            startButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-            startButton.TextColor3 = Color3.new(0, 0, 0)
-            startButton.Font = Enum.Font.GothamBlack
-            startButton.TextSize = 18
-            startButton.Text = "Start"
-            startButton.Parent = statusFrame
-        end
-
-        if not startButton:GetAttribute("TowerClientHooked") then
-            startButton.MouseButton1Click:Connect(function()
-                if gameEnded then
-                    remotes.RequestRestart:FireServer()
-                else
-                    remotes.RequestWaveStart:FireServer()
-                end
-            end)
-            startButton:SetAttribute("TowerClientHooked", true)
+        startButton = statusFrame:FindFirstChild("StartButton", true)
+        if startButton and startButton:IsA("TextButton") then
+            if not startButton:GetAttribute("TowerClientHooked") then
+                startButton.MouseButton1Click:Connect(function()
+                    if gameEnded then
+                        remotes.RequestRestart:FireServer()
+                    else
+                        remotes.RequestWaveStart:FireServer()
+                    end
+                end)
+                startButton:SetAttribute("TowerClientHooked", true)
+            end
+        else
+            if startButton then
+                warn("TowerClient: StartButton must be a TextButton inside the Status frame.")
+            else
+                warn("TowerClient: StartButton was not found inside the Status frame.")
+            end
+            startButton = nil
         end
     else
         warn("TowerClient: Status frame named 'Status' was not found. Add one to show money, lives, and wave info.")
     end
 
-    towerDetailsFrame = towerDetailsFrame or screenGui:FindFirstChild("TowerDetails")
-    if not towerDetailsFrame then
-        towerDetailsFrame = Instance.new("Frame")
-        towerDetailsFrame.Name = "TowerDetails"
-        towerDetailsFrame.Size = UDim2.new(0, 220, 0, 260)
-        towerDetailsFrame.Position = UDim2.new(1, -240, 0, 160)
-        towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        towerDetailsFrame.BackgroundTransparency = 0.2
-        towerDetailsFrame.BorderSizePixel = 0
-        towerDetailsFrame.Visible = false
-        towerDetailsFrame.Parent = screenGui
+    towerDetailsFrame = screenGui:FindFirstChild("TowerDetails", true)
+    if towerDetailsFrame then
+        towerNameLabel = towerDetailsFrame:FindFirstChild("TowerNameLabel", true)
+        if not towerNameLabel then
+            warn("TowerClient: TowerNameLabel was not found inside TowerDetails.")
+        end
 
-        local detailLayout = Instance.new("UIListLayout")
-        detailLayout.Padding = UDim.new(0, 4)
-        detailLayout.FillDirection = Enum.FillDirection.Vertical
-        detailLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        detailLayout.Parent = towerDetailsFrame
-    end
+        towerLevelLabel = towerDetailsFrame:FindFirstChild("TowerLevelLabel", true)
+        if not towerLevelLabel then
+            warn("TowerClient: TowerLevelLabel was not found inside TowerDetails.")
+        end
 
-    towerNameLabel = towerNameLabel or towerDetailsFrame:FindFirstChild("TowerNameLabel")
-    if not towerNameLabel then
-        towerNameLabel = Instance.new("TextLabel")
-        towerNameLabel.Name = "TowerNameLabel"
-        towerNameLabel.BackgroundTransparency = 1
-        towerNameLabel.Font = Enum.Font.GothamBold
-        towerNameLabel.TextSize = 18
-        towerNameLabel.TextColor3 = Color3.new(1, 1, 1)
-        towerNameLabel.Text = ""
-        towerNameLabel.Size = UDim2.new(1, -10, 0, 24)
-        towerNameLabel.Position = UDim2.new(0, 5, 0, 0)
-        towerNameLabel.Parent = towerDetailsFrame
-    end
+        towerStatsLabel = towerDetailsFrame:FindFirstChild("TowerStatsLabel", true)
+        if not towerStatsLabel then
+            warn("TowerClient: TowerStatsLabel was not found inside TowerDetails.")
+        end
 
-    towerLevelLabel = towerLevelLabel or towerDetailsFrame:FindFirstChild("TowerLevelLabel")
-    if not towerLevelLabel then
-        towerLevelLabel = Instance.new("TextLabel")
-        towerLevelLabel.Name = "TowerLevelLabel"
-        towerLevelLabel.BackgroundTransparency = 1
-        towerLevelLabel.Font = Enum.Font.Gotham
-        towerLevelLabel.TextSize = 16
-        towerLevelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        towerLevelLabel.Text = ""
-        towerLevelLabel.Size = UDim2.new(1, -10, 0, 20)
-        towerLevelLabel.Position = UDim2.new(0, 5, 0, 28)
-        towerLevelLabel.Parent = towerDetailsFrame
-    end
+        ownershipLabel = towerDetailsFrame:FindFirstChild("OwnershipLabel", true)
+        if not ownershipLabel then
+            warn("TowerClient: OwnershipLabel was not found inside TowerDetails.")
+        end
 
-    towerStatsLabel = towerStatsLabel or towerDetailsFrame:FindFirstChild("TowerStatsLabel")
-    if not towerStatsLabel then
-        towerStatsLabel = Instance.new("TextLabel")
-        towerStatsLabel.Name = "TowerStatsLabel"
-        towerStatsLabel.BackgroundTransparency = 1
-        towerStatsLabel.Font = Enum.Font.Gotham
-        towerStatsLabel.TextSize = 15
-        towerStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        towerStatsLabel.Text = ""
-        towerStatsLabel.TextWrapped = true
-        towerStatsLabel.Size = UDim2.new(1, -10, 0, 70)
-        towerStatsLabel.Position = UDim2.new(0, 5, 0, 52)
-        towerStatsLabel.Parent = towerDetailsFrame
-    end
+        upgradeDescriptionLabel = towerDetailsFrame:FindFirstChild("UpgradeDescriptionLabel", true)
+        if not upgradeDescriptionLabel then
+            warn("TowerClient: UpgradeDescriptionLabel was not found inside TowerDetails.")
+        end
 
-    ownershipLabel = ownershipLabel or towerDetailsFrame:FindFirstChild("OwnershipLabel")
-    if not ownershipLabel then
-        ownershipLabel = Instance.new("TextLabel")
-        ownershipLabel.Name = "OwnershipLabel"
-        ownershipLabel.BackgroundTransparency = 1
-        ownershipLabel.Font = Enum.Font.Gotham
-        ownershipLabel.TextSize = 14
-        ownershipLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
-        ownershipLabel.Text = ""
-        ownershipLabel.Size = UDim2.new(1, -10, 0, 20)
-        ownershipLabel.Position = UDim2.new(0, 5, 0, 124)
-        ownershipLabel.Parent = towerDetailsFrame
-    end
-
-    upgradeDescriptionLabel = upgradeDescriptionLabel or towerDetailsFrame:FindFirstChild("UpgradeDescriptionLabel")
-    if not upgradeDescriptionLabel then
-        upgradeDescriptionLabel = Instance.new("TextLabel")
-        upgradeDescriptionLabel.Name = "UpgradeDescriptionLabel"
-        upgradeDescriptionLabel.BackgroundTransparency = 1
-        upgradeDescriptionLabel.Font = Enum.Font.Gotham
-        upgradeDescriptionLabel.TextSize = 14
-        upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(180, 220, 255)
-        upgradeDescriptionLabel.TextWrapped = true
-        upgradeDescriptionLabel.Text = ""
-        upgradeDescriptionLabel.Size = UDim2.new(1, -10, 0, 40)
-        upgradeDescriptionLabel.Position = UDim2.new(0, 5, 0, 146)
-        upgradeDescriptionLabel.Parent = towerDetailsFrame
-    end
-
-    upgradeButton = upgradeButton or towerDetailsFrame:FindFirstChild("UpgradeButton")
-    if not (upgradeButton and upgradeButton:IsA("TextButton")) then
-        upgradeButton = Instance.new("TextButton")
-        upgradeButton.Name = "UpgradeButton"
-        upgradeButton.Size = UDim2.new(1, -10, 0, 32)
-        upgradeButton.Position = UDim2.new(0, 5, 0, 190)
-        upgradeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-        upgradeButton.TextColor3 = Color3.new(1, 1, 1)
-        upgradeButton.Font = Enum.Font.GothamBold
-        upgradeButton.TextSize = 16
-        upgradeButton.Text = "Upgrade (E)"
-        upgradeButton.AutoButtonColor = false
-        upgradeButton.Visible = false
-        upgradeButton.Parent = towerDetailsFrame
-    end
-
-    if not upgradeButton:GetAttribute("TowerClientHooked") then
-        upgradeButton.MouseButton1Click:Connect(function()
-            if selectedTower then
-                remotes.TowerUpgradeRequested:FireServer(selectedTower)
+        upgradeButton = towerDetailsFrame:FindFirstChild("UpgradeButton", true)
+        if upgradeButton and upgradeButton:IsA("TextButton") then
+            upgradeButtonOriginalColor = upgradeButton.BackgroundColor3
+            upgradeButtonOriginalTextColor = upgradeButton.TextColor3
+            upgradeButtonOriginalBackgroundTransparency = upgradeButton.BackgroundTransparency
+            upgradeButtonOriginalTextTransparency = upgradeButton.TextTransparency
+            upgradeButtonOriginalAutoButtonColor = upgradeButton.AutoButtonColor
+            if not upgradeButton:GetAttribute("TowerClientHooked") then
+                upgradeButton.MouseButton1Click:Connect(function()
+                    if selectedTower then
+                        remotes.TowerUpgradeRequested:FireServer(selectedTower)
+                    end
+                end)
+                upgradeButton:SetAttribute("TowerClientHooked", true)
             end
-        end)
-        upgradeButton:SetAttribute("TowerClientHooked", true)
-    end
-
-    sellButton = sellButton or towerDetailsFrame:FindFirstChild("SellButton")
-    if not (sellButton and sellButton:IsA("TextButton")) then
-        sellButton = Instance.new("TextButton")
-        sellButton.Name = "SellButton"
-        sellButton.Size = UDim2.new(1, -10, 0, 32)
-        sellButton.Position = UDim2.new(0, 5, 0, 228)
-        sellButton.BackgroundColor3 = Color3.fromRGB(220, 120, 120)
-        sellButton.TextColor3 = Color3.new(0, 0, 0)
-        sellButton.Font = Enum.Font.GothamBold
-        sellButton.TextSize = 16
-        sellButton.Text = "Sell (X)"
-        sellButton.AutoButtonColor = true
-        sellButton.Visible = false
-        sellButton.Parent = towerDetailsFrame
-    end
-
-    if not sellButton:GetAttribute("TowerClientHooked") then
-        sellButton.MouseButton1Click:Connect(function()
-            if selectedTower then
-                remotes.TowerSoldRequested:FireServer(selectedTower)
+        else
+            if upgradeButton then
+                warn("TowerClient: UpgradeButton inside TowerDetails must be a TextButton.")
+            else
+                warn("TowerClient: UpgradeButton was not found inside TowerDetails.")
             end
-        end)
-        sellButton:SetAttribute("TowerClientHooked", true)
+            upgradeButton = nil
+        end
+
+        sellButton = towerDetailsFrame:FindFirstChild("SellButton", true)
+        if sellButton and sellButton:IsA("TextButton") then
+            sellButtonOriginalAutoButtonColor = sellButton.AutoButtonColor
+            if not sellButton:GetAttribute("TowerClientHooked") then
+                sellButton.MouseButton1Click:Connect(function()
+                    if selectedTower then
+                        remotes.TowerSoldRequested:FireServer(selectedTower)
+                    end
+                end)
+                sellButton:SetAttribute("TowerClientHooked", true)
+            end
+        else
+            if sellButton then
+                warn("TowerClient: SellButton inside TowerDetails must be a TextButton.")
+            else
+                warn("TowerClient: SellButton was not found inside TowerDetails.")
+            end
+            sellButton = nil
+        end
+    else
+        warn("TowerClient: TowerDetails frame was not found. Selection UI will be hidden.")
     end
 
-    updateAllEnemyBillboards()
+    priceLabelContainer = screenGui:FindFirstChild("PlayerTowerPriceLabels", true)
+    if priceLabelContainer and priceLabelContainer:IsA("GuiObject") then
+        upgradePriceLabel = priceLabelContainer:FindFirstChild("UpgradePriceLabel", true)
+        sellPriceLabel = priceLabelContainer:FindFirstChild("SellPriceLabel", true)
+        priceLabelContainer.Visible = false
+    elseif priceLabelContainer then
+        warn("TowerClient: PlayerTowerPriceLabels must be a GuiObject to toggle visibility.")
+        priceLabelContainer = nil
+    else
+        warn("TowerClient: PlayerTowerPriceLabels container not found. Hover price labels will be disabled.")
+    end
+
     updateStartButtonVisual()
 
     remotes.MoneyChanged.OnClientEvent:Connect(function(money)
@@ -1252,13 +1003,18 @@ local function createGui()
         if waveLabel then
             waveLabel.Text = "Wave: 0"
         end
-        if hoverBillboard then
-            hoverBillboard.Enabled = false
+        if hoverGui and hoverGui:IsA("GuiObject") then
+            hoverGui.Visible = false
         end
-        updateAllEnemyBillboards()
+        priceLabelsCanShow = false
+        if priceLabelContainer then
+            priceLabelContainer.Visible = false
+        end
     end)
 
     return screenGui
+end
+
 end
 
 createGui()
@@ -1275,6 +1031,10 @@ local function clearSelection()
     end
     if sellButton then
         sellButton.Visible = false
+    end
+    priceLabelsCanShow = false
+    if priceLabelContainer then
+        priceLabelContainer.Visible = false
     end
 end
 
@@ -1378,6 +1138,26 @@ local function computePlacementValidity(position, hitInstance)
     return isPositionClear(position)
 end
 
+local function updatePriceLabelHoverState()
+    if not priceLabelContainer then
+        return
+    end
+
+    if not priceLabelsCanShow or not selectedTower then
+        if priceLabelContainer.Visible then
+            priceLabelContainer.Visible = false
+        end
+        return
+    end
+
+    local target = mouse.Target
+    if target and target:IsDescendantOf(selectedTower) then
+        priceLabelContainer.Visible = true
+    elseif priceLabelContainer.Visible then
+        priceLabelContainer.Visible = false
+    end
+end
+
 local function updatePreview()
     if not placingTowerType or not previewPart then
         placementValid = false
@@ -1421,46 +1201,49 @@ local function updateEnemyHover()
     local target = mouse.Target
     local enemyModel = getEnemyModelFromInstance(target)
     if enemyModel then
-        local billboard = ensureHoverBillboard()
-        local adornee = enemyModel.PrimaryPart or enemyModel:FindFirstChild("HumanoidRootPart") or enemyModel:FindFirstChild("Head")
-        if adornee then
-            billboard.Adornee = adornee
-            local healthValue = enemyModel:FindFirstChild("HealthValue")
-            local maxHealth = enemyModel:GetAttribute("MaxHealth")
-            local displayName = enemyModel:GetAttribute("DisplayName") or enemyModel.Name or "Enemy"
-            local currentHealth = nil
-            if healthValue then
-                currentHealth = math.max(0, math.floor(healthValue.Value + 0.5))
-            end
-
-            if hoverNameLabel then
-                hoverNameLabel.Text = displayName
-            end
-
-            if hoverHealthLabel then
-                if currentHealth and typeof(maxHealth) == "number" then
-                    hoverHealthLabel.Text = string.format("HP: %d / %d", currentHealth, maxHealth)
-                elseif currentHealth then
-                    hoverHealthLabel.Text = string.format("HP: %d", currentHealth)
-                else
-                    hoverHealthLabel.Text = "HP: ???"
-                end
-            elseif hoverCombinedLabel then
-                if currentHealth and typeof(maxHealth) == "number" then
-                    hoverCombinedLabel.Text = string.format("%s - HP: %d / %d", displayName, currentHealth, maxHealth)
-                elseif currentHealth then
-                    hoverCombinedLabel.Text = string.format("%s - HP: %d", displayName, currentHealth)
-                else
-                    hoverCombinedLabel.Text = string.format("%s - HP: ???", displayName)
-                end
-            end
-            billboard.Enabled = true
-        else
-            billboard.Enabled = false
+        local guiObject = ensureHoverGui()
+        if not (guiObject and guiObject:IsA("GuiObject")) then
+            return
         end
+
+        local healthValue = enemyModel:FindFirstChild("HealthValue")
+        local maxHealth = enemyModel:GetAttribute("MaxHealth")
+        local displayName = enemyModel:GetAttribute("DisplayName") or enemyModel.Name or "Enemy"
+        local currentHealth
+        if healthValue then
+            currentHealth = math.max(0, math.floor(healthValue.Value + 0.5))
+        end
+
+        if hoverNameLabel then
+            hoverNameLabel.Text = displayName
+        end
+
+        if hoverHealthLabel then
+            if currentHealth and typeof(maxHealth) == "number" then
+                hoverHealthLabel.Text = string.format("HP: %d / %d", currentHealth, maxHealth)
+            elseif currentHealth then
+                hoverHealthLabel.Text = string.format("HP: %d", currentHealth)
+            else
+                hoverHealthLabel.Text = "HP: ???"
+            end
+        elseif hoverCombinedLabel then
+            if currentHealth and typeof(maxHealth) == "number" then
+                hoverCombinedLabel.Text = string.format("%s - HP: %d / %d", displayName, currentHealth, maxHealth)
+            elseif currentHealth then
+                hoverCombinedLabel.Text = string.format("%s - HP: %d", displayName, currentHealth)
+            else
+                hoverCombinedLabel.Text = string.format("%s - HP: ???", displayName)
+            end
+        end
+
+        local mousePosition = Vector2.new(mouse.X, mouse.Y)
+        local offsetX = guiObject:GetAttribute("OffsetX") or 16
+        local offsetY = guiObject:GetAttribute("OffsetY") or 16
+        guiObject.Position = UDim2.fromOffset(mousePosition.X + offsetX, mousePosition.Y + offsetY)
+        guiObject.Visible = true
     else
-        if hoverBillboard then
-            hoverBillboard.Enabled = false
+        if hoverGui and hoverGui:IsA("GuiObject") then
+            hoverGui.Visible = false
         end
     end
 end
@@ -1520,6 +1303,7 @@ end
 RunService.RenderStepped:Connect(function()
     updatePreview()
     updateEnemyHover()
+    updatePriceLabelHoverState()
 
     if selectedTower and (not selectedTower.Parent) then
         clearSelection()

@@ -296,46 +296,6 @@ function WaveService:SpawnEnemy(enemyType, config)
     end
     healthValue.Value = config.Health
 
-    local healthDisplay = enemyModel:FindFirstChild("HealthDisplay")
-    if not healthDisplay or not healthDisplay:IsA("BillboardGui") then
-        if healthDisplay then
-            healthDisplay:Destroy()
-        end
-        healthDisplay = Instance.new("BillboardGui")
-        healthDisplay.Name = "HealthDisplay"
-        healthDisplay.Parent = enemyModel
-    end
-    healthDisplay.AlwaysOnTop = true
-    healthDisplay.Enabled = true
-    healthDisplay.ExtentsOffsetWorldSpace = Vector3.new(0, 4, 0)
-    healthDisplay.Size = UDim2.new(0, 140, 0, 32)
-    healthDisplay.Adornee = primary
-
-    local healthLabel = healthDisplay:FindFirstChildWhichIsA("TextLabel")
-    if not healthLabel then
-        healthLabel = Instance.new("TextLabel")
-        healthLabel.Parent = healthDisplay
-    end
-    healthLabel.BackgroundTransparency = 1
-    healthLabel.TextColor3 = Color3.new(1, 1, 1)
-    healthLabel.TextStrokeTransparency = 0.2
-    healthLabel.Font = Enum.Font.GothamBold
-    healthLabel.TextScaled = true
-    healthLabel.Size = UDim2.fromScale(1, 1)
-
-    local maxHealth = config.Health
-    local function updateHealthLabel()
-        local current = math.max(0, math.floor(healthValue.Value + 0.5))
-        if typeof(maxHealth) == "number" then
-            healthLabel.Text = string.format("%s - HP: %d / %d", displayName or enemyType, current, maxHealth)
-        else
-            healthLabel.Text = string.format("%s - HP: %d", displayName or enemyType, current)
-        end
-    end
-
-    updateHealthLabel()
-    healthValue:GetPropertyChangedSignal("Value"):Connect(updateHealthLabel)
-
     if isDefault then
         if enemyType == "Runner" then
             primary.Color = Color3.fromRGB(255, 200, 80)

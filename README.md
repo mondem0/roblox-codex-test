@@ -70,10 +70,13 @@ Design your own interface once and let the client script clone it for every play
    * **`Shop`** – any Frame/ScrollingFrame you like. Add one `TextButton` per tower and set the button’s `TowerType` attribute (string) to match the key in `TowerConfigs` (e.g. `Archer`). If you want to preserve your custom text, set the button’s `AutoText` attribute to `false`; otherwise the script will label it as “Name | $Cost”.
    * **`Status`** – holds the HUD labels. Add `TextLabel`s named `MoneyLabel`, `LivesLabel`, and `WaveLabel`, plus a `TextButton` named `StartButton`. The script updates the text automatically; set `AutoText = false` and/or `AutoStyle = false` on `StartButton` if you prefer to manage the label or colors yourself.
    * **`TowerDetails`** – the inspection panel. Include `TextLabel`s named `TowerNameLabel`, `TowerLevelLabel`, `TowerStatsLabel`, `OwnershipLabel`, and `UpgradeDescriptionLabel`, plus buttons named `UpgradeButton` and `SellButton`. Feel free to restyle fonts, colors, and layout—the script only fills in the text and toggles visibility.
-3. To customize the hover tooltip, add a **`BillboardGui`** named **`EnemyHoverTemplate`** under `ReplicatedStorage/Assets/UI`. Include `TextLabel`s named `NameLabel` and `HealthLabel` (or a single `TextLabel` named `InfoLabel` if you prefer one combined line). The LocalScript reuses your design instead of the built-in fallback.
-4. You can add additional GUI elements (wave timers, ability buttons, etc.) to `TowerHUD`; they will clone along with everything else. Just avoid naming conflicts with the reserved objects listed above.
+3. To customize the hover tooltip, add a **GuiObject** (for example a `Frame` or `TextLabel`) or an entire **`ScreenGui`** named **`EnemyHoverTemplate`** under `ReplicatedStorage/Assets/UI`. Include `TextLabel`s named `NameLabel` and `HealthLabel` (or a single `TextLabel` named `InfoLabel`). The LocalScript clones this UI, keeps your colors, and positions it near the player’s cursor while hovering an enemy. Optional `OffsetX`/`OffsetY` number attributes on the root GuiObject let you tweak the cursor offset in pixels.
+4. Add a GuiObject named **`PlayerTowerPriceLabels`** anywhere inside `TowerHUD` if you want hover pricing. Place (and style) `TextLabel`s named `UpgradePriceLabel` and `SellPriceLabel` inside it. The script hides this container by default, updates the text with your tower’s next upgrade cost and sell refund, and shows it whenever the player hovers their mouse over a tower they own. Position it wherever you like in Studio—the script only toggles visibility and text.
+5. You can add additional GUI elements (wave timers, ability buttons, etc.) to `TowerHUD`; they will clone along with everything else. Just avoid naming conflicts with the reserved objects listed above.
+The scripts leave your color choices intact—they only update text, toggle visibility, and enable/disable buttons based on game state. If something is missing, the client logs a warning instead of generating fallback UI, so keep the names above consistent.
 
-If the templates are missing, the script falls back to a functional default UI so you can iterate without blocking gameplay.
+
+
 
 ## Extending Enemy Types & Waves
 
@@ -83,7 +86,7 @@ You can expand the roster and pacing without editing any gameplay scripts—just
 
 1. Open **`EnemyConfigs`**. Each key in the returned table (e.g. `Grunt`, `Runner`, `Tank`) defines an enemy archetype.
 2. Duplicate an existing entry and change its fields:
-   * `Name`: Label shown in the UI (hover tooltip + floating health billboards).
+   * `Name`: Label shown in the hover UI.
    * `ModelName`: The model to clone from `ReplicatedStorage/Assets/Enemies` (defaults to the key if omitted).
    * `Health`: Starting hit points.
    * `Speed`: How fast the enemy moves along the path (studs per second).
@@ -126,7 +129,7 @@ table.insert(WaveConfigs, {
 * **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
-* **Enemy info**: Hovering over an enemy shows a floating billboard with its name and health plus a tooltip near your cursor. Edit the `EnemyHoverTemplate` billboard (or remove it) if you want to restyle that display.
+* **Enemy info**: Hovering over an enemy shows your `EnemyHoverTemplate` UI beside the cursor with that enemy’s name and HP—no default billboard is spawned. Edit the template in `ReplicatedStorage/Assets/UI` to restyle the display.
 
 ## Testing Checklist
 
