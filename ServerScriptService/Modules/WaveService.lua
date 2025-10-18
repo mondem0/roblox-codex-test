@@ -262,60 +262,14 @@ function WaveService:SpawnWave(waveNumber)
         if self.GameEnded then
             return
         end
-
-        local delay = tonumber(group.Delay) or 0
-
-        if typeof(group.Types) == "table" then
-            local cycles = math.max(0, math.floor(tonumber(group.Repeat or group.Count) or 1))
-
-            for cycle = 1, cycles do
+        local config = EnemyConfigs[group.Type]
+        if config then
+            for _ = 1, group.Count do
                 if self.GameEnded then
                     return
                 end
-
-                for _, entry in ipairs(group.Types) do
-                    local entryType = entry and entry.Type
-                    local entryConfig = entryType and EnemyConfigs[entryType]
-                    if entryConfig then
-                        local entryCount = math.max(0, math.floor(tonumber(entry.Count) or 1))
-                        for _ = 1, entryCount do
-                            if self.GameEnded then
-                                return
-                            end
-                            self:SpawnEnemy(entryType, entryConfig)
-                        end
-                    end
-                end
-
-                if cycle < cycles and delay > 0 then
-                    task.wait(delay)
-                end
-            end
-        else
-            local config = EnemyConfigs[group.Type]
-            if config then
-                local totalToSpawn = math.max(0, tonumber(group.Count) or 0)
-                local batchSize = math.max(1, math.floor(tonumber(group.BatchSize) or 1))
-
-                local remaining = totalToSpawn
-                while remaining > 0 do
-                    if self.GameEnded then
-                        return
-                    end
-
-                    local spawnNow = math.min(batchSize, remaining)
-                    for _ = 1, spawnNow do
-                        if self.GameEnded then
-                            return
-                        end
-                        self:SpawnEnemy(group.Type, config)
-                    end
-
-                    remaining -= spawnNow
-                    if remaining > 0 and delay > 0 then
-                        task.wait(delay)
-                    end
-                end
+                self:SpawnEnemy(group.Type, config)
+                task.wait(group.Delay)
             end
         end
     end
