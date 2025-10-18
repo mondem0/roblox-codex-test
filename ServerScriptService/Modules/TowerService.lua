@@ -252,10 +252,11 @@ function TowerService:Tick(dt)
                                 barrel.CFrame = lookCFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
                             end
                         end
-                        towerData.Cooldown = towerData.Config.FireRate
+                        local fireRate = towerData.Config.FireRate or 0
+                        towerData.Cooldown = math.max(0.05, fireRate)
                         if towerData.Config.SplashRadius then
                             self.WaveService:SplashDamage(
-                                head.Position,
+                                targetPrimary.Position,
                                 towerData.Config.SplashRadius,
                                 towerData
                             )
@@ -303,6 +304,20 @@ function TowerService:UpgradeTower(player, towerModel)
 
     self.Remotes.TowerUpgraded:FireClient(player, towerModel, towerData.Level)
     return true
+end
+
+function TowerService:Reset()
+    local towersFolder = workspace:FindFirstChild("Towers")
+    for towerModel in pairs(self.Towers) do
+        if towerModel and towerModel.Parent then
+            towerModel:Destroy()
+        end
+        self.Towers[towerModel] = nil
+    end
+    if towersFolder then
+        towersFolder:ClearAllChildren()
+    end
+    self.Towers = {}
 end
 
 return TowerService

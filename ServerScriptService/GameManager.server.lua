@@ -27,6 +27,8 @@ local Remotes = {
     GameEnded = getOrCreateRemote("GameEnded", "RemoteEvent"),
     RequestWaveStart = getOrCreateRemote("RequestWaveStart", "RemoteEvent"),
     TowerUpgraded = getOrCreateRemote("TowerUpgraded", "RemoteEvent"),
+    RequestRestart = getOrCreateRemote("RequestRestart", "RemoteEvent"),
+    GameRestarted = getOrCreateRemote("GameRestarted", "RemoteEvent"),
 }
 
 local mapModel = workspace:WaitForChild("Map")
@@ -64,6 +66,21 @@ end)
 
 Remotes.TowerUpgradeRequested.OnServerEvent:Connect(function(player, towerModel)
     towerService:UpgradeTower(player, towerModel)
+end)
+
+Remotes.RequestRestart.OnServerEvent:Connect(function(player)
+    if waveService.IsSpawning then
+        return
+    end
+
+    local activeEnemies = next(waveService.Enemies)
+    if activeEnemies then
+        return
+    end
+
+    waveService:ResetGame()
+    towerService:Reset()
+    Remotes.GameRestarted:FireAllClients()
 end)
 
 RunService.Heartbeat:Connect(function(dt)

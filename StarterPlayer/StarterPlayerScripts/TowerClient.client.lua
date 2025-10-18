@@ -9,6 +9,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local towerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
+local enemiesFolder = workspace:WaitForChild("Enemies")
 
 local placingTowerType
 local previewPart
@@ -20,6 +21,9 @@ local rangeAdornment
 local previewRangeAdornment
 local selectedTowerConnections = {}
 local currentMoney = 0
+local showEnemyHP = true
+local gameEnded = false
+local hpToggleButton
 
 local towerDetailsFrame
 local towerNameLabel
@@ -30,7 +34,7 @@ local upgradeDescriptionLabel
 local upgradeButton
 
 local PREVIEW_SIZE = Vector3.new(4, 1, 4)
-local RANGE_ORIENTATION = CFrame.Angles(0, 0, math.rad(90))
+local RANGE_ORIENTATION = CFrame.Angles(math.rad(90), 0, 0)
 
 local function disconnectSelectedConnections()
     for _, conn in ipairs(selectedTowerConnections) do
@@ -53,6 +57,49 @@ local function destroyPreviewRangeIndicator()
     end
 end
 
+local function applyEnemyBillboardState(enemyModel)
+    local display = enemyModel:FindFirstChild("HealthDisplay")
+    if display and display:IsA("BillboardGui") then
+        display.Enabled = showEnemyHP
+    end
+end
+
+local function watchEnemy(enemyModel)
+    if not enemyModel or not enemyModel:IsA("Model") then
+        return
+    end
+
+    applyEnemyBillboardState(enemyModel)
+    enemyModel.ChildAdded:Connect(function(child)
+        if child.Name == "HealthDisplay" and child:IsA("BillboardGui") then
+            child.Enabled = showEnemyHP
+        end
+    end)
+end
+
+local function updateAllEnemyBillboards()
+    for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+        applyEnemyBillboardState(enemy)
+    end
+end
+
+local function updateHPToggleVisual()
+    if not hpToggleButton then
+        return
+    end
+
+    hpToggleButton.Text = showEnemyHP and "Hide Enemy HP" or "Show Enemy HP"
+    hpToggleButton.BackgroundColor3 = showEnemyHP and Color3.fromRGB(220, 120, 120) or Color3.fromRGB(80, 200, 120)
+end
+
+for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+    watchEnemy(enemy)
+end
+
+enemiesFolder.ChildAdded:Connect(function(enemy)
+    watchEnemy(enemy)
+end)
+
 local function createRaycastParams()
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Blacklist
@@ -72,7 +119,6 @@ local function getEnemyModelFromInstance(instance)
         return nil
     end
 
-    local enemiesFolder = workspace:FindFirstChild("Enemies")
     if not enemiesFolder then
         return nil
     end
@@ -469,9 +515,53 @@ local function createGui()
     startButton.Text = "Start"
     startButton.Parent = statusFrame
 
+    local lastVictoryState
+
+    local function updateStartButtonVisual()
+        if gameEnded then
+            if lastVictoryState == true then
+                startButton.Text = "Victory! Restart"
+                startButton.BackgroundColor3 = Color3.fromRGB(120, 255, 120)
+            elseif lastVictoryState == false then
+                startButton.Text = "Defeat! Restart"
+                startButton.BackgroundColor3 = Color3.fromRGB(255, 120, 120)
+            else
+                startButton.Text = "Restart"
+                startButton.BackgroundColor3 = Color3.fromRGB(120, 120, 255)
+            end
+        else
+            startButton.Text = "Start"
+            startButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        end
+    end
+
     startButton.MouseButton1Click:Connect(function()
-        remotes.RequestWaveStart:FireServer()
+        if gameEnded then
+            remotes.RequestRestart:FireServer()
+        else
+            remotes.RequestWaveStart:FireServer()
+        end
     end)
+
+    hpToggleButton = Instance.new("TextButton")
+    hpToggleButton.Name = "HPToggleButton"
+    hpToggleButton.Size = UDim2.new(0, 180, 0, 30)
+    hpToggleButton.Position = UDim2.new(0.5, -90, 0, 128)
+    hpToggleButton.BackgroundColor3 = Color3.fromRGB(220, 120, 120)
+    hpToggleButton.TextColor3 = Color3.new(0, 0, 0)
+    hpToggleButton.Font = Enum.Font.GothamBold
+    hpToggleButton.TextSize = 16
+    hpToggleButton.Text = "Hide Enemy HP"
+    hpToggleButton.Parent = statusFrame
+
+    hpToggleButton.MouseButton1Click:Connect(function()
+        showEnemyHP = not showEnemyHP
+        updateHPToggleVisual()
+        updateAllEnemyBillboards()
+    end)
+
+    updateHPToggleVisual()
+    updateAllEnemyBillboards()
 
     remotes.MoneyChanged.OnClientEvent:Connect(function(money)
         currentMoney = money
@@ -490,9 +580,26 @@ local function createGui()
     end)
 
     remotes.GameEnded.OnClientEvent:Connect(function(victory)
-        startButton.Text = victory and "Victory!" or "Defeat"
-        startButton.BackgroundColor3 = victory and Color3.fromRGB(120, 255, 120) or Color3.fromRGB(255, 120, 120)
+        gameEnded = true
+        lastVictoryState = victory
+        updateStartButtonVisual()
     end)
+
+    remotes.GameRestarted.OnClientEvent:Connect(function()
+        gameEnded = false
+        lastVictoryState = nil
+        updateStartButtonVisual()
+        clearSelection()
+        destroyRangeIndicator()
+        cancelPlacement()
+        waveLabel.Text = "Wave: 0"
+        if hoverBillboard then
+            hoverBillboard.Enabled = false
+        end
+        updateAllEnemyBillboards()
+    end)
+
+    updateStartButtonVisual()
 
     towerDetailsFrame = Instance.new("Frame")
     towerDetailsFrame.Name = "TowerDetails"

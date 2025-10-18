@@ -103,10 +103,11 @@ end
 
 function WaveService:GameOver()
     self.IsSpawning = false
-    for enemyModel, _ in pairs(self.Enemies) do
+    for enemyModel in pairs(self.Enemies) do
         if enemyModel then
             enemyModel:Destroy()
         end
+        self.Enemies[enemyModel] = nil
     end
     self.Remotes.GameEnded:FireAllClients(false)
 end
@@ -256,6 +257,37 @@ function WaveService:SpawnEnemy(enemyType, config)
     healthValue.Value = config.Health
     healthValue.Parent = enemyModel
 
+    local healthDisplay = Instance.new("BillboardGui")
+    healthDisplay.Name = "HealthDisplay"
+    healthDisplay.AlwaysOnTop = true
+    healthDisplay.Enabled = true
+    healthDisplay.ExtentsOffsetWorldSpace = Vector3.new(0, 4, 0)
+    healthDisplay.Size = UDim2.new(0, 140, 0, 32)
+    healthDisplay.Adornee = primary
+    healthDisplay.Parent = enemyModel
+
+    local healthLabel = Instance.new("TextLabel")
+    healthLabel.BackgroundTransparency = 1
+    healthLabel.TextColor3 = Color3.new(1, 1, 1)
+    healthLabel.TextStrokeTransparency = 0.2
+    healthLabel.Font = Enum.Font.GothamBold
+    healthLabel.TextScaled = true
+    healthLabel.Size = UDim2.fromScale(1, 1)
+    healthLabel.Parent = healthDisplay
+
+    local maxHealth = config.Health
+    local function updateHealthLabel()
+        local current = math.max(0, math.floor(healthValue.Value + 0.5))
+        if typeof(maxHealth) == "number" then
+            healthLabel.Text = string.format("HP: %d / %d", current, maxHealth)
+        else
+            healthLabel.Text = string.format("HP: %d", current)
+        end
+    end
+
+    updateHealthLabel()
+    healthValue:GetPropertyChangedSignal("Value"):Connect(updateHealthLabel)
+
     if enemyType == "Runner" then
         primary.Color = Color3.fromRGB(255, 200, 80)
     elseif enemyType == "Tank" then
@@ -281,6 +313,24 @@ function WaveService:SpawnEnemy(enemyType, config)
     task.spawn(function()
         self:MoveEnemy(enemyModel)
     end)
+end
+
+function WaveService:ResetGame()
+    self.IsSpawning = false
+    for enemyModel in pairs(self.Enemies) do
+        if enemyModel then
+            enemyModel:Destroy()
+        end
+        self.Enemies[enemyModel] = nil
+    end
+    self.Enemies = {}
+    self.ActiveWave = 0
+    self.BaseHealth = 30
+    for player in pairs(self.PlayerStats) do
+        self.PlayerStats[player] = { Money = 350, Lives = self.BaseHealth }
+        self.Remotes.MoneyChanged:FireClient(player, 350)
+        self.Remotes.LivesChanged:FireClient(player, self.BaseHealth)
+    end
 end
 
 function WaveService:MoveEnemy(enemyModel)
