@@ -7,15 +7,31 @@ function PathService:GetWaypoints(pathFolder)
         return waypoints
     end
 
-    local children = pathFolder:GetChildren()
-    table.sort(children, function(a, b)
-        return tonumber(a.Name) < tonumber(b.Name)
+    local waypointParts = {}
+
+    for _, child in ipairs(pathFolder:GetChildren()) do
+        if child:IsA("BasePart") then
+            local numericName = tonumber(child.Name)
+            if numericName then
+                table.insert(waypointParts, {
+                    Index = numericName,
+                    Position = child.Position,
+                })
+            else
+                warn(string.format(
+                    "Ignoring waypoint %s because its name is not numeric",
+                    child:GetFullName()
+                ))
+            end
+        end
+    end
+
+    table.sort(waypointParts, function(a, b)
+        return a.Index < b.Index
     end)
 
-    for _, waypointPart in ipairs(children) do
-        if waypointPart:IsA("BasePart") then
-            table.insert(waypoints, waypointPart.Position)
-        end
+    for _, waypoint in ipairs(waypointParts) do
+        table.insert(waypoints, waypoint.Position)
     end
 
     if #waypoints < 2 then
