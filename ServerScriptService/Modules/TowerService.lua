@@ -1,12 +1,8 @@
 local TowerConfigs = require(game.ReplicatedStorage.Modules.Config.TowerConfigs)
 
-local Debris = game:GetService("Debris")
-
 local TowerService = {}
 TowerService.__index = TowerService
 
-local PROJECTILE_FOLDER_NAME = "Projectiles"
-local PROJECTILE_SPEED = 60
 local TOWER_BASE_HALF_SIZE = 2
 
 local function cloneTowerConfig(config)
@@ -37,9 +33,6 @@ function TowerService.new(mapModel, waveService, remotes)
     self.WaveService = waveService
     self.Remotes = remotes
     self.Towers = {}
-    self.ProjectilesFolder = Instance.new("Folder")
-    self.ProjectilesFolder.Name = PROJECTILE_FOLDER_NAME
-    self.ProjectilesFolder.Parent = workspace
 
     if not workspace:FindFirstChild("Towers") then
         local towersFolder = Instance.new("Folder")
@@ -70,7 +63,7 @@ local function buildTowerModel(towerType)
     local head = Instance.new("Part")
     head.Name = "Head"
     head.Size = Vector3.new(1.5, 2, 1.5)
-    head.Anchored = false
+    head.Anchored = true
     head.CanCollide = false
     head.Material = Enum.Material.Neon
     head.Color = Color3.fromRGB(0, 170, 255)
@@ -85,14 +78,19 @@ local function buildTowerModel(towerType)
 
     head.CFrame = base.CFrame * CFrame.new(0, (base.Size.Y + head.Size.Y) / 2, 0)
 
-    local weld = Instance.new("WeldConstraint")
-    weld.Part0 = base
-    weld.Part1 = head
-    weld.Parent = head
+    local barrel = Instance.new("Part")
+    barrel.Name = "Barrel"
+    barrel.Size = Vector3.new(0.35, 0.35, 2.6)
+    barrel.Anchored = true
+    barrel.CanCollide = false
+    barrel.Material = Enum.Material.Metal
+    barrel.Color = Color3.fromRGB(255, 180, 60)
+    barrel.Parent = model
+    barrel.CFrame = head.CFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
 
     model.PrimaryPart = base
 
-    return model, head
+    return model, head, barrel
 end
 
 function TowerService:CanAfford(player, towerType)
@@ -121,9 +119,6 @@ function TowerService:IsPlacementValid(position)
         params.IgnoreWater = true
 
         local ignoreList = {}
-        if self.ProjectilesFolder then
-            table.insert(ignoreList, self.ProjectilesFolder)
-        end
         local towersFolderInstance = workspace:FindFirstChild("Towers")
         if towersFolderInstance then
             table.insert(ignoreList, towersFolderInstance)
@@ -169,7 +164,7 @@ function TowerService:AddTower(player, towerType, position)
         return
     end
 
-    local towerModel, head = buildTowerModel(towerType)
+    local towerModel, head, barrel = buildTowerModel(towerType)
     if not towerModel then
         return
     end
@@ -177,12 +172,21 @@ function TowerService:AddTower(player, towerType, position)
     towerModel.Parent = workspace.Towers
     towerModel:SetPrimaryPartCFrame(CFrame.new(position.X, position.Y + towerModel.PrimaryPart.Size.Y / 2, position.Z))
 
+    local base = towerModel.PrimaryPart
+    if base and head then
+        head.CFrame = base.CFrame * CFrame.new(0, (base.Size.Y + head.Size.Y) / 2, 0)
+    end
+    if head and barrel then
+        barrel.CFrame = head.CFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
+    end
+
     local towerData = {
         Player = player,
         Type = towerType,
         Config = cloneTowerConfig(towerConfig),
         Model = towerModel,
         Head = head,
+        Barrel = barrel,
         Cooldown = 0,
         Level = 1
     }
@@ -218,48 +222,6 @@ local function getFarthestEnemyInRange(towerPosition, range, enemies)
     return farthestEnemy
 end
 
-function TowerService:SpawnProjectile(towerData, target)
-    local head = towerData.Head
-    if not head then
-        return
-    end
-
-    local projectile = Instance.new("Part")
-    projectile.Size = Vector3.new(0.5, 0.5, 0.5)
-    projectile.Anchored = false
-    projectile.CanCollide = false
-    projectile.Shape = Enum.PartType.Ball
-    projectile.Material = Enum.Material.Neon
-    projectile.Color = Color3.fromRGB(255, 220, 80)
-    projectile.CFrame = CFrame.new(head.Position, target.PrimaryPart.Position)
-    projectile.Parent = self.ProjectilesFolder
-
-    local direction = (target.PrimaryPart.Position - projectile.Position).Unit
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Velocity = direction * PROJECTILE_SPEED
-    bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    bodyVelocity.Parent = projectile
-
-    projectile.Velocity = bodyVelocity.Velocity
-
-    Debris:AddItem(projectile, 2)
-
-    local touchedConnection
-    touchedConnection = projectile.Touched:Connect(function(hit)
-        if hit and hit:IsDescendantOf(target) then
-            if touchedConnection then
-                touchedConnection:Disconnect()
-            end
-            bodyVelocity:Destroy()
-            projectile.Anchored = true
-            projectile.Transparency = 1
-            projectile.CanTouch = false
-            self.WaveService:DamageEnemy(target, towerData)
-            Debris:AddItem(projectile, 0.1)
-        end
-    end)
-end
-
 function TowerService:Tick(dt)
     for towerModel, towerData in pairs(self.Towers) do
         if not towerModel.Parent then
@@ -278,6 +240,18 @@ function TowerService:Tick(dt)
                         self.WaveService.Enemies
                     )
                     if target then
+                        local targetPrimary = target.PrimaryPart
+                        if targetPrimary then
+                            local headPosition = head.Position
+                            local flatTarget = Vector3.new(targetPrimary.Position.X, headPosition.Y, targetPrimary.Position.Z)
+                            local lookCFrame = CFrame.new(headPosition, flatTarget)
+                            head.CFrame = lookCFrame
+                            local barrel = towerData.Barrel or towerModel:FindFirstChild("Barrel")
+                            if barrel then
+                                towerData.Barrel = barrel
+                                barrel.CFrame = lookCFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
+                            end
+                        end
                         towerData.Cooldown = towerData.Config.FireRate
                         if towerData.Config.SplashRadius then
                             self.WaveService:SplashDamage(
@@ -286,7 +260,7 @@ function TowerService:Tick(dt)
                                 towerData
                             )
                         else
-                            self:SpawnProjectile(towerData, target)
+                            self.WaveService:DamageEnemy(target, towerData)
                         end
                     end
                 end

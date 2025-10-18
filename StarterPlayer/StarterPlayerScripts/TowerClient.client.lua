@@ -17,6 +17,7 @@ local hoverBillboard
 local hoverLabel
 local selectedTower
 local rangeAdornment
+local previewRangeAdornment
 local selectedTowerConnections = {}
 local currentMoney = 0
 
@@ -29,6 +30,7 @@ local upgradeDescriptionLabel
 local upgradeButton
 
 local PREVIEW_SIZE = Vector3.new(4, 1, 4)
+local RANGE_ORIENTATION = CFrame.Angles(0, 0, math.rad(90))
 
 local function disconnectSelectedConnections()
     for _, conn in ipairs(selectedTowerConnections) do
@@ -41,6 +43,13 @@ local function destroyRangeIndicator()
     if rangeAdornment then
         rangeAdornment:Destroy()
         rangeAdornment = nil
+    end
+end
+
+local function destroyPreviewRangeIndicator()
+    if previewRangeAdornment then
+        previewRangeAdornment:Destroy()
+        previewRangeAdornment = nil
     end
 end
 
@@ -204,6 +213,7 @@ local function showRangeIndicator(towerModel, range)
     rangeAdornment.AlwaysOnTop = true
     rangeAdornment.ZIndex = 2
     rangeAdornment.Height = 0.15
+    rangeAdornment.CFrame = RANGE_ORIENTATION
     rangeAdornment.Radius = range
     rangeAdornment.Parent = towerModel
 end
@@ -368,6 +378,24 @@ local function createGui()
                 previewPart.Size = PREVIEW_SIZE
                 previewPart.Name = "PlacementPreview"
                 previewPart.Parent = workspace
+            end
+            local config = towerConfigs[placingTowerType]
+            if config and config.Range then
+                if not previewRangeAdornment then
+                    previewRangeAdornment = Instance.new("CylinderHandleAdornment")
+                    previewRangeAdornment.Name = "PlacementRange"
+                    previewRangeAdornment.Color3 = Color3.fromRGB(120, 220, 255)
+                    previewRangeAdornment.Transparency = 0.45
+                    previewRangeAdornment.AlwaysOnTop = true
+                    previewRangeAdornment.ZIndex = 2
+                    previewRangeAdornment.Height = 0.15
+                    previewRangeAdornment.CFrame = RANGE_ORIENTATION
+                end
+                previewRangeAdornment.Radius = config.Range
+                previewRangeAdornment.Adornee = previewPart
+                previewRangeAdornment.Parent = previewPart
+            elseif previewRangeAdornment then
+                destroyPreviewRangeIndicator()
             end
             placementValid = false
             selectedTower = nil
@@ -612,6 +640,7 @@ local function cancelPlacement()
         previewPart:Destroy()
         previewPart = nil
     end
+    destroyPreviewRangeIndicator()
     placementValid = false
 end
 
@@ -684,6 +713,9 @@ local function updatePreview()
         local hitPosition = rayResult.Position
         local previewPosition = Vector3.new(hitPosition.X, hitPosition.Y + previewPart.Size.Y / 2, hitPosition.Z)
         previewPart.CFrame = CFrame.new(previewPosition)
+        if previewRangeAdornment then
+            previewRangeAdornment.CFrame = RANGE_ORIENTATION
+        end
         placementValid = computePlacementValidity(hitPosition, rayResult.Instance)
         previewPart.Color = placementValid and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 100, 100)
     else
