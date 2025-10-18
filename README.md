@@ -67,11 +67,15 @@ Design your own interface once and let the client script clone it for every play
 
 1. Inside `ReplicatedStorage/Assets/UI`, create a **`ScreenGui`** named **`TowerHUD`**. This layout is copied into each player’s `PlayerGui` when they join.
 2. Give the `TowerHUD` three top-level children (names are important):
-   * **`Shop`** – any Frame/ScrollingFrame you like. Add one `TextButton` per tower and set the button’s `TowerType` attribute (string) to match the key in `TowerConfigs` (e.g. `Archer`). If you want to preserve your custom text, set the button’s `AutoText` attribute to `false`; otherwise the script will label it as “Name | $Cost”.
+   * **`Shop`** – any Frame/ScrollingFrame you like. Add three slot buttons (any `GuiButton`) and name them `Slot1`, `Slot2`, and `Slot3` (or assign a numeric `SlotIndex` attribute). These slots start disabled and are populated after the player chooses a loadout. Leave whatever placeholder copy you prefer; if a slot’s `AutoText` attribute is set to `false`, the script will not overwrite the text when a tower is assigned. You can keep other buttons or UI inside the shop—the script only manages the three slot buttons.
    * **`Status`** – holds the HUD labels. Add `TextLabel`s named `MoneyLabel`, `LivesLabel`, and `WaveLabel`, plus a `TextButton` named `StartButton`. The script updates the text automatically; set `AutoText = false` and/or `AutoStyle = false` on `StartButton` if you prefer to manage the label or colors yourself.
    * **`TowerDetails`** – the inspection panel. Include `TextLabel`s named `TowerNameLabel`, `TowerLevelLabel`, `TowerStatsLabel`, `OwnershipLabel`, and `UpgradeDescriptionLabel`, plus buttons named `UpgradeButton` and `SellButton`. Feel free to restyle fonts, colors, and layout—the script only fills in the text and toggles visibility.
-3. To customize the hover tooltip, add a **GuiObject** (for example a `Frame` or `TextLabel`) or an entire **`ScreenGui`** named **`EnemyHoverTemplate`** under `ReplicatedStorage/Assets/UI`. Include `TextLabel`s named `NameLabel` and `HealthLabel` (or a single `TextLabel` named `InfoLabel`). The LocalScript clones this UI, keeps your colors, and positions it near the player’s cursor while hovering an enemy. Optional `OffsetX`/`OffsetY` number attributes on the root GuiObject let you tweak the cursor offset in pixels.
-4. Add a GuiObject named **`PlayerTowerPriceLabels`** anywhere inside `TowerHUD` if you want hover pricing. Place (and style) `TextLabel`s named `UpgradePriceLabel` and `SellPriceLabel` inside it. The script hides this container by default, updates the text with your tower’s next upgrade cost and sell refund, and shows it whenever the player hovers their mouse over a tower they own. Position it wherever you like in Studio—the script only toggles visibility and text.
+3. Add a **`ScreenGui`** named **`TowerSelection`** under `ReplicatedStorage/Assets/UI`. Inside it, create a `SelectionFrame` (or `SelectionPanel`) that contains:
+   * A container named **`TowerList`** with a `GuiButton` called **`TowerButtonTemplate`**. The script clones this template once per tower in `TowerConfigs`, fills in the name/cost (unless `AutoText = false`), and reuses your layout and colors. Optional `SelectionOrder` numbers in the configs control the list order; otherwise entries are sorted alphabetically.
+   * Three slot buttons named `Slot1`, `Slot2`, `Slot3` (or any buttons with a numeric `SlotIndex` attribute). The selection UI highlights the active slot, lets players right-click to clear it, and shows the chosen tower name using your styling.
+   * A `GuiButton` named **`ConfirmButton`** that closes the picker once all three slots are filled. The script toggles its `Active` state and adds a `SelectionReady` attribute so you can drive custom visuals.
+4. To customize the hover tooltip, add a **GuiObject** (for example a `Frame` or `TextLabel`) or an entire **`ScreenGui`** named **`EnemyHoverTemplate`** under `ReplicatedStorage/Assets/UI`. Include `TextLabel`s named `NameLabel` and `HealthLabel` (or a single `TextLabel` named `InfoLabel`). The LocalScript clones this UI, keeps your colors, and positions it near the player’s cursor while hovering an enemy. Optional `OffsetX`/`OffsetY` number attributes on the root GuiObject let you tweak the cursor offset in pixels.
+5. Add a GuiObject named **`PlayerTowerPriceLabels`** anywhere inside `TowerHUD` if you want hover pricing. Place (and style) `TextLabel`s named `UpgradePriceLabel` and `SellPriceLabel` inside it. The script hides this container by default, updates the text with your tower’s next upgrade cost and sell refund, and shows it whenever the player hovers their mouse over a tower they own. Position it wherever you like in Studio—the script only toggles visibility and text.
 5. You can add additional GUI elements (wave timers, ability buttons, etc.) to `TowerHUD`; they will clone along with everything else. Just avoid naming conflicts with the reserved objects listed above.
 The scripts leave your color choices intact—they only update text, toggle visibility, and enable/disable buttons based on game state. If something is missing, the client logs a warning instead of generating fallback UI, so keep the names above consistent.
 
@@ -125,6 +129,7 @@ table.insert(WaveConfigs, {
 ## Gameplay Overview
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
+* **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker.
 * **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP). These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
 * **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
@@ -134,11 +139,12 @@ table.insert(WaveConfigs, {
 ## Testing Checklist
 
 1. Publish the game or run **Play** in Studio.
-2. Confirm the UI appears with tower buttons, money, lives, wave counter, and a `Start` button.
-3. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
-4. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers.
-5. Press **`X`** while aiming the preview to cancel placement without spending money.
-6. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
-7. With one of your towers selected, press **`E`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.
+2. Confirm the UI appears with tower slots, money, lives, wave counter, and a `Start` button.
+3. Open the tower selection screen, assign three towers to the slots, and confirm the loadout. The shop buttons should update to the towers you chose.
+4. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
+5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers.
+6. Press **`X`** while aiming the preview to cancel placement without spending money.
+7. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
+8. With one of your towers selected, press **`E`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.
 
 Enjoy customizing the visuals, adding sound effects, or expanding with new towers and waves!

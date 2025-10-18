@@ -37,6 +37,8 @@ local currentMoney = 0
 local gameEnded = false
 local lastVictoryState
 local shopButtonConnections = {}
+local shopSlotButtons = {}
+local shopSlotOriginalText = {}
 local beginPlacement
 local shopDescendantConnection
 
@@ -60,6 +62,18 @@ local upgradeButtonOriginalAutoButtonColor
 local sellButtonOriginalAutoButtonColor
 local priceLabelsCanShow = false
 local GREY_COLOR = Color3.new(0.5, 0.5, 0.5)
+
+local selectionScreenGui
+local selectionFrame
+local selectionTowerList
+local towerButtonTemplate
+local selectionSlotButtons = {}
+local selectionSlotOriginalText = {}
+local selectionActiveSlot
+local selectionConfirmButton
+local selectionConfirmButtonOriginalAutoButtonColor
+local loadoutSelection = {}
+local selectionComplete = false
 
 local DEFAULT_PREVIEW_SIZE = Vector3.new(4, 1, 4)
 local DEFAULT_PREVIEW_RADIUS = math.max(DEFAULT_PREVIEW_SIZE.X, DEFAULT_PREVIEW_SIZE.Z) / 2
@@ -409,7 +423,7 @@ local function disconnectShopButton(button)
 end
 
 local function connectShopButton(button)
-    if not button or not button:IsA("TextButton") then
+    if not button or not button:IsA("GuiButton") then
         return
     end
 
@@ -423,11 +437,11 @@ local function connectShopButton(button)
     end
 
     local config = towerConfigs[towerType]
-    if config and button:GetAttribute("AutoText") ~= false then
+    if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
         button.Text = string.format("%s | $%d", config.Name or towerType, config.Cost or 0)
     end
 
-    shopButtonConnections[button] = button.MouseButton1Click:Connect(function()
+    shopButtonConnections[button] = button.Activated:Connect(function()
         beginPlacement(towerType)
     end)
 
@@ -436,6 +450,344 @@ local function connectShopButton(button)
             disconnectShopButton(button)
         end
     end)
+end
+
+local function resolveSlotIndex(button)
+    if not (button and button:IsA("GuiObject")) then
+        return nil
+    end
+
+    local slotIndex = button:GetAttribute("SlotIndex")
+    if typeof(slotIndex) == "number" then
+        slotIndex = math.floor(slotIndex + 0.5)
+        if slotIndex >= 1 then
+            return slotIndex
+        end
+    end
+
+    if typeof(slotIndex) == "string" then
+        local numeric = tonumber(slotIndex)
+        if numeric then
+            return math.floor(numeric + 0.5)
+        end
+    end
+
+    local match = string.match(button.Name, "Slot(%d+)")
+    if match then
+        return tonumber(match)
+    end
+
+    return nil
+end
+
+local function updateConfirmButtonState()
+    if not selectionConfirmButton then
+        return
+    end
+
+    local ready = true
+    for i = 1, 3 do
+        if not loadoutSelection[i] then
+            ready = false
+            break
+        end
+    end
+
+    if selectionConfirmButtonOriginalAutoButtonColor == nil then
+        selectionConfirmButtonOriginalAutoButtonColor = selectionConfirmButton.AutoButtonColor
+    end
+
+    selectionConfirmButton.Active = ready
+    if selectionConfirmButtonOriginalAutoButtonColor ~= nil then
+        selectionConfirmButton.AutoButtonColor = ready and selectionConfirmButtonOriginalAutoButtonColor or false
+    end
+    selectionConfirmButton:SetAttribute("SelectionReady", ready)
+end
+
+local function updateSelectionSlotDisplay(slotIndex)
+    local button = selectionSlotButtons[slotIndex]
+    if not button then
+        return
+    end
+
+    local towerType = loadoutSelection[slotIndex]
+    if towerType and towerConfigs[towerType] then
+        button:SetAttribute("TowerType", towerType)
+        if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
+            local config = towerConfigs[towerType]
+            button.Text = config.Name or towerType
+        end
+    else
+        button:SetAttribute("TowerType", nil)
+        if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
+            button.Text = selectionSlotOriginalText[slotIndex] or "Empty Slot"
+        end
+    end
+
+    button:SetAttribute("ActiveSlot", selectionActiveSlot == slotIndex)
+end
+
+local function setActiveSelectionSlot(slotIndex)
+    if selectionActiveSlot == slotIndex then
+        return
+    end
+
+    selectionActiveSlot = slotIndex
+
+    for index in pairs(selectionSlotButtons) do
+        updateSelectionSlotDisplay(index)
+    end
+end
+
+local function findFirstEmptySlot()
+    for i = 1, 3 do
+        if not loadoutSelection[i] then
+            return i
+        end
+    end
+    return nil
+end
+
+local function assignTowerToSlot(slotIndex, towerType)
+    if not (slotIndex and towerType and towerConfigs[towerType]) then
+        return
+    end
+
+    loadoutSelection[slotIndex] = towerType
+    updateSelectionSlotDisplay(slotIndex)
+
+    local nextEmpty = findFirstEmptySlot()
+    if nextEmpty then
+        setActiveSelectionSlot(nextEmpty)
+    end
+
+    updateConfirmButtonState()
+end
+
+local function clearSlot(slotIndex)
+    if not slotIndex then
+        return
+    end
+
+    loadoutSelection[slotIndex] = nil
+    updateSelectionSlotDisplay(slotIndex)
+    setActiveSelectionSlot(slotIndex)
+    updateConfirmButtonState()
+end
+
+local function applyLoadoutToShop()
+    for slotIndex, button in pairs(shopSlotButtons) do
+        if button and button:IsA("GuiButton") then
+            local towerType = loadoutSelection[slotIndex]
+            if towerType and towerConfigs[towerType] then
+                disconnectShopButton(button)
+                button:SetAttribute("TowerType", towerType)
+                if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
+                    local config = towerConfigs[towerType]
+                    button.Text = string.format("%s | $%d", config.Name or towerType, config.Cost or 0)
+                end
+                button.Active = true
+                button.Visible = true
+                connectShopButton(button)
+            else
+                disconnectShopButton(button)
+                button:SetAttribute("TowerType", nil)
+                if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
+                    local defaultText = shopSlotOriginalText[slotIndex]
+                    if defaultText then
+                        button.Text = defaultText
+                    end
+                end
+                button.Active = false
+            end
+        end
+    end
+end
+
+local function populateTowerSelectionButtons()
+    if not (selectionTowerList and towerButtonTemplate and towerButtonTemplate:IsA("GuiButton")) then
+        return
+    end
+
+    for _, child in ipairs(selectionTowerList:GetChildren()) do
+        if child ~= towerButtonTemplate and child:GetAttribute("TowerClientGenerated") then
+            child:Destroy()
+        end
+    end
+
+    local keys = {}
+    for towerType in pairs(towerConfigs) do
+        table.insert(keys, towerType)
+    end
+
+    table.sort(keys, function(a, b)
+        local configA = towerConfigs[a]
+        local configB = towerConfigs[b]
+        local orderA = configA and configA.SelectionOrder or math.huge
+        local orderB = configB and configB.SelectionOrder or math.huge
+        if orderA ~= orderB then
+            return orderA < orderB
+        end
+        local nameA = configA and configA.Name or a
+        local nameB = configB and configB.Name or b
+        return tostring(nameA) < tostring(nameB)
+    end)
+
+    for _, towerType in ipairs(keys) do
+        local config = towerConfigs[towerType]
+        local button = towerButtonTemplate:Clone()
+        button.Name = string.format("%sSelectButton", towerType)
+        button.Visible = true
+        button.Parent = selectionTowerList
+        button:SetAttribute("TowerType", towerType)
+        button:SetAttribute("TowerClientGenerated", true)
+        if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
+            button.Text = string.format("%s | $%d", config.Name or towerType, config.Cost or 0)
+        end
+        if typeof(config.SelectionOrder) == "number" then
+            button.LayoutOrder = config.SelectionOrder
+        end
+        if button:IsA("GuiButton") then
+            button.Activated:Connect(function()
+                local slotIndex = selectionActiveSlot or findFirstEmptySlot() or 1
+                assignTowerToSlot(slotIndex, towerType)
+            end)
+        end
+    end
+
+    if towerButtonTemplate:IsA("GuiObject") then
+        towerButtonTemplate.Visible = false
+    end
+end
+
+local function createSelectionGui()
+    if selectionScreenGui then
+        return selectionScreenGui
+    end
+
+    local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
+    local uiFolder = assetsFolder and assetsFolder:FindFirstChild("UI")
+    local template = uiFolder and uiFolder:FindFirstChild("TowerSelection")
+
+    if not (template and template:IsA("ScreenGui")) then
+        warn("TowerClient: Provide a ScreenGui named 'TowerSelection' under ReplicatedStorage/Assets/UI.")
+        return nil
+    end
+
+    selectionScreenGui = template:Clone()
+    selectionScreenGui.ResetOnSpawn = false
+    selectionScreenGui.IgnoreGuiInset = true
+    selectionScreenGui.Enabled = true
+    selectionScreenGui.Parent = playerGui
+
+    selectionFrame = selectionScreenGui:FindFirstChild("SelectionFrame", true)
+        or selectionScreenGui:FindFirstChild("SelectionPanel", true)
+        or selectionScreenGui:FindFirstChildWhichIsA("GuiObject")
+
+    if selectionFrame and selectionFrame:IsA("GuiObject") then
+        selectionFrame.Visible = true
+    else
+        warn("TowerClient: TowerSelection must contain a GuiObject named 'SelectionFrame' (or 'SelectionPanel').")
+        selectionFrame = nil
+    end
+
+    if selectionFrame then
+        selectionTowerList = selectionFrame:FindFirstChild("TowerList", true)
+        if selectionTowerList and selectionTowerList:IsA("GuiObject") then
+            towerButtonTemplate = selectionTowerList:FindFirstChild("TowerButtonTemplate")
+            if towerButtonTemplate and towerButtonTemplate:IsA("GuiButton") then
+                towerButtonTemplate.Visible = false
+            else
+                warn("TowerClient: TowerList must contain a GuiButton named 'TowerButtonTemplate'.")
+                towerButtonTemplate = nil
+            end
+        else
+            warn("TowerClient: TowerSelection UI is missing a 'TowerList' container.")
+        end
+
+        for _, descendant in ipairs(selectionFrame:GetDescendants()) do
+            if descendant:IsA("GuiButton") then
+                local slotIndex = resolveSlotIndex(descendant)
+                if slotIndex and slotIndex >= 1 and slotIndex <= 3 then
+                    selectionSlotButtons[slotIndex] = descendant
+                    if descendant:IsA("TextButton") and descendant:GetAttribute("AutoText") ~= false then
+                        selectionSlotOriginalText[slotIndex] = selectionSlotOriginalText[slotIndex] or descendant.Text
+                    end
+                    descendant.Activated:Connect(function()
+                        setActiveSelectionSlot(slotIndex)
+                    end)
+                    if descendant:IsA("TextButton") then
+                        descendant.MouseButton2Click:Connect(function()
+                            clearSlot(slotIndex)
+                        end)
+                    end
+                end
+            end
+        end
+
+        selectionConfirmButton = selectionFrame:FindFirstChild("ConfirmButton", true)
+        if selectionConfirmButton and selectionConfirmButton:IsA("GuiButton") then
+            selectionConfirmButtonOriginalAutoButtonColor = selectionConfirmButton.AutoButtonColor
+            selectionConfirmButton.Activated:Connect(function()
+                local ready = true
+                for i = 1, 3 do
+                    if not loadoutSelection[i] then
+                        ready = false
+                        break
+                    end
+                end
+                if not ready then
+                    return
+                end
+
+                selectionComplete = true
+                if selectionScreenGui then
+                    selectionScreenGui.Enabled = false
+                end
+                applyLoadoutToShop()
+            end)
+        else
+            if selectionConfirmButton then
+                warn("TowerClient: ConfirmButton must be a GuiButton.")
+            else
+                warn("TowerClient: TowerSelection UI requires a ConfirmButton to continue.")
+            end
+            selectionConfirmButton = nil
+        end
+    end
+
+    populateTowerSelectionButtons()
+
+    for index in pairs(selectionSlotButtons) do
+        updateSelectionSlotDisplay(index)
+    end
+
+    setActiveSelectionSlot(findFirstEmptySlot() or 1)
+    updateConfirmButtonState()
+
+    return selectionScreenGui
+end
+
+local function showTowerSelection()
+    createSelectionGui()
+    populateTowerSelectionButtons()
+
+    loadoutSelection = {}
+    selectionActiveSlot = nil
+    selectionComplete = false
+
+    for index in pairs(selectionSlotButtons) do
+        updateSelectionSlotDisplay(index)
+    end
+
+    setActiveSelectionSlot(findFirstEmptySlot() or 1)
+    updateConfirmButtonState()
+
+    if selectionScreenGui then
+        selectionScreenGui.Enabled = true
+    end
+
+    applyLoadoutToShop()
 end
 
 local function ensureHoverGui()
@@ -816,19 +1168,39 @@ local function createGui()
 
     shopFrame = screenGui:FindFirstChild("Shop", true)
     if shopFrame then
+        shopSlotButtons = {}
         for _, descendant in ipairs(shopFrame:GetDescendants()) do
-            if descendant:IsA("TextButton") then
-                connectShopButton(descendant)
+            if descendant:IsA("GuiButton") then
+                local slotIndex = resolveSlotIndex(descendant)
+                if slotIndex and slotIndex >= 1 and slotIndex <= 3 then
+                    shopSlotButtons[slotIndex] = descendant
+                    if descendant:IsA("TextButton") and descendant:GetAttribute("AutoText") ~= false then
+                        shopSlotOriginalText[slotIndex] = shopSlotOriginalText[slotIndex] or descendant.Text
+                    end
+                    disconnectShopButton(descendant)
+                else
+                    connectShopButton(descendant)
+                end
             end
         end
         if shopDescendantConnection then
             shopDescendantConnection:Disconnect()
         end
         shopDescendantConnection = shopFrame.DescendantAdded:Connect(function(descendant)
-            if descendant:IsA("TextButton") then
-                connectShopButton(descendant)
+            if descendant:IsA("GuiButton") then
+                local slotIndex = resolveSlotIndex(descendant)
+                if slotIndex and slotIndex >= 1 and slotIndex <= 3 then
+                    shopSlotButtons[slotIndex] = descendant
+                    if descendant:IsA("TextButton") and descendant:GetAttribute("AutoText") ~= false then
+                        shopSlotOriginalText[slotIndex] = shopSlotOriginalText[slotIndex] or descendant.Text
+                    end
+                    applyLoadoutToShop()
+                else
+                    connectShopButton(descendant)
+                end
             end
         end)
+        applyLoadoutToShop()
     else
         warn("TowerClient: Shop frame named 'Shop' was not found inside the Tower HUD. Add one to enable tower placement buttons.")
     end
@@ -931,7 +1303,7 @@ local function createGui()
             if not sellButton:GetAttribute("TowerClientHooked") then
                 sellButton.MouseButton1Click:Connect(function()
                     if selectedTower then
-                        remotes.TowerSoldRequested:FireServer(selectedTower)
+                        remotes.TowerSellRequested:FireServer(selectedTower)
                     end
                 end)
                 sellButton:SetAttribute("TowerClientHooked", true)
@@ -1010,6 +1382,7 @@ local function createGui()
         if priceLabelContainer then
             priceLabelContainer.Visible = false
         end
+        showTowerSelection()
     end)
 
     return screenGui
@@ -1018,6 +1391,7 @@ end
 end
 
 createGui()
+showTowerSelection()
 
 local function clearSelection()
     selectedTower = nil
