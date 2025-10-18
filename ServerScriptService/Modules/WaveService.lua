@@ -1,6 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EnemyConfigs = require(ReplicatedStorage.Modules.Config.EnemyConfigs)
+local WaveConfigs = require(ReplicatedStorage.Modules.Config.WaveConfigs)
 local PathService = require(ReplicatedStorage.Modules.PathService)
 local RunService = game:GetService("RunService")
 
@@ -8,29 +9,6 @@ local WaveService = {}
 WaveService.__index = WaveService
 
 local Players = game:GetService("Players")
-
-local waves = {
-    {
-        { Type = "Grunt", Count = 12, Delay = 0.75 },
-    },
-    {
-        { Type = "Grunt", Count = 14, Delay = 0.7 },
-        { Type = "Runner", Count = 6, Delay = 0.6 },
-    },
-    {
-        { Type = "Runner", Count = 14, Delay = 0.55 },
-        { Type = "Grunt", Count = 16, Delay = 0.65 },
-    },
-    {
-        { Type = "Tank", Count = 6, Delay = 1.3 },
-        { Type = "Runner", Count = 10, Delay = 0.6 },
-    },
-    {
-        { Type = "Grunt", Count = 20, Delay = 0.6 },
-        { Type = "Tank", Count = 8, Delay = 1.1 },
-        { Type = "Runner", Count = 12, Delay = 0.55 },
-    }
-}
 
 local function buildEnemyModel(enemyType, config)
     local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
@@ -256,7 +234,7 @@ function WaveService:BeginNextWave()
     if self.GameEnded then
         return
     end
-    if self.ActiveWave >= #waves then
+    if self.ActiveWave >= #WaveConfigs then
         self:WinGame()
         return
     end
@@ -275,7 +253,7 @@ function WaveService:BeginNextWave()
 end
 
 function WaveService:SpawnWave(waveNumber)
-    local wave = waves[waveNumber]
+    local wave = WaveConfigs[waveNumber]
     if not wave then
         return
     end

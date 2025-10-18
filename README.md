@@ -11,8 +11,9 @@ Create the folders in **Explorer** exactly as listed. If a folder already exists
 2. Inside `Modules`, add a `Folder` named `Config`.
 3. Insert a `ModuleScript` named **`TowerConfigs`** and paste the contents of [`ReplicatedStorage/Modules/Config/TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua).
 4. Insert a `ModuleScript` named **`EnemyConfigs`** and paste the contents of [`ReplicatedStorage/Modules/Config/EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua).
-5. In `Modules`, add a `ModuleScript` named **`PathService`** and paste [`ReplicatedStorage/Modules/PathService.lua`](ReplicatedStorage/Modules/PathService.lua).
-6. Create a `Folder` named `Remotes`. You do **not** need to add RemoteEvents manually; [`ServerScriptService/GameManager.server.lua`](ServerScriptService/GameManager.server.lua) will generate them if missing.
+5. Insert a `ModuleScript` named **`WaveConfigs`** and paste [`ReplicatedStorage/Modules/Config/WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua).
+6. In `Modules`, add a `ModuleScript` named **`PathService`** and paste [`ReplicatedStorage/Modules/PathService.lua`](ReplicatedStorage/Modules/PathService.lua).
+7. Create a `Folder` named `Remotes`. You do **not** need to add RemoteEvents manually; [`ServerScriptService/GameManager.server.lua`](ServerScriptService/GameManager.server.lua) will generate them if missing.
 
 ### ServerScriptService
 1. Add a `Folder` called `Modules`.
@@ -59,11 +60,55 @@ You can replace the minimalist placeholder geometry with your own creations with
 4. **Adjusting names**: If you use different model names, update the corresponding `ModelName` value in the config table.
 5. **Optional flair**: Accessories, meshes, particles, or lights parented to the model will automatically replicate when towers or enemies spawn.
 
+## Extending Enemy Types & Waves
+
+You can expand the roster and pacing without editing any gameplay scripts—just update the config modules inside `ReplicatedStorage/Modules/Config`.
+
+### Adding a new enemy type
+
+1. Open **`EnemyConfigs`**. Each key in the returned table (e.g. `Grunt`, `Runner`, `Tank`) defines an enemy archetype.
+2. Duplicate an existing entry and change its fields:
+   * `Name`: Label shown in the UI.
+   * `ModelName`: The model to clone from `ReplicatedStorage/Assets/Enemies` (defaults to the key if omitted).
+   * `Health`: Starting hit points.
+   * `Speed`: How fast the enemy moves along the path (studs per second).
+   * `Reward`: How much cash each player earns when this enemy dies.
+   * Optional extra fields (like custom slow resistance) can be added; scripts ignore unknown keys.
+3. If the enemy uses a custom model, add it to `ReplicatedStorage/Assets/Enemies` and match the `ModelName` value.
+
+```lua
+EnemyConfigs.Shielder = {
+    Name = "Shielder",
+    ModelName = "Shielder",
+    Health = 220,
+    Speed = 10,
+    Reward = 45,
+}
+```
+
+### Creating or editing waves
+
+1. Open **`WaveConfigs`**. The module returns an array where each element represents a wave.
+2. A wave is a list of spawn groups. Each group defines:
+   * `Type`: Key from `EnemyConfigs`.
+   * `Count`: How many to spawn in that group.
+   * `Delay`: Seconds between each enemy in the group.
+3. Append a new wave (or edit existing ones) to change pacing. Use as many groups per wave as you like.
+
+```lua
+table.insert(WaveConfigs, {
+    { Type = "Runner", Count = 20, Delay = 0.45 },
+    { Type = "Shielder", Count = 4, Delay = 1.6 },
+})
+```
+
+> Tip: keep the last wave challenging—clearing the final wave ends the game with a victory. You can add an unlimited number of waves.
+
 ## Gameplay Overview
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
-* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP). Defeating enemies awards cash for all players.
-* **Waves**: Five handcrafted waves. The system automatically starts the next wave when the current one clears. Players can also press the `Start` button before wave 1.
+* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP). These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
+* **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 
