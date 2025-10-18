@@ -67,7 +67,7 @@ The `TowerClient` LocalScript now fabricates every interface element at runtime,
 
 * A pre-game **tower selection screen** that lists every entry from `TowerConfigs`, lets creators pick three unique towers for their loadout, and prevents placement until all slots are filled.
 * A bottom **shop bar** that shows the chosen towers, previews their cost, and blocks interaction until the loadout is confirmed.
-* A top-left **status panel** with money, lives, wave counter, and a Start/Restart button that reacts to wins or losses automatically.
+* A top-left **status panel** with money, lives, and the current wave, plus a separate Start/Restart button that appears near the panel once the loadout is confirmed.
 * A top-right **tower details** window that displays range, damage, slow/splash stats, upgrade descriptions, and live sell values. Upgrade (`E`) and sell (`X`) hotkeys stay in sync with the buttons and dim when you cannot afford an action.
 * A cursor-following **enemy hover card** that always shows the hovered enemy’s name and health for quick debugging.
 
@@ -105,12 +105,13 @@ EnemyConfigs.Shielder = {
 2. A wave is a list of spawn groups. Each group defines:
    * `Type`: Key from `EnemyConfigs`.
    * `Count`: How many to spawn in that group.
-   * `Delay`: Seconds between each enemy in the group.
-3. Append a new wave (or edit existing ones) to change pacing. Use as many groups per wave as you like.
+   * `Delay`: Seconds to wait between batches (use `0` for no delay).
+   * `BatchSize` *(optional)*: How many enemies to spawn at once. Omit or set to `1` to keep the default single-spawn flow.
+3. Append a new wave (or edit existing ones) to change pacing. Use as many groups per wave as you like and mix different `BatchSize` values for variety.
 
 ```lua
 table.insert(WaveConfigs, {
-    { Type = "Runner", Count = 20, Delay = 0.45 },
+    { Type = "Runner", Count = 20, Delay = 0.45, BatchSize = 4 },
     { Type = "Shielder", Count = 4, Delay = 1.6 },
 })
 ```
@@ -120,9 +121,9 @@ table.insert(WaveConfigs, {
 ## Gameplay Overview
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
-* **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one.
+* **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
 * **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP). These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
-* **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1.
+* **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Use `BatchSize` on any group to spawn several enemies simultaneously.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 * **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.
@@ -130,10 +131,10 @@ table.insert(WaveConfigs, {
 ## Testing Checklist
 
 1. Publish the game or run **Play** in Studio.
-2. When Play starts, the auto-generated HUD should appear with tower slots, money, lives, a wave counter, and a `Start` button.
-3. Use the tower selection screen that pops up to assign three different towers to the slots and confirm the loadout. The shop buttons should update to the towers you chose.
+2. When Play starts, the auto-generated HUD should appear with tower slots, money, lives, and a wave counter. The Start button should be hidden for now.
+3. Use the tower selection screen that pops up to assign three different towers to the slots and confirm the loadout. The shop buttons should update to the towers you chose, and the Start button should appear near the status panel.
 4. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
-5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers.
+5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers. Groups that set `BatchSize` above 1 will spawn multiple enemies simultaneously.
 6. Press **`X`** while aiming the preview to cancel placement without spending money.
 7. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
 8. With one of your towers selected, press **`E`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.
