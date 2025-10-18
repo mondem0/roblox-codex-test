@@ -26,7 +26,7 @@ Create the folders in **Explorer** exactly as listed. If a folder already exists
 1. Inside `StarterPlayer > StarterPlayerScripts`, insert a `LocalScript` named **`TowerClient`**.
 2. Paste [`StarterPlayer/StarterPlayerScripts/TowerClient.client.lua`](StarterPlayer/StarterPlayerScripts/TowerClient.client.lua).
 
-Create a `Folder` named **`Assets`** inside `ReplicatedStorage` (if you haven't already for the models) and add a subfolder called **`UI`**. Place your UI templates there as described in [Custom UI Templates](#custom-ui-templates); the client script clones those layouts into each player's `PlayerGui`.
+If you plan to replace the sample tower or enemy meshes, create a `Folder` named **`Assets`** inside `ReplicatedStorage` and add optional subfolders called **`Towers`** and **`Enemies`**. The client script now builds the entire interface at runtime, so no UI templates are required.
 
 ## Map Construction Instructions
 
@@ -47,7 +47,7 @@ Follow these steps to build the play area quickly:
 
 You can replace the minimalist placeholder geometry with your own creations without touching any scripts.
 
-1. **Create an Assets folder**: Inside `ReplicatedStorage`, add a `Folder` named **`Assets`**. Within it, create three folders: **`Towers`**, **`Enemies`**, and **`UI`**.
+1. **Create an Assets folder (optional)**: Inside `ReplicatedStorage`, add a `Folder` named **`Assets`**. Within it, create subfolders named **`Towers`** and **`Enemies`** for any custom models you want to swap in. Leave them empty to use the auto-generated geometry.
 2. **Tower models**:
    * Parent each custom tower `Model` to `ReplicatedStorage/Assets/Towers` and name it after the `ModelName` field in [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) (defaults: `Archer`, `Cannon`, `FrostMage`).
    * Include a `Base` part (set as `PrimaryPart`, anchored, centered on the ground), plus a `Head` assembly that pivots toward enemies. The `Head` can be a single `Part` **or** a `Model` that contains multiple pieces; just make sure the model’s `PrimaryPart` is the piece that should rotate. Keep every child anchored (or welded to the pivot) so the script can reposition them together.
@@ -61,26 +61,17 @@ You can replace the minimalist placeholder geometry with your own creations with
 4. **Adjusting names**: If you use different model names, update the corresponding `ModelName` value in the config table.
 5. **Optional flair**: Accessories, meshes, particles, or lights parented to the model will automatically replicate when towers or enemies spawn.
 
-## Custom UI Templates
+## Built-in UI
 
-Design your own interface once and let the client script clone it for every player:
+The `TowerClient` LocalScript now fabricates every interface element at runtime, so you can drop the scripts into a clean experience and press Play without wiring any Gui objects by hand. Out of the box you get:
 
-1. Inside `ReplicatedStorage/Assets/UI`, create a **`ScreenGui`** named **`TowerHUD`**. This layout is copied into each player’s `PlayerGui` when they join.
-2. Give the `TowerHUD` three top-level children (names are important):
-   * **`Shop`** – any Frame/ScrollingFrame you like. Add three slot buttons (any `GuiButton`) and name them `Slot1`, `Slot2`, and `Slot3` (or assign a numeric `SlotIndex` attribute). These slots start disabled and are populated after the player chooses a loadout. Leave whatever placeholder copy you prefer; if a slot’s `AutoText` attribute is set to `false`, the script will not overwrite the text when a tower is assigned. You can keep other buttons or UI inside the shop—the script only manages the three slot buttons.
-   * **`Status`** – holds the HUD labels. Add `TextLabel`s named `MoneyLabel`, `LivesLabel`, and `WaveLabel`, plus a `TextButton` named `StartButton`. The script updates the text automatically; set `AutoText = false` and/or `AutoStyle = false` on `StartButton` if you prefer to manage the label or colors yourself.
-   * **`TowerDetails`** – the inspection panel. Include `TextLabel`s named `TowerNameLabel`, `TowerLevelLabel`, `TowerStatsLabel`, `OwnershipLabel`, and `UpgradeDescriptionLabel`, plus buttons named `UpgradeButton` and `SellButton`. Feel free to restyle fonts, colors, and layout—the script only fills in the text and toggles visibility.
-3. Add a **`ScreenGui`** named **`TowerSelection`** under `ReplicatedStorage/Assets/UI`. Inside it, create a `SelectionFrame` (or `SelectionPanel`) that contains:
-   * A container named **`TowerList`** with a `GuiButton` called **`TowerButtonTemplate`**. The script clones this template once per tower in `TowerConfigs`, fills in the name/cost (unless `AutoText = false`), and reuses your layout and colors. Optional `SelectionOrder` numbers in the configs control the list order; otherwise entries are sorted alphabetically.
-   * Three slot buttons named `Slot1`, `Slot2`, `Slot3` (or any buttons with a numeric `SlotIndex` attribute). The selection UI highlights the active slot, lets players right-click to clear it, and shows the chosen tower name using your styling.
-   * A `GuiButton` named **`ConfirmButton`** that closes the picker once all three slots are filled. The script toggles its `Active` state and adds a `SelectionReady` attribute so you can drive custom visuals.
-4. To customize the hover tooltip, add a **GuiObject** (for example a `Frame` or `TextLabel`) or an entire **`ScreenGui`** named **`EnemyHoverTemplate`** under `ReplicatedStorage/Assets/UI`. Include `TextLabel`s named `NameLabel` and `HealthLabel` (or a single `TextLabel` named `InfoLabel`). The LocalScript clones this UI, keeps your colors, and positions it near the player’s cursor while hovering an enemy. Optional `OffsetX`/`OffsetY` number attributes on the root GuiObject let you tweak the cursor offset in pixels.
-5. Add a GuiObject named **`PlayerTowerPriceLabels`** anywhere inside `TowerHUD` if you want hover pricing. Place (and style) `TextLabel`s named `UpgradePriceLabel` and `SellPriceLabel` inside it. The script hides this container by default, updates the text with your tower’s next upgrade cost and sell refund, and shows it whenever the player hovers their mouse over a tower they own. Position it wherever you like in Studio—the script only toggles visibility and text.
-5. You can add additional GUI elements (wave timers, ability buttons, etc.) to `TowerHUD`; they will clone along with everything else. Just avoid naming conflicts with the reserved objects listed above.
-The scripts leave your color choices intact—they only update text, toggle visibility, and enable/disable buttons based on game state. If something is missing, the client logs a warning instead of generating fallback UI, so keep the names above consistent.
+* A pre-game **tower selection screen** that lists every entry from `TowerConfigs`, lets creators pick three towers for their loadout, and prevents placement until all slots are filled.
+* A bottom **shop bar** that shows the chosen towers, previews their cost, and blocks interaction until the loadout is confirmed.
+* A top-left **status panel** with money, lives, wave counter, and a Start/Restart button that reacts to wins or losses automatically.
+* A top-right **tower details** window that displays range, damage, slow/splash stats, upgrade descriptions, and live sell values. Upgrade (`E`) and sell (`X`) hotkeys stay in sync with the buttons and dim when you cannot afford an action.
+* A cursor-following **enemy hover card** that always shows the hovered enemy’s name and health for quick debugging.
 
-
-
+If you want a bespoke layout, you can still duplicate the generated Gui objects in play mode, tweak them in Studio, and then update the script to match your custom hierarchy. The default skins are intentionally minimalist so you can ship immediately or treat them as a starting point for further styling.
 
 ## Extending Enemy Types & Waves
 
@@ -134,13 +125,13 @@ table.insert(WaveConfigs, {
 * **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
-* **Enemy info**: Hovering over an enemy shows your `EnemyHoverTemplate` UI beside the cursor with that enemy’s name and HP—no default billboard is spawned. Edit the template in `ReplicatedStorage/Assets/UI` to restyle the display.
+* **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.
 
 ## Testing Checklist
 
 1. Publish the game or run **Play** in Studio.
-2. Confirm the UI appears with tower slots, money, lives, wave counter, and a `Start` button.
-3. Open the tower selection screen, assign three towers to the slots, and confirm the loadout. The shop buttons should update to the towers you chose.
+2. When Play starts, the auto-generated HUD should appear with tower slots, money, lives, a wave counter, and a `Start` button.
+3. Use the tower selection screen that pops up to assign three towers to the slots and confirm the loadout. The shop buttons should update to the towers you chose.
 4. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
 5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers.
 6. Press **`X`** while aiming the preview to cancel placement without spending money.
