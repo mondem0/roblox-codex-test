@@ -49,7 +49,9 @@ You can replace the minimalist placeholder geometry with your own creations with
 1. **Create an Assets folder**: Inside `ReplicatedStorage`, add a `Folder` named **`Assets`**. Within it, create two folders: **`Towers`** and **`Enemies`**.
 2. **Tower models**:
    * Parent each custom tower `Model` to `ReplicatedStorage/Assets/Towers` and name it after the `ModelName` field in [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) (defaults: `Archer`, `Cannon`, `FrostMage`).
-   * Include a `Base` part (set as `PrimaryPart`, anchored, centered on the ground), a `Head` part that pivots toward enemies, and a thin `Barrel` part pointing along the head’s negative Z-axis. Anchor every part and disable collisions so placement remains smooth.
+   * Include a `Base` part (set as `PrimaryPart`, anchored, centered on the ground), plus a `Head` assembly that pivots toward enemies. The `Head` can be a single `Part` **or** a `Model` that contains multiple pieces; just make sure the model’s `PrimaryPart` is the piece that should rotate. Keep every child anchored (or welded to the pivot) so the script can reposition them together.
+   * Add a thin `Barrel` `Part` that sticks out of the front of the head. You can leave it as a sibling of the head or parent it under the head model—the server will locate it automatically. Aim the barrel down the head’s negative Z-axis so it points forward when the tower spawns.
+   * Anchor every part and disable collisions so placement remains smooth.
 3. **Enemy models**:
    * Parent each enemy `Model` to `ReplicatedStorage/Assets/Enemies` using the names in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua) (`Grunt`, `Runner`, `Tank`).
    * Provide a `HumanoidRootPart` (or assign a `PrimaryPart`) centered on the character plus a `Head` part. Anchor all geometry and disable collisions so enemies glide along the path.
@@ -62,7 +64,7 @@ You can replace the minimalist placeholder geometry with your own creations with
 * **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP). Defeating enemies awards cash for all players.
 * **Waves**: Five handcrafted waves. The system automatically starts the next wave when the current one clears. Players can also press the `Start` button before wave 1.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
-* **Tower management**: Sell owned towers for **50%** of the total amount invested (base cost + upgrades) or cancel placement via the UI button, right-click, or the `Esc`/`R` keys.
+* **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`U`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 
 ## Testing Checklist
 
@@ -70,8 +72,8 @@ You can replace the minimalist placeholder geometry with your own creations with
 2. Confirm the UI appears with tower buttons, money, lives, wave counter, and a `Start` button.
 3. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
 4. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers.
-5. Use the cancel button (or right-click) to exit placement mode without spending money.
+5. Press **`X`** while aiming the preview to cancel placement without spending money.
 6. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
-7. Upgrade and sell a placed tower to confirm upgrade costs apply and 50% refunds are awarded on sale.
+7. With one of your towers selected, press **`U`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.
 
 Enjoy customizing the visuals, adding sound effects, or expanding with new towers and waves!

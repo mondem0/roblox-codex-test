@@ -61,6 +61,7 @@ local function buildTowerModel(towerType)
         if template and template:IsA("Model") then
             local cloned = template:Clone()
             cloned.Name = towerConfig.Name
+            cloned:SetAttribute("TemplateModel", true)
             local base = cloned.PrimaryPart or cloned:FindFirstChild("Base") or cloned:FindFirstChildWhichIsA("BasePart")
             if base and not cloned.PrimaryPart then
                 cloned.PrimaryPart = base
@@ -135,6 +136,75 @@ local function buildTowerModel(towerType)
     model.PrimaryPart = base
 
     return model, head, barrel
+end
+
+local function captureHeadGeometry(towerModel, head, barrel)
+    if not towerModel then
+        return nil
+    end
+
+    head = head or towerModel:FindFirstChild("Head")
+    barrel = barrel or towerModel:FindFirstChild("Barrel") or towerModel:FindFirstChild("Barrel", true)
+    if head and head:IsA("Model") and not head.PrimaryPart then
+        local pivotCandidate = head:FindFirstChildWhichIsA("BasePart")
+        if pivotCandidate then
+            head.PrimaryPart = pivotCandidate
+        end
+    end
+
+    local headPivot
+    if head then
+        if head:IsA("BasePart") then
+            headPivot = head
+        elseif head:IsA("Model") then
+            headPivot = head.PrimaryPart
+        end
+    end
+
+    local headOffsets = {}
+    if head and headPivot then
+        if head:IsA("Model") then
+            for _, descendant in ipairs(head:GetDescendants()) do
+                if descendant:IsA("BasePart") then
+                    headOffsets[descendant] = headPivot.CFrame:ToObjectSpace(descendant.CFrame)
+                end
+            end
+        elseif head:IsA("BasePart") then
+            headOffsets[head] = headPivot.CFrame:ToObjectSpace(head.CFrame)
+        end
+    end
+
+    local barrelOffset
+    if barrel and barrel:IsA("BasePart") and headPivot then
+        barrelOffset = headPivot.CFrame:ToObjectSpace(barrel.CFrame)
+    end
+
+    return {
+        Head = head,
+        HeadPivot = headPivot,
+        HeadOffsets = headOffsets,
+        Barrel = barrel,
+        BarrelOffset = barrelOffset,
+    }
+end
+
+local function ensureHeadGeometry(towerData)
+    if not towerData then
+        return nil
+    end
+
+    local headInfo = towerData.HeadInfo
+    if headInfo and headInfo.HeadPivot and headInfo.HeadPivot.Parent then
+        return headInfo
+    end
+
+    headInfo = captureHeadGeometry(towerData.Model, towerData.Head, towerData.Barrel)
+    towerData.HeadInfo = headInfo
+    if headInfo then
+        towerData.Head = headInfo.Head
+        towerData.Barrel = headInfo.Barrel
+    end
+    return headInfo
 end
 
 function TowerService:CanAfford(player, towerType)
@@ -227,11 +297,13 @@ function TowerService:AddTower(player, towerType, position)
     local heightOffset = primary.Size.Y / 2
     towerModel:PivotTo(CFrame.new(position.X, position.Y + heightOffset, position.Z))
 
-    if head then
-        head.CFrame = primary.CFrame * CFrame.new(0, (primary.Size.Y + head.Size.Y) / 2, 0)
-    end
-    if head and barrel then
-        barrel.CFrame = head.CFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
+    if not towerModel:GetAttribute("TemplateModel") then
+        if head and head:IsA("BasePart") then
+            head.CFrame = primary.CFrame * CFrame.new(0, (primary.Size.Y + head.Size.Y) / 2, 0)
+        end
+        if head and barrel and head:IsA("BasePart") and barrel:IsA("BasePart") then
+            barrel.CFrame = head.CFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
+        end
     end
 
     local towerData = {
@@ -247,6 +319,7 @@ function TowerService:AddTower(player, towerType, position)
     }
 
     self.Towers[towerModel] = towerData
+    ensureHeadGeometry(towerData)
     updateTowerAttributes(towerModel, towerData)
     return towerModel
 end
@@ -284,32 +357,42 @@ function TowerService:Tick(dt)
         else
             towerData.Cooldown = math.max(0, towerData.Cooldown - dt)
             if towerData.Cooldown <= 0 then
-                local head = towerData.Head or towerModel:FindFirstChild("Head")
-                if head then
-                    towerData.Head = head
-                end
-                if head then
+                local headInfo = ensureHeadGeometry(towerData)
+                local headPivot = headInfo and headInfo.HeadPivot
+                if headPivot then
                     local target = getFarthestEnemyInRange(
-                        head.Position,
+                        headPivot.Position,
                         towerData.Config.Range,
                         self.WaveService.Enemies
                     )
                     if target then
                         local targetPrimary = target.PrimaryPart
                         if targetPrimary then
-                            local headPosition = head.Position
+                            local headPosition = headPivot.Position
                             local flatTarget = Vector3.new(targetPrimary.Position.X, headPosition.Y, targetPrimary.Position.Z)
                             local lookCFrame = CFrame.new(headPosition, flatTarget)
-                            head.CFrame = lookCFrame
-                            local barrel = towerData.Barrel or towerModel:FindFirstChild("Barrel")
-                            if barrel then
-                                towerData.Barrel = barrel
-                                barrel.CFrame = lookCFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
+                            headPivot.CFrame = lookCFrame
+
+                            if headInfo.HeadOffsets then
+                                for part, offset in pairs(headInfo.HeadOffsets) do
+                                    if part ~= headPivot and part.Parent then
+                                        part.CFrame = lookCFrame * offset
+                                    end
+                                end
+                            end
+
+                            if headInfo.Barrel and headInfo.Barrel.Parent then
+                                towerData.Barrel = headInfo.Barrel
+                                local barrelOffset = headInfo.BarrelOffset
+                                if barrelOffset then
+                                    headInfo.Barrel.CFrame = lookCFrame * barrelOffset
+                                end
                             end
                         end
+
                         local fireRate = towerData.Config.FireRate or 0
                         towerData.Cooldown = math.max(0.05, fireRate)
-                        if towerData.Config.SplashRadius then
+                        if towerData.Config.SplashRadius and targetPrimary then
                             self.WaveService:SplashDamage(
                                 targetPrimary.Position,
                                 towerData.Config.SplashRadius,
