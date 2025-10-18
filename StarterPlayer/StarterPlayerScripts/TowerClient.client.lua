@@ -789,7 +789,7 @@ local function createSelectionGui()
     selectionConfirmButton = Instance.new("TextButton")
     selectionConfirmButton.Name = "ConfirmButton"
     selectionConfirmButton.Size = UDim2.fromOffset(200, 44)
-    selectionConfirmButton.Position = UDim2.new(0, 160, 0, 346)
+    selectionConfirmButton.Position = UDim2.new(0, 160, 1, -54)
     selectionConfirmButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
     selectionConfirmButton.BorderSizePixel = 0
     selectionConfirmButton.Font = Enum.Font.GothamBold
