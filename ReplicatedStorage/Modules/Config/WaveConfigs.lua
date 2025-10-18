@@ -51,7 +51,12 @@ local wave5 = {
     { Type = "Runner", Count = 12, Delay = 0.55 },
 }
 
-local WaveConfigs = {
+--
+-- Expose each wave both by name (wave1, wave2, …) and by numeric index so
+-- existing wave iteration logic continues to function unchanged while keeping
+-- the configuration easy to scan in Studio.
+--
+local namedWaves = {
     wave1 = wave1,
     wave2 = wave2,
     wave3 = wave3,
@@ -59,10 +64,16 @@ local WaveConfigs = {
     wave5 = wave5,
 }
 
-WaveConfigs[1] = wave1
-WaveConfigs[2] = wave2
-WaveConfigs[3] = wave3
-WaveConfigs[4] = wave4
-WaveConfigs[5] = wave5
+local ordered = {
+    namedWaves.wave1,
+    namedWaves.wave2,
+    namedWaves.wave3,
+    namedWaves.wave4,
+    namedWaves.wave5,
+}
 
-return WaveConfigs
+for index, wave in ipairs(ordered) do
+    namedWaves[index] = wave
+end
+
+return namedWaves
