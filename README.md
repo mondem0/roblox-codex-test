@@ -101,29 +101,39 @@ EnemyConfigs.Shielder = {
 
 ### Creating or editing waves
 
-1. Open **`WaveConfigs`**. The module returns an array where each element represents a wave.
-2. A wave is a list of spawn groups. Each group defines:
-   * `Type`: Key from `EnemyConfigs`.
-   * `Count`: How many to spawn in that group.
-   * `Delay`: Seconds to wait between batches (use `0` for no delay).
-   * `BatchSize` *(optional)*: How many enemies to spawn at once. Omit or set to `1` to keep the default single-spawn flow.
-3. Append a new wave (or edit existing ones) to change pacing. Use as many groups per wave as you like and mix different `BatchSize` values for variety.
+1. Open **`WaveConfigs`**. The module now exposes a small helper named `AddWave` that registers each wave, assigns it both a numeric index, and stores optional metadata such as rewards or descriptions.
+2. A wave is still a list of spawn groups. Each group can spawn one enemy type sequentially or mix several types at the same time:
+   * For a **single-type group**, set `Type`, `Count`, and `Delay` (seconds to wait between each enemy; use `0` for no delay).
+   * For a **multi-type group**, provide a `Spawns` array. Each entry in the array needs a `Type` and an optional `Count` (defaults to `1`). Include `Repeat` (or `Repeats`) to send the combined set multiple times, and use `Delay` to control the gap between each repeated set.
+3. Duplicate one of the `AddWave({ ... })` blocks (or insert a new one) to introduce additional waves. Change the `Name`, `Reward`, `Description`, or any custom metadata you want to track, then edit the `Groups` array to control the actual spawns.
 
 ```lua
-table.insert(WaveConfigs, {
-    { Type = "Runner", Count = 20, Delay = 0.45, BatchSize = 4 },
-    { Type = "Shielder", Count = 4, Delay = 1.6 },
+WaveConfigs.AddWave({
+    Name = "wave6",
+    Reward = 180,
+    Description = "Air support arrives alongside heavy shields.",
+    Groups = {
+        { Type = "Runner", Count = 20, Delay = 0.45 },
+        {
+            Spawns = {
+                { Type = "Runner", Count = 2 },
+                { Type = "Shielder", Count = 1 },
+            },
+            Repeat = 3,
+            Delay = 1.6,
+        },
+    },
 })
 ```
 
-> Tip: keep the last wave challenging—clearing the final wave ends the game with a victory. You can add an unlimited number of waves.
+> Tip: keep the last wave challenging—clearing the final wave ends the game with a victory. You can add an unlimited number of waves, and any metadata you include remains accessible through `WaveConfigs.Definitions` for custom progression logic.
 
 ## Gameplay Overview
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
 * **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
 * **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP). These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
-* **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Use `BatchSize` on any group to spawn several enemies simultaneously.
+* **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Spawns` will emit multiple enemy types simultaneously.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 * **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.
@@ -134,7 +144,7 @@ table.insert(WaveConfigs, {
 2. When Play starts, the auto-generated HUD should appear with tower slots, money, lives, and a wave counter. The Start button should be hidden for now.
 3. Use the tower selection screen that pops up to assign three different towers to the slots and confirm the loadout. The shop buttons should update to the towers you chose, and the Start button should appear near the status panel.
 4. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
-5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers. Groups that set `BatchSize` above 1 will spawn multiple enemies simultaneously.
+5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers. Groups that define a `Spawns` array will release several enemy types at the same moment.
 6. Press **`X`** while aiming the preview to cancel placement without spending money.
 7. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
 8. With one of your towers selected, press **`E`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.

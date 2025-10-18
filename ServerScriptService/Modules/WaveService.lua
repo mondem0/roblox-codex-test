@@ -262,16 +262,70 @@ function WaveService:SpawnWave(waveNumber)
         if self.GameEnded then
             return
         end
-        local config = EnemyConfigs[group.Type]
-        if config then
-            for _ = 1, group.Count do
+        self:SpawnGroup(group)
+    end
+end
+
+function WaveService:SpawnGroup(group)
+    if not group then
+        return
+    end
+
+    if group.Spawns then
+        local repeatCount = math.max(1, group.Repeat or group.Repeats or 1)
+        local delay = group.Delay or 0
+
+        for iteration = 1, repeatCount do
+            for _, spawn in ipairs(group.Spawns) do
                 if self.GameEnded then
                     return
                 end
-                self:SpawnEnemy(group.Type, config)
-                task.wait(group.Delay)
+
+                local spawnType = spawn.Type
+                local config = spawnType and EnemyConfigs[spawnType]
+                if config then
+                    local count = math.max(1, spawn.Count or 1)
+                    for _ = 1, count do
+                        if self.GameEnded then
+                            return
+                        end
+                        self:SpawnEnemy(spawnType, config)
+                    end
+                end
+            end
+
+            if iteration < repeatCount and delay > 0 then
+                task.wait(delay)
             end
         end
+
+        if delay > 0 then
+            task.wait(delay)
+        end
+
+        return
+    end
+
+    local enemyType = group.Type
+    local config = enemyType and EnemyConfigs[enemyType]
+    if not config then
+        return
+    end
+
+    local count = math.max(1, group.Count or 1)
+    local delay = group.Delay or 0
+    for index = 1, count do
+        if self.GameEnded then
+            return
+        end
+        self:SpawnEnemy(enemyType, config)
+        if index < count and delay > 0 then
+            task.wait(delay)
+        end
+    end
+
+    if delay > 0 then
+        task.wait(delay)
     end
 end
 
