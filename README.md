@@ -90,28 +90,16 @@ You can expand the roster and pacing without editing any gameplay scripts—just
    * Additional custom fields can be added; scripts ignore unknown keys you store for your own systems.
 3. If the enemy uses a custom model, add it to `ReplicatedStorage/Assets/Enemies` and match the `ModelName` value.
 
-```lua
-EnemyConfigs.Shielder = {
-    Name = "Bulwark Captain",
-    ModelName = "Shielder",
-    Health = 320,
-    Speed = 9,
-    Reward = 60,
-    DebuffImmunities = { Explosion = true },
-}
-```
-
 #### Debuff immunities
 
-Set `DebuffImmunities` on an enemy entry to make it shrug off specific status effects applied by towers. The value can be either
-an array of status names or a dictionary-style table with boolean flags. The wave service automatically normalizes everything to
-lowercase before checking the immunity list.
+Set `DebuffImmunities` on an enemy entry to make it shrug off specific status effects applied by towers. The value can be either an array of status names or a dictionary-style table with boolean flags. The wave service automatically normalizes everything to lowercase before checking the immunity list.
 
 Two status strings ship in the default scripts:
 
 * `Slow` &mdash; prevents the Frost Mage slow from applying.
-* `Explosion` &mdash; blocks splash damage unless the enemy is the cannon's primary target, enabling shield formations that soak
-  direct hits without sharing the blast.
+* `Explosion` &mdash; blocks splash damage unless the enemy is the cannon's primary target, enabling shield formations that soak direct hits without sharing the blast.
+
+Below are standalone examples that demonstrate the two built-in immunities. You can copy and adapt these snippets when creating your own archetypes:
 
 ```lua
 EnemyConfigs.LightningBoss = {
@@ -122,10 +110,38 @@ EnemyConfigs.LightningBoss = {
     Reward = 225,
     DebuffImmunities = { Slow = true },
 }
+
+EnemyConfigs.Shielder = {
+    Name = "Bulwark Captain",
+    ModelName = "Shielder",
+    Health = 320,
+    Speed = 9,
+    Reward = 60,
+    DebuffImmunities = { Explosion = true },
+}
 ```
 
-> In the sample content, both **Boss1** and **LightningBoss** ignore slow effects so Frost Mage towers cannot stall them, while
-> the new **Shielder** archetype shrugs off splash damage unless directly targeted.
+##### Combining multiple immunities
+
+To make a single enemy resistant to several debuffs, include each status name in the `DebuffImmunities` table. Both dictionary-style and array-style declarations work, so use whichever fits your workflow. The example below shows an elite enemy that ignores both slow effects and untargeted explosions:
+
+```lua
+EnemyConfigs.ParagonChampion = {
+    Name = "Paragon Champion",
+    ModelName = "BossElite",
+    Health = 1100,
+    Speed = 11,
+    Reward = 275,
+    DebuffImmunities = {
+        Slow = true,
+        Explosion = true,
+    },
+    -- alternatively:
+    -- DebuffImmunities = { "Slow", "Explosion" },
+}
+```
+
+> In the sample content, both **Boss1** and **LightningBoss** ignore slow effects so Frost Mage towers cannot stall them, while the new **Shielder** archetype shrugs off splash damage unless directly targeted. Use the combined example above if you want a single enemy to benefit from both defenses.
 
 ### Creating or editing waves
 
