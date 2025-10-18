@@ -437,7 +437,7 @@ local function connectShopButton(button)
 
     local config = towerConfigs[towerType]
     if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
-        button.Text = string.format("%s | $%d", config.Name or towerType, config.Cost or 0)
+        button.Text = config.Name or towerType
     end
 
     shopButtonConnections[button] = button.Activated:Connect(function()
@@ -738,7 +738,7 @@ local function createSelectionGui()
     local slotsLabel = Instance.new("TextLabel")
     slotsLabel.Name = "SlotsLabel"
     slotsLabel.Size = UDim2.fromOffset(500, 24)
-    slotsLabel.Position = UDim2.new(0, 10, 0, 310)
+    slotsLabel.Position = UDim2.new(0, 10, 0, 290)
     slotsLabel.BackgroundTransparency = 1
     slotsLabel.Font = Enum.Font.Gotham
     slotsLabel.TextSize = 18
@@ -750,7 +750,7 @@ local function createSelectionGui()
     local slotsFrame = Instance.new("Frame")
     slotsFrame.Name = "SlotsContainer"
     slotsFrame.Size = UDim2.fromOffset(500, 48)
-    slotsFrame.Position = UDim2.new(0, 10, 0, 340)
+    slotsFrame.Position = UDim2.new(0, 10, 0, 320)
     slotsFrame.BackgroundTransparency = 1
     slotsFrame.Parent = selectionFrame
 
@@ -789,7 +789,7 @@ local function createSelectionGui()
     selectionConfirmButton = Instance.new("TextButton")
     selectionConfirmButton.Name = "ConfirmButton"
     selectionConfirmButton.Size = UDim2.fromOffset(200, 44)
-    selectionConfirmButton.Position = UDim2.new(0, 160, 0, 366)
+    selectionConfirmButton.Position = UDim2.new(0, 160, 0, 346)
     selectionConfirmButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
     selectionConfirmButton.BorderSizePixel = 0
     selectionConfirmButton.Font = Enum.Font.GothamBold
@@ -1528,7 +1528,10 @@ local function createGui()
         end
 
         if statusFrame then
-            statusFrame.Position = UDim2.fromOffset(20, 20)
+            local statusSize = statusFrame.AbsoluteSize
+            local statusX = math.max(absoluteSize.X - statusSize.X - 20, 0)
+            local statusY = math.max(absoluteSize.Y - statusSize.Y - 20, 0)
+            statusFrame.Position = UDim2.fromOffset(statusX, statusY)
         end
 
         if towerDetailsFrame then
