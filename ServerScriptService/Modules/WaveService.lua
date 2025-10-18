@@ -283,7 +283,11 @@ function WaveService:SpawnEnemy(enemyType, config)
 
     enemyModel.Parent = workspace.Enemies
 
+    local displayName = config.Name or enemyType
     enemyModel:SetAttribute("MaxHealth", config.Health)
+    if displayName then
+        enemyModel:SetAttribute("DisplayName", displayName)
+    end
     local healthValue = enemyModel:FindFirstChild("HealthValue")
     if not healthValue or not healthValue:IsA("NumberValue") then
         healthValue = Instance.new("NumberValue")
@@ -323,9 +327,9 @@ function WaveService:SpawnEnemy(enemyType, config)
     local function updateHealthLabel()
         local current = math.max(0, math.floor(healthValue.Value + 0.5))
         if typeof(maxHealth) == "number" then
-            healthLabel.Text = string.format("HP: %d / %d", current, maxHealth)
+            healthLabel.Text = string.format("%s - HP: %d / %d", displayName or enemyType, current, maxHealth)
         else
-            healthLabel.Text = string.format("HP: %d", current)
+            healthLabel.Text = string.format("%s - HP: %d", displayName or enemyType, current)
         end
     end
 
@@ -347,9 +351,11 @@ function WaveService:SpawnEnemy(enemyType, config)
         end
     end
 
-    local headOffset
-    if head then
-        headOffset = primary.CFrame:ToObjectSpace(head.CFrame)
+    local partOffsets = {}
+    for _, part in ipairs(enemyModel:GetDescendants()) do
+        if part:IsA("BasePart") and part ~= primary then
+            partOffsets[part] = primary.CFrame:ToObjectSpace(part.CFrame)
+        end
     end
 
     self.Enemies[enemyModel] = {
@@ -359,7 +365,7 @@ function WaveService:SpawnEnemy(enemyType, config)
         Progress = 1,
         Slow = nil,
         HealthValue = healthValue,
-        HeadOffset = headOffset
+        PartOffsets = partOffsets
     }
 
     if self.PathCache.SpawnCFrame then
@@ -399,8 +405,7 @@ function WaveService:MoveEnemy(enemyModel)
 
     local waypoints = self.PathCache.Waypoints
     local primary = enemyModel.PrimaryPart
-    local head = enemyModel:FindFirstChild("Head")
-    local headOffset = enemyData.HeadOffset
+    local partOffsets = enemyData.PartOffsets
 
     while enemyModel.Parent and enemyData.Health > 0 do
         if self.GameEnded then
@@ -417,11 +422,11 @@ function WaveService:MoveEnemy(enemyModel)
         local alpha = enemyData.Progress - index
         local currentPos = startPos:Lerp(endPos, alpha)
         primary.CFrame = CFrame.new(currentPos, endPos)
-        if head then
-            if headOffset then
-                head.CFrame = primary.CFrame * headOffset
-            else
-                head.CFrame = primary.CFrame * CFrame.new(0, 2, 0)
+        if partOffsets then
+            for part, offset in pairs(partOffsets) do
+                if part and part.Parent and part:IsDescendantOf(enemyModel) then
+                    part.CFrame = primary.CFrame * offset
+                end
             end
         end
 

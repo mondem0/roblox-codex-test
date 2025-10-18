@@ -57,6 +57,7 @@ You can replace the minimalist placeholder geometry with your own creations with
 3. **Enemy models**:
    * Parent each enemy `Model` to `ReplicatedStorage/Assets/Enemies` using the names in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua) (`Grunt`, `Runner`, `Tank`).
    * Provide a `HumanoidRootPart` (or assign a `PrimaryPart`) centered on the character plus a `Head` part. Anchor all geometry and disable collisions so enemies glide along the path.
+   * Add as many extra anchored `BasePart` limbs, accessories, or sub-models as you like—the server records each part’s offset from the root so the entire rig follows the path and rotates correctly.
 4. **Adjusting names**: If you use different model names, update the corresponding `ModelName` value in the config table.
 5. **Optional flair**: Accessories, meshes, particles, or lights parented to the model will automatically replicate when towers or enemies spawn.
 
@@ -68,7 +69,7 @@ You can expand the roster and pacing without editing any gameplay scripts—just
 
 1. Open **`EnemyConfigs`**. Each key in the returned table (e.g. `Grunt`, `Runner`, `Tank`) defines an enemy archetype.
 2. Duplicate an existing entry and change its fields:
-   * `Name`: Label shown in the UI.
+   * `Name`: Label shown in the UI (hover tooltip + floating health billboards).
    * `ModelName`: The model to clone from `ReplicatedStorage/Assets/Enemies` (defaults to the key if omitted).
    * `Health`: Starting hit points.
    * `Speed`: How fast the enemy moves along the path (studs per second).
@@ -111,6 +112,7 @@ table.insert(WaveConfigs, {
 * **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
+* **Enemy info toggle**: Use the **Hide Enemy Info** button in the HUD to hide both the hover tooltip and floating HP/name billboards; click it again to show the data.
 
 ## Testing Checklist
 

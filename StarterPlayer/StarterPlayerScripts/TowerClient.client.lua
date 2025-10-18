@@ -24,7 +24,7 @@ local previewRangeRing
 local previewRangeAdornment
 local selectedTowerConnections = {}
 local currentMoney = 0
-local showEnemyHP = true
+local showEnemyInfo = true
 local gameEnded = false
 local hpToggleButton
 
@@ -223,7 +223,7 @@ end
 local function applyEnemyBillboardState(enemyModel)
     local display = enemyModel:FindFirstChild("HealthDisplay")
     if display and display:IsA("BillboardGui") then
-        display.Enabled = showEnemyHP
+        display.Enabled = showEnemyInfo
     end
 end
 
@@ -235,7 +235,7 @@ local function watchEnemy(enemyModel)
     applyEnemyBillboardState(enemyModel)
     enemyModel.ChildAdded:Connect(function(child)
         if child.Name == "HealthDisplay" and child:IsA("BillboardGui") then
-            child.Enabled = showEnemyHP
+            child.Enabled = showEnemyInfo
         end
     end)
 end
@@ -251,8 +251,8 @@ local function updateHPToggleVisual()
         return
     end
 
-    hpToggleButton.Text = showEnemyHP and "Hide Enemy HP" or "Show Enemy HP"
-    hpToggleButton.BackgroundColor3 = showEnemyHP and Color3.fromRGB(220, 120, 120) or Color3.fromRGB(80, 200, 120)
+    hpToggleButton.Text = showEnemyInfo and "Hide Enemy Info" or "Show Enemy Info"
+    hpToggleButton.BackgroundColor3 = showEnemyInfo and Color3.fromRGB(220, 120, 120) or Color3.fromRGB(80, 200, 120)
 end
 
 for _, enemy in ipairs(enemiesFolder:GetChildren()) do
@@ -754,13 +754,16 @@ local function createGui()
     hpToggleButton.TextColor3 = Color3.new(0, 0, 0)
     hpToggleButton.Font = Enum.Font.GothamBold
     hpToggleButton.TextSize = 16
-    hpToggleButton.Text = "Hide Enemy HP"
+    hpToggleButton.Text = "Hide Enemy Info"
     hpToggleButton.Parent = statusFrame
 
     hpToggleButton.MouseButton1Click:Connect(function()
-        showEnemyHP = not showEnemyHP
+        showEnemyInfo = not showEnemyInfo
         updateHPToggleVisual()
         updateAllEnemyBillboards()
+        if not showEnemyInfo and hoverBillboard then
+            hoverBillboard.Enabled = false
+        end
     end)
 
     updateHPToggleVisual()
@@ -1071,6 +1074,13 @@ local function updatePreview()
 end
 
 local function updateEnemyHover()
+    if not showEnemyInfo then
+        if hoverBillboard then
+            hoverBillboard.Enabled = false
+        end
+        return
+    end
+
     local target = mouse.Target
     local enemyModel = getEnemyModelFromInstance(target)
     if enemyModel then
@@ -1080,15 +1090,16 @@ local function updateEnemyHover()
             billboard.Adornee = adornee
             local healthValue = enemyModel:FindFirstChild("HealthValue")
             local maxHealth = enemyModel:GetAttribute("MaxHealth")
+            local displayName = enemyModel:GetAttribute("DisplayName") or enemyModel.Name or "Enemy"
             if healthValue and hoverLabel then
                 local currentHealth = math.max(0, math.floor(healthValue.Value + 0.5))
                 if typeof(maxHealth) == "number" then
-                    hoverLabel.Text = string.format("HP: %d / %d", currentHealth, maxHealth)
+                    hoverLabel.Text = string.format("%s - HP: %d / %d", displayName, currentHealth, maxHealth)
                 else
-                    hoverLabel.Text = string.format("HP: %d", currentHealth)
+                    hoverLabel.Text = string.format("%s - HP: %d", displayName, currentHealth)
                 end
             elseif hoverLabel then
-                hoverLabel.Text = "HP: ???"
+                hoverLabel.Text = string.format("%s - HP: ???", displayName)
             end
             billboard.Enabled = true
         else
