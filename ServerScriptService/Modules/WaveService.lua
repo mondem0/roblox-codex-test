@@ -10,6 +10,50 @@ WaveService.__index = WaveService
 
 local Players = game:GetService("Players")
 
+local function normalizeImmunityMap(raw)
+    if type(raw) == "string" then
+        local map = {}
+        map[string.lower(raw)] = true
+        return map
+    elseif type(raw) == "table" then
+        local map = {}
+        local hasArrayValues = #raw > 0
+
+        if hasArrayValues then
+            for _, immunity in ipairs(raw) do
+                if type(immunity) == "string" then
+                    map[string.lower(immunity)] = true
+                end
+            end
+        else
+            for key, value in pairs(raw) do
+                if value and type(key) == "string" then
+                    map[string.lower(key)] = true
+                end
+            end
+        end
+
+        if next(map) then
+            return map
+        end
+    end
+
+    return nil
+end
+
+local function enemyImmuneTo(enemyData, debuffType)
+    if not enemyData or not debuffType then
+        return false
+    end
+
+    local immunities = enemyData.DebuffImmunities
+    if not immunities then
+        return false
+    end
+
+    return immunities[string.lower(debuffType)] == true
+end
+
 local function buildEnemyModel(enemyType, config)
     local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
     local enemiesFolder = assetsFolder and assetsFolder:FindFirstChild("Enemies")
@@ -175,7 +219,7 @@ function WaveService:DamageEnemy(enemyModel, towerData)
         self:AdjustMoney(towerData.Player, appliedDamage)
     end
 
-    if towerData.Config.SlowPercent then
+    if towerData.Config.SlowPercent and not enemyImmuneTo(enemyData, "Slow") then
         enemyData.Slow = {
             EndsAt = tick() + (towerData.Config.SlowDuration or 2),
             Percent = towerData.Config.SlowPercent
@@ -262,16 +306,70 @@ function WaveService:SpawnWave(waveNumber)
         if self.GameEnded then
             return
         end
-        local config = EnemyConfigs[group.Type]
-        if config then
-            for _ = 1, group.Count do
+        self:SpawnGroup(group)
+    end
+end
+
+function WaveService:SpawnGroup(group)
+    if not group then
+        return
+    end
+
+    if group.Spawns then
+        local repeatCount = math.max(1, group.Repeat or group.Repeats or 1)
+        local delay = group.Delay or 0
+
+        for iteration = 1, repeatCount do
+            for _, spawn in ipairs(group.Spawns) do
                 if self.GameEnded then
                     return
                 end
-                self:SpawnEnemy(group.Type, config)
-                task.wait(group.Delay)
+
+                local spawnType = spawn.Type
+                local config = spawnType and EnemyConfigs[spawnType]
+                if config then
+                    local count = math.max(1, spawn.Count or 1)
+                    for _ = 1, count do
+                        if self.GameEnded then
+                            return
+                        end
+                        self:SpawnEnemy(spawnType, config)
+                    end
+                end
+            end
+
+            if iteration < repeatCount and delay > 0 then
+                task.wait(delay)
             end
         end
+
+        if delay > 0 then
+            task.wait(delay)
+        end
+
+        return
+    end
+
+    local enemyType = group.Type
+    local config = enemyType and EnemyConfigs[enemyType]
+    if not config then
+        return
+    end
+
+    local count = math.max(1, group.Count or 1)
+    local delay = group.Delay or 0
+    for index = 1, count do
+        if self.GameEnded then
+            return
+        end
+        self:SpawnEnemy(enemyType, config)
+        if index < count and delay > 0 then
+            task.wait(delay)
+        end
+    end
+
+    if delay > 0 then
+        task.wait(delay)
     end
 end
 
@@ -325,7 +423,8 @@ function WaveService:SpawnEnemy(enemyType, config)
         Progress = 1,
         Slow = nil,
         HealthValue = healthValue,
-        PartOffsets = partOffsets
+        PartOffsets = partOffsets,
+        DebuffImmunities = normalizeImmunityMap(config.DebuffImmunities),
     }
 
     if self.PathCache.SpawnCFrame then
@@ -391,10 +490,14 @@ function WaveService:MoveEnemy(enemyModel)
         end
 
         local speed = enemyData.Speed
-        if enemyData.Slow and enemyData.Slow.EndsAt > tick() then
-            speed = speed * (1 - enemyData.Slow.Percent)
-        elseif enemyData.Slow and enemyData.Slow.EndsAt <= tick() then
-            enemyData.Slow = nil
+        if enemyData.Slow then
+            if enemyImmuneTo(enemyData, "Slow") then
+                enemyData.Slow = nil
+            elseif enemyData.Slow.EndsAt > tick() then
+                speed = speed * (1 - enemyData.Slow.Percent)
+            else
+                enemyData.Slow = nil
+            end
         end
 
         local step = RunService.Heartbeat:Wait()

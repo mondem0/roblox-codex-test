@@ -19,6 +19,22 @@ local EnemyConfigs = {
         Health = 160,
         Speed = 8,
         Reward = 35
+    },
+    Boss1 = {
+        Name = "Obsidian Colossus",
+        ModelName = "Boss1",
+        Health = 600,
+        Speed = 10,
+        Reward = 150,
+        DebuffImmunities = { Slow = true },
+    },
+    LightningBoss = {
+        Name = "Storm Tyrant",
+        ModelName = "LightningBoss",
+        Health = 850,
+        Speed = 12,
+        Reward = 225,
+        DebuffImmunities = { Slow = true },
     }
 }
 
