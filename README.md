@@ -65,7 +65,7 @@ You can replace the minimalist placeholder geometry with your own creations with
 
 The `TowerClient` LocalScript now fabricates every interface element at runtime, so you can drop the scripts into a clean experience and press Play without wiring any Gui objects by hand. Out of the box you get:
 
-* A pre-game **tower selection screen** that lists every entry from `TowerConfigs`, lets creators pick three towers for their loadout, and prevents placement until all slots are filled.
+* A pre-game **tower selection screen** that lists every entry from `TowerConfigs`, lets creators pick three unique towers for their loadout, and prevents placement until all slots are filled.
 * A bottom **shop bar** that shows the chosen towers, previews their cost, and blocks interaction until the loadout is confirmed.
 * A top-left **status panel** with money, lives, wave counter, and a Start/Restart button that reacts to wins or losses automatically.
 * A top-right **tower details** window that displays range, damage, slow/splash stats, upgrade descriptions, and live sell values. Upgrade (`E`) and sell (`X`) hotkeys stay in sync with the buttons and dim when you cannot afford an action.
@@ -120,7 +120,7 @@ table.insert(WaveConfigs, {
 ## Gameplay Overview
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
-* **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker.
+* **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one.
 * **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP). These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
 * **Waves**: Five sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
@@ -131,7 +131,7 @@ table.insert(WaveConfigs, {
 
 1. Publish the game or run **Play** in Studio.
 2. When Play starts, the auto-generated HUD should appear with tower slots, money, lives, a wave counter, and a `Start` button.
-3. Use the tower selection screen that pops up to assign three towers to the slots and confirm the loadout. The shop buttons should update to the towers you chose.
+3. Use the tower selection screen that pops up to assign three different towers to the slots and confirm the loadout. The shop buttons should update to the towers you chose.
 4. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
 5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers.
 6. Press **`X`** while aiming the preview to cancel placement without spending money.

@@ -551,6 +551,15 @@ local function assignTowerToSlot(slotIndex, towerType)
         return
     end
 
+    -- Prevent duplicate towers in the loadout by clearing any other slot that already
+    -- contains the requested tower before assigning it to the active slot.
+    for i = 1, 3 do
+        if i ~= slotIndex and loadoutSelection[i] == towerType then
+            loadoutSelection[i] = nil
+            updateSelectionSlotDisplay(i)
+        end
+    end
+
     loadoutSelection[slotIndex] = towerType
     updateSelectionSlotDisplay(slotIndex)
 
