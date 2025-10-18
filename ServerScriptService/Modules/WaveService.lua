@@ -122,7 +122,17 @@ function WaveService:DamageEnemy(enemyModel, towerData)
         return
     end
 
-    enemyData.Health -= towerData.Config.Damage
+    local damageAmount = towerData.Config.Damage or 0
+    if damageAmount <= 0 then
+        return
+    end
+
+    local appliedDamage = math.min(damageAmount, enemyData.Health)
+    enemyData.Health -= appliedDamage
+
+    if towerData.Player then
+        self:AdjustMoney(towerData.Player, appliedDamage)
+    end
 
     if towerData.Config.SlowPercent then
         enemyData.Slow = {

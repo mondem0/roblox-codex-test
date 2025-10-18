@@ -153,7 +153,7 @@ function TowerService:SpawnProjectile(towerData, target)
     projectile.Shape = Enum.PartType.Ball
     projectile.Material = Enum.Material.Neon
     projectile.Color = Color3.fromRGB(255, 220, 80)
-    projectile.CFrame = head.CFrame
+    projectile.CFrame = CFrame.new(head.Position, target.PrimaryPart.Position)
     projectile.Parent = self.ProjectilesFolder
 
     local direction = (target.PrimaryPart.Position - projectile.Position).Unit
@@ -162,13 +162,20 @@ function TowerService:SpawnProjectile(towerData, target)
     bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
     bodyVelocity.Parent = projectile
 
+    projectile.Velocity = bodyVelocity.Velocity
+
     Debris:AddItem(projectile, 2)
 
-    projectile.Touched:Connect(function(hit)
+    local touchedConnection
+    touchedConnection = projectile.Touched:Connect(function(hit)
         if hit and hit:IsDescendantOf(target) then
+            if touchedConnection then
+                touchedConnection:Disconnect()
+            end
             bodyVelocity:Destroy()
             projectile.Anchored = true
             projectile.Transparency = 1
+            projectile.CanTouch = false
             self.WaveService:DamageEnemy(target, towerData)
             Debris:AddItem(projectile, 0.1)
         end

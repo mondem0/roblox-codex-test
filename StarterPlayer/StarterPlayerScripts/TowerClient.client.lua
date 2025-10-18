@@ -12,6 +12,20 @@ local towerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
 local placingTowerType
 local previewPart
 
+local function createRaycastParams()
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.IgnoreWater = true
+
+    local ignoreList = { player.Character }
+    if previewPart then
+        table.insert(ignoreList, previewPart)
+    end
+
+    params.FilterDescendantsInstances = ignoreList
+    return params
+end
+
 local function createGui()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "TowerDefenseUI"
@@ -191,9 +205,12 @@ local function updatePreview()
     end
 
     local unitRay = mouse.UnitRay
-    local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000)
+    local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
     if rayResult then
-        previewPart.CFrame = CFrame.new(rayResult.Position)
+        local hitPosition = rayResult.Position
+        previewPart.CFrame = CFrame.new(
+            Vector3.new(hitPosition.X, hitPosition.Y + previewPart.Size.Y / 2, hitPosition.Z)
+        )
     end
 end
 
@@ -204,7 +221,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 
     if input.UserInputType == Enum.UserInputType.MouseButton1 and placingTowerType then
         local unitRay = mouse.UnitRay
-        local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000)
+        local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
         if rayResult and isOnBuildableGround(rayResult.Instance) then
             remotes.TowerPlaced:FireServer(placingTowerType, rayResult.Position)
             cancelPlacement()
