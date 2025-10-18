@@ -86,17 +86,18 @@ You can expand the roster and pacing without editing any gameplay scripts—just
    * `Health`: Starting hit points.
    * `Speed`: How fast the enemy moves along the path (studs per second).
    * `Reward`: How much cash each player earns when this enemy dies.
-   * `DebuffImmunities`: Optional table or array of status names that the enemy should ignore (e.g. `{ Slow = true }` or `{ "Slow" }`).
+   * `DebuffImmunities`: Optional table or array of status names that the enemy should ignore (e.g. `{ Slow = true }` or `{ "Explosion" }`).
    * Additional custom fields can be added; scripts ignore unknown keys you store for your own systems.
 3. If the enemy uses a custom model, add it to `ReplicatedStorage/Assets/Enemies` and match the `ModelName` value.
 
 ```lua
 EnemyConfigs.Shielder = {
-    Name = "Shielder",
+    Name = "Bulwark Captain",
     ModelName = "Shielder",
-    Health = 220,
-    Speed = 10,
-    Reward = 45,
+    Health = 320,
+    Speed = 9,
+    Reward = 60,
+    DebuffImmunities = { Explosion = true },
 }
 ```
 
@@ -105,6 +106,12 @@ EnemyConfigs.Shielder = {
 Set `DebuffImmunities` on an enemy entry to make it shrug off specific status effects applied by towers. The value can be either
 an array of status names or a dictionary-style table with boolean flags. The wave service automatically normalizes everything to
 lowercase before checking the immunity list.
+
+Two status strings ship in the default scripts:
+
+* `Slow` &mdash; prevents the Frost Mage slow from applying.
+* `Explosion` &mdash; blocks splash damage unless the enemy is the cannon's primary target, enabling shield formations that soak
+  direct hits without sharing the blast.
 
 ```lua
 EnemyConfigs.LightningBoss = {
@@ -117,7 +124,8 @@ EnemyConfigs.LightningBoss = {
 }
 ```
 
-> In the sample content, both **Boss1** and **LightningBoss** ignore slow effects so Frost Mage towers cannot stall them.
+> In the sample content, both **Boss1** and **LightningBoss** ignore slow effects so Frost Mage towers cannot stall them, while
+> the new **Shielder** archetype shrugs off splash damage unless directly targeted.
 
 ### Creating or editing waves
 
@@ -152,7 +160,7 @@ WaveConfigs.AddWave({
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
 * **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
-* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
+* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
 * **Waves**: Six sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Spawns` will emit multiple enemy types simultaneously.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).

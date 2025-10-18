@@ -20,6 +20,14 @@ local EnemyConfigs = {
         Speed = 8,
         Reward = 35
     },
+    Shielder = {
+        Name = "Bulwark Captain",
+        ModelName = "Shielder",
+        Health = 320,
+        Speed = 9,
+        Reward = 60,
+        DebuffImmunities = { Explosion = true },
+    },
     Boss1 = {
         Name = "Obsidian Colossus",
         ModelName = "Boss1",

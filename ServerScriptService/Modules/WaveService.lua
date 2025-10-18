@@ -231,12 +231,16 @@ function WaveService:DamageEnemy(enemyModel, towerData)
     end
 end
 
-function WaveService:SplashDamage(origin, radius, towerData)
+function WaveService:SplashDamage(origin, radius, towerData, targetEnemy)
     for enemyModel, enemyData in pairs(self.Enemies) do
         if enemyModel.PrimaryPart then
             local distance = (enemyModel.PrimaryPart.Position - origin).Magnitude
             if distance <= radius then
-                self:DamageEnemy(enemyModel, towerData)
+                local isPrimaryTarget = not targetEnemy or enemyModel == targetEnemy
+                local immuneToSplash = (not isPrimaryTarget) and enemyImmuneTo(enemyData, "Explosion")
+                if not immuneToSplash then
+                    self:DamageEnemy(enemyModel, towerData)
+                end
             end
         end
     end

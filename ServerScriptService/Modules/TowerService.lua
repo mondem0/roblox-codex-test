@@ -471,7 +471,8 @@ function TowerService:Tick(dt)
                             self.WaveService:SplashDamage(
                                 targetPrimary.Position,
                                 splashRadius,
-                                towerData
+                                towerData,
+                                target
                             )
                             if self.Remotes and self.Remotes.SplashFired then
                                 local splashColor = towerData.Config.SplashColor

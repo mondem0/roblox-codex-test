@@ -114,31 +114,40 @@ addWave({
 
 addWave({
     Name = "wave5",
-    Description = "Final exam with simultaneous Tank support.",
-    Reward = 140,
+    Description = "Shield phalanx introduces explosion-resistant frontline units.",
+    Reward = 150,
     Groups = {
+        { Type = "Runner", Count = 10, Delay = 0.6 },
         {
             Spawns = {
-                { Type = "Grunt", Count = 2 },
+                { Type = "Shielder", Count = 1 },
                 { Type = "Tank", Count = 1 },
             },
-            Repeat = 6,
-            Delay = 0.7,
+            Repeat = 5,
+            Delay = 1.1,
         },
-        { Type = "Runner", Count = 12, Delay = 0.55 },
+        { Type = "Grunt", Count = 12, Delay = 0.5 },
     },
 })
 
 addWave({
     Name = "wave6",
-    Description = "Storm Tyrant arrives with unstoppable bodyguards.",
+    Description = "Storm Tyrant arrives with unstoppable, explosion-proof bodyguards.",
     Reward = 260,
     Groups = {
+        {
+            Spawns = {
+                { Type = "Shielder", Count = 1 },
+                { Type = "Tank", Count = 1 },
+            },
+            Repeat = 3,
+            Delay = 1.4,
+        },
         { Type = "Boss1", Count = 2, Delay = 2.5 },
         { Type = "LightningBoss", Count = 1 },
     },
     Metadata = {
-        Notes = "Both boss archetypes ignore slow effects.",
+        Notes = "Bosses ignore slow effects while Shielders shrug off untargeted splash damage.",
     },
 })
 
