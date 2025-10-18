@@ -392,12 +392,22 @@ function TowerService:Tick(dt)
 
                         local fireRate = towerData.Config.FireRate or 0
                         towerData.Cooldown = math.max(0.05, fireRate)
-                        if towerData.Config.SplashRadius and targetPrimary then
+                        local splashRadius = towerData.Config.SplashRadius
+                        if splashRadius and targetPrimary then
                             self.WaveService:SplashDamage(
                                 targetPrimary.Position,
-                                towerData.Config.SplashRadius,
+                                splashRadius,
                                 towerData
                             )
+                            if self.Remotes and self.Remotes.SplashFired then
+                                local splashColor = towerData.Config.SplashColor
+                                    or Color3.fromRGB(255, 185, 90)
+                                self.Remotes.SplashFired:FireAllClients(
+                                    targetPrimary.Position,
+                                    splashRadius,
+                                    splashColor
+                                )
+                            end
                         else
                             self.WaveService:DamageEnemy(target, towerData)
                         end

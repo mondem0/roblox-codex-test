@@ -30,6 +30,7 @@ local Remotes = {
     TowerUpgraded = getOrCreateRemote("TowerUpgraded", "RemoteEvent"),
     RequestRestart = getOrCreateRemote("RequestRestart", "RemoteEvent"),
     GameRestarted = getOrCreateRemote("GameRestarted", "RemoteEvent"),
+    SplashFired = getOrCreateRemote("SplashFired", "RemoteEvent"),
 }
 
 local mapModel = workspace:WaitForChild("Map")

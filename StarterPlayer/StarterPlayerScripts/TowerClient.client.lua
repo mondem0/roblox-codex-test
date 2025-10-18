@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
@@ -97,6 +98,48 @@ local function updateRangeRing(anchor, adornment, radius, position)
     local clampedRadius = math.max(0.1, radius)
     adornment.Radius = clampedRadius
     anchor.CFrame = CFrame.new(position)
+end
+
+local function showExplosion(position, radius, color)
+    if typeof(position) ~= "Vector3" then
+        return
+    end
+
+    local splashRadius = math.max(0.5, tonumber(radius) or 1)
+    local sphere = Instance.new("Part")
+    sphere.Name = "SplashEffect"
+    sphere.Shape = Enum.PartType.Ball
+    sphere.Material = Enum.Material.Neon
+    sphere.Color = color or Color3.fromRGB(255, 185, 90)
+    sphere.Transparency = 0.45
+    sphere.CanCollide = false
+    sphere.CanQuery = false
+    sphere.CanTouch = false
+    sphere.CastShadow = false
+    sphere.Anchored = true
+    sphere.Size = Vector3.new(0.5, 0.5, 0.5)
+    sphere.CFrame = CFrame.new(position)
+    sphere.Parent = workspace
+
+    local tweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+    local goal = {
+        Size = Vector3.new(splashRadius * 2, splashRadius * 2, splashRadius * 2),
+        Transparency = 1
+    }
+
+    local tween = TweenService:Create(sphere, tweenInfo, goal)
+    tween:Play()
+    tween.Completed:Connect(function()
+        if sphere then
+            sphere:Destroy()
+        end
+    end)
+
+    task.delay(tweenInfo.Time + 0.1, function()
+        if sphere then
+            sphere:Destroy()
+        end
+    end)
 end
 
 local function cancelPlacement()
@@ -1031,6 +1074,12 @@ remotes.TowerUpgraded.OnClientEvent:Connect(function(towerModel)
         updateTowerDetails(towerModel)
     end
 end)
+
+if remotes:FindFirstChild("SplashFired") then
+    remotes.SplashFired.OnClientEvent:Connect(function(position, radius, color)
+        showExplosion(position, radius, color)
+    end)
+end
 
 RunService.RenderStepped:Connect(function()
     updatePreview()
