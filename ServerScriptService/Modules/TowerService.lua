@@ -6,6 +6,68 @@ local TowerService = {}
 TowerService.__index = TowerService
 
 local TOWER_BASE_HALF_SIZE = 2
+local DEFAULT_BASE_SIZE = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
+local TowerFootprints = {}
+
+local function normalizeBaseSize(value)
+    if typeof(value) == "Vector3" then
+        return value
+    elseif typeof(value) == "table" then
+        local x = value.X or value.x or value.Width or value.width or value[1]
+        local y = value.Y or value.y or value.Height or value.height or value[2]
+        local z = value.Z or value.z or value.Depth or value.depth or value[3]
+        if x and y and z then
+            return Vector3.new(tonumber(x) or 0, tonumber(y) or 0, tonumber(z) or 0)
+        end
+    end
+
+    return nil
+end
+
+local function sanitizeBaseSize(size)
+    if not size then
+        return DEFAULT_BASE_SIZE
+    end
+
+    return Vector3.new(
+        math.max(0.1, math.abs(size.X)),
+        math.max(0.1, math.abs(size.Y)),
+        math.max(0.1, math.abs(size.Z))
+    )
+end
+
+local function getTowerBaseSize(towerType)
+    if towerType and TowerFootprints[towerType] then
+        return TowerFootprints[towerType]
+    end
+
+    local baseSize
+    local config = towerType and TowerConfigs[towerType]
+    if config then
+        baseSize = normalizeBaseSize(config.BaseSize)
+    end
+
+    if not baseSize and config then
+        local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
+        local towersFolder = assetsFolder and assetsFolder:FindFirstChild("Towers")
+        local modelName = config.ModelName or config.Name or towerType
+        if towersFolder and modelName then
+            local template = towersFolder:FindFirstChild(modelName)
+            if template and template:IsA("Model") then
+                local base = template.PrimaryPart or template:FindFirstChild("Base") or template:FindFirstChildWhichIsA("BasePart")
+                if base and base:IsA("BasePart") then
+                    baseSize = base.Size
+                end
+            end
+        end
+    end
+
+    local sanitized = sanitizeBaseSize(baseSize)
+    if towerType then
+        TowerFootprints[towerType] = sanitized
+    end
+    return sanitized
+end
 
 local function cloneTowerConfig(config)
     local newConfig = {}
@@ -79,6 +141,7 @@ local function buildTowerModel(towerType)
 
             if base then
                 base.CanCollide = false
+                TowerFootprints[towerType] = TowerFootprints[towerType] or sanitizeBaseSize(base.Size)
             end
             if head and head:IsA("BasePart") then
                 head.Anchored = true
@@ -96,9 +159,10 @@ local function buildTowerModel(towerType)
     local model = Instance.new("Model")
     model.Name = towerConfig.Name
 
+    local baseSize = sanitizeBaseSize(normalizeBaseSize(towerConfig.BaseSize))
     local base = Instance.new("Part")
     base.Name = "Base"
-    base.Size = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
+    base.Size = baseSize or DEFAULT_BASE_SIZE
     base.Anchored = true
     base.Material = Enum.Material.SmoothPlastic
     base.Color = Color3.fromRGB(40, 40, 40)
@@ -134,6 +198,7 @@ local function buildTowerModel(towerType)
     barrel.CFrame = head.CFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
 
     model.PrimaryPart = base
+    TowerFootprints[towerType] = TowerFootprints[towerType] or base.Size
 
     return model, head, barrel
 end
@@ -220,9 +285,15 @@ function TowerService:ChargePlayer(player, amount)
     self.WaveService:AdjustMoney(player, -amount)
 end
 
-function TowerService:IsPlacementValid(position)
+function TowerService:IsPlacementValid(position, towerType)
     if not position then
         return false
+    end
+
+    local candidateSize = getTowerBaseSize(towerType)
+    local candidateRadius = math.max(candidateSize.X, candidateSize.Z) / 2
+    if candidateRadius <= 0 then
+        candidateRadius = TOWER_BASE_HALF_SIZE
     end
 
     local map = workspace:FindFirstChild("Map")
@@ -258,7 +329,8 @@ function TowerService:IsPlacementValid(position)
         if primary then
             local otherPos = primary.Position
             local horizontalDistance = (Vector3.new(otherPos.X, 0, otherPos.Z) - Vector3.new(position.X, 0, position.Z)).Magnitude
-            local spacing = (primary.Size.X / 2) + TOWER_BASE_HALF_SIZE
+            local otherRadius = math.max(primary.Size.X, primary.Size.Z) / 2
+            local spacing = otherRadius + candidateRadius
             if horizontalDistance < spacing then
                 return false
             end
@@ -274,7 +346,7 @@ function TowerService:AddTower(player, towerType, position)
         return
     end
 
-    if not self:IsPlacementValid(position) then
+    if not self:IsPlacementValid(position, towerType) then
         return
     end
 
@@ -293,6 +365,8 @@ function TowerService:AddTower(player, towerType, position)
     if towerModel.PrimaryPart ~= primary then
         towerModel.PrimaryPart = primary
     end
+
+    TowerFootprints[towerType] = TowerFootprints[towerType] or sanitizeBaseSize(primary.Size)
 
     local heightOffset = primary.Size.Y / 2
     towerModel:PivotTo(CFrame.new(position.X, position.Y + heightOffset, position.Z))

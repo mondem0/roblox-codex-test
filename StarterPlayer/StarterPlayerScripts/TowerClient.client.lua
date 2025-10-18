@@ -37,7 +37,11 @@ local upgradeDescriptionLabel
 local upgradeButton
 local sellButton
 
-local PREVIEW_SIZE = Vector3.new(4, 1, 4)
+local DEFAULT_PREVIEW_SIZE = Vector3.new(4, 1, 4)
+local DEFAULT_PREVIEW_RADIUS = math.max(DEFAULT_PREVIEW_SIZE.X, DEFAULT_PREVIEW_SIZE.Z) / 2
+local previewFootprintSize = DEFAULT_PREVIEW_SIZE
+local previewFootprintRadius = DEFAULT_PREVIEW_RADIUS
+local footprintCache = {}
 local RANGE_RING_HEIGHT = 0.05
 
 local function disconnectSelectedConnections()
@@ -61,6 +65,68 @@ local function destroyPreviewRangeIndicator()
         previewRangeRing = nil
         previewRangeAdornment = nil
     end
+end
+
+local function normalizeBaseSize(value)
+    if typeof(value) == "Vector3" then
+        return value
+    elseif typeof(value) == "table" then
+        local x = value.X or value.x or value.Width or value.width or value[1]
+        local y = value.Y or value.y or value.Height or value.height or value[2]
+        local z = value.Z or value.z or value.Depth or value.depth or value[3]
+        if x and y and z then
+            return Vector3.new(tonumber(x) or 0, tonumber(y) or 0, tonumber(z) or 0)
+        end
+    end
+
+    return nil
+end
+
+local function sanitizeFootprint(size)
+    if not size then
+        return DEFAULT_PREVIEW_SIZE
+    end
+
+    return Vector3.new(
+        math.max(0.1, math.abs(size.X)),
+        math.max(0.1, math.abs(size.Y)),
+        math.max(0.1, math.abs(size.Z))
+    )
+end
+
+local function getTowerFootprint(towerType)
+    if not towerType then
+        return DEFAULT_PREVIEW_SIZE
+    end
+
+    if footprintCache[towerType] then
+        return footprintCache[towerType]
+    end
+
+    local config = towerConfigs[towerType]
+    local baseSize
+    if config then
+        baseSize = normalizeBaseSize(config.BaseSize)
+    end
+
+    if not baseSize and config then
+        local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
+        local towersFolder = assetsFolder and assetsFolder:FindFirstChild("Towers")
+        local modelName = config.ModelName or config.Name or towerType
+        if towersFolder and modelName then
+            local template = towersFolder:FindFirstChild(modelName)
+            if template and template:IsA("Model") then
+                local base = template.PrimaryPart or template:FindFirstChild("Base") or template:FindFirstChildWhichIsA("BasePart")
+                if base and base:IsA("BasePart") then
+                    baseSize = base.Size
+                end
+            end
+        end
+    end
+
+    local sanitized = sanitizeFootprint(baseSize)
+    footprintCache[towerType] = sanitized
+    return sanitized
 end
 
 local function createRangeRing(name, color, transparency)
@@ -150,6 +216,8 @@ local function cancelPlacement()
     end
     destroyPreviewRangeIndicator()
     placementValid = false
+    previewFootprintSize = DEFAULT_PREVIEW_SIZE
+    previewFootprintRadius = DEFAULT_PREVIEW_RADIUS
 end
 
 local function applyEnemyBillboardState(enemyModel)
@@ -555,10 +623,13 @@ local function createGui()
                 previewPart.CanCollide = false
                 previewPart.Transparency = 0.5
                 previewPart.Color = Color3.fromRGB(255, 100, 100)
-                previewPart.Size = PREVIEW_SIZE
                 previewPart.Name = "PlacementPreview"
                 previewPart.Parent = workspace
             end
+            local footprint = getTowerFootprint(placingTowerType)
+            previewFootprintSize = Vector3.new(footprint.X, math.max(0.2, footprint.Y), footprint.Z)
+            previewFootprintRadius = math.max(previewFootprintSize.X, previewFootprintSize.Z) / 2
+            previewPart.Size = previewFootprintSize
             local config = towerConfigs[placingTowerType]
             if config and config.Range then
                 if not previewRangeRing then
@@ -937,7 +1008,8 @@ local function isPositionClear(position)
         if primary then
             local towerPos = primary.Position
             local horizontalDistance = (Vector3.new(towerPos.X, 0, towerPos.Z) - Vector3.new(position.X, 0, position.Z)).Magnitude
-            local spacing = (primary.Size.X / 2) + (PREVIEW_SIZE.X / 2)
+            local otherRadius = math.max(primary.Size.X, primary.Size.Z) / 2
+            local spacing = otherRadius + previewFootprintRadius
             if horizontalDistance < spacing then
                 return false
             end
