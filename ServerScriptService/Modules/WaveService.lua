@@ -264,28 +264,12 @@ function WaveService:SpawnWave(waveNumber)
         end
         local config = EnemyConfigs[group.Type]
         if config then
-            local totalToSpawn = math.max(0, tonumber(group.Count) or 0)
-            local batchSize = math.max(1, math.floor(tonumber(group.BatchSize) or 1))
-            local delay = tonumber(group.Delay) or 0
-
-            local remaining = totalToSpawn
-            while remaining > 0 do
+            for _ = 1, group.Count do
                 if self.GameEnded then
                     return
                 end
-
-                local spawnNow = math.min(batchSize, remaining)
-                for _ = 1, spawnNow do
-                    if self.GameEnded then
-                        return
-                    end
-                    self:SpawnEnemy(group.Type, config)
-                end
-
-                remaining -= spawnNow
-                if remaining > 0 and delay > 0 then
-                    task.wait(delay)
-                end
+                self:SpawnEnemy(group.Type, config)
+                task.wait(group.Delay)
             end
         end
     end
