@@ -654,7 +654,7 @@ local function populateTowerSelectionButtons()
         local config = towerConfigs[towerType]
         local button = Instance.new("TextButton")
         button.Name = string.format("%sSelectButton", towerType)
-        button.Size = UDim2.fromOffset(390, 36)
+        button.Size = UDim2.fromOffset(500, 36)
         button.Position = UDim2.new(0, 5, 0, 0)
         button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
         button.BorderSizePixel = 0
@@ -666,7 +666,7 @@ local function populateTowerSelectionButtons()
         button.Parent = selectionTowerList
         button:SetAttribute("TowerType", towerType)
         button:SetAttribute("TowerClientGenerated", true)
-        button.Text = string.format("%s | $%d", config.Name or towerType, config.Cost or 0)
+        button.Text = config.Name or towerType
 
         button.MouseButton1Click:Connect(function()
             local slotIndex = selectionActiveSlot or findFirstEmptySlot() or 1
@@ -695,7 +695,7 @@ local function createSelectionGui()
 
     selectionFrame = Instance.new("Frame")
     selectionFrame.Name = "SelectionFrame"
-    selectionFrame.Size = UDim2.fromOffset(420, 360)
+    selectionFrame.Size = UDim2.fromOffset(520, 420)
     selectionFrame.Position = UDim2.fromOffset(0, 0)
     selectionFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     selectionFrame.BorderSizePixel = 0
@@ -718,7 +718,7 @@ local function createSelectionGui()
 
     selectionTowerList = Instance.new("ScrollingFrame")
     selectionTowerList.Name = "TowerList"
-    selectionTowerList.Size = UDim2.fromOffset(400, 180)
+    selectionTowerList.Size = UDim2.fromOffset(500, 240)
     selectionTowerList.Position = UDim2.new(0, 10, 0, 60)
     selectionTowerList.CanvasSize = UDim2.fromOffset(0, 0)
     selectionTowerList.ScrollBarThickness = 6
@@ -737,8 +737,8 @@ local function createSelectionGui()
 
     local slotsLabel = Instance.new("TextLabel")
     slotsLabel.Name = "SlotsLabel"
-    slotsLabel.Size = UDim2.fromOffset(400, 24)
-    slotsLabel.Position = UDim2.new(0, 10, 0, 250)
+    slotsLabel.Size = UDim2.fromOffset(500, 24)
+    slotsLabel.Position = UDim2.new(0, 10, 0, 310)
     slotsLabel.BackgroundTransparency = 1
     slotsLabel.Font = Enum.Font.Gotham
     slotsLabel.TextSize = 18
@@ -749,8 +749,8 @@ local function createSelectionGui()
 
     local slotsFrame = Instance.new("Frame")
     slotsFrame.Name = "SlotsContainer"
-    slotsFrame.Size = UDim2.fromOffset(400, 48)
-    slotsFrame.Position = UDim2.new(0, 10, 0, 280)
+    slotsFrame.Size = UDim2.fromOffset(500, 48)
+    slotsFrame.Position = UDim2.new(0, 10, 0, 340)
     slotsFrame.BackgroundTransparency = 1
     slotsFrame.Parent = selectionFrame
 
@@ -789,7 +789,7 @@ local function createSelectionGui()
     selectionConfirmButton = Instance.new("TextButton")
     selectionConfirmButton.Name = "ConfirmButton"
     selectionConfirmButton.Size = UDim2.fromOffset(200, 44)
-    selectionConfirmButton.Position = UDim2.new(0, 110, 0, 306)
+    selectionConfirmButton.Position = UDim2.new(0, 160, 0, 366)
     selectionConfirmButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
     selectionConfirmButton.BorderSizePixel = 0
     selectionConfirmButton.Font = Enum.Font.GothamBold
@@ -1280,7 +1280,7 @@ local function createGui()
 
     statusFrame = Instance.new("Frame")
     statusFrame.Name = "Status"
-    statusFrame.Size = UDim2.fromOffset(260, 160)
+    statusFrame.Size = UDim2.fromOffset(320, 180)
     statusFrame.Position = UDim2.fromOffset(0, 0)
     statusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     statusFrame.BackgroundTransparency = 0.1
@@ -1295,7 +1295,7 @@ local function createGui()
     moneyLabel.Name = "MoneyLabel"
     moneyLabel.BackgroundTransparency = 1
     moneyLabel.Position = UDim2.new(0, 12, 0, 12)
-    moneyLabel.Size = UDim2.fromOffset(236, 24)
+    moneyLabel.Size = UDim2.fromOffset(296, 24)
     moneyLabel.Font = Enum.Font.GothamBold
     moneyLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
     moneyLabel.TextSize = 20
@@ -1307,7 +1307,7 @@ local function createGui()
     livesLabel.Name = "LivesLabel"
     livesLabel.BackgroundTransparency = 1
     livesLabel.Position = UDim2.new(0, 12, 0, 44)
-    livesLabel.Size = UDim2.fromOffset(236, 24)
+    livesLabel.Size = UDim2.fromOffset(296, 24)
     livesLabel.Font = Enum.Font.Gotham
     livesLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
     livesLabel.TextSize = 18
@@ -1319,7 +1319,7 @@ local function createGui()
     waveLabel.Name = "WaveLabel"
     waveLabel.BackgroundTransparency = 1
     waveLabel.Position = UDim2.new(0, 12, 0, 76)
-    waveLabel.Size = UDim2.fromOffset(236, 24)
+    waveLabel.Size = UDim2.fromOffset(296, 24)
     waveLabel.Font = Enum.Font.Gotham
     waveLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
     waveLabel.TextSize = 18
@@ -1329,8 +1329,8 @@ local function createGui()
 
     startButton = Instance.new("TextButton")
     startButton.Name = "StartButton"
-    startButton.Size = UDim2.fromOffset(236, 32)
-    startButton.Position = UDim2.new(0, 12, 0, 108)
+    startButton.Size = UDim2.fromOffset(296, 36)
+    startButton.Position = UDim2.new(0, 12, 0, 112)
     startButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
     startButton.BorderSizePixel = 0
     startButton.Font = Enum.Font.GothamBold
