@@ -1,5 +1,7 @@
-local EnemyConfigs = require(game.ReplicatedStorage.Modules.Config.EnemyConfigs)
-local PathService = require(game.ReplicatedStorage.Modules.PathService)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local EnemyConfigs = require(ReplicatedStorage.Modules.Config.EnemyConfigs)
+local PathService = require(ReplicatedStorage.Modules.PathService)
 local RunService = game:GetService("RunService")
 
 local WaveService = {}
@@ -29,6 +31,60 @@ local waves = {
         { Type = "Runner", Count = 12, Delay = 0.55 },
     }
 }
+
+local function buildEnemyModel(enemyType, config)
+    local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
+    local enemiesFolder = assetsFolder and assetsFolder:FindFirstChild("Enemies")
+    local modelName = config.ModelName or config.Name or enemyType
+
+    if enemiesFolder and modelName then
+        local template = enemiesFolder:FindFirstChild(modelName)
+        if template and template:IsA("Model") then
+            local cloned = template:Clone()
+            cloned.Name = enemyType
+            local primary = cloned.PrimaryPart or cloned:FindFirstChild("HumanoidRootPart") or cloned:FindFirstChildWhichIsA("BasePart")
+            if not primary then
+                cloned:Destroy()
+            else
+                if cloned.PrimaryPart ~= primary then
+                    cloned.PrimaryPart = primary
+                end
+                for _, descendant in ipairs(cloned:GetDescendants()) do
+                    if descendant:IsA("BasePart") then
+                        descendant.Anchored = true
+                        descendant.CanCollide = false
+                    end
+                end
+                local head = cloned:FindFirstChild("Head")
+                return cloned, primary, head, false
+            end
+        end
+    end
+
+    local enemyModel = Instance.new("Model")
+    enemyModel.Name = enemyType
+
+    local primary = Instance.new("Part")
+    primary.Name = "HumanoidRootPart"
+    primary.Size = Vector3.new(2, 3, 2)
+    primary.Anchored = true
+    primary.CanCollide = false
+    primary.Color = Color3.fromRGB(120, 255, 120)
+    primary.Parent = enemyModel
+
+    enemyModel.PrimaryPart = primary
+
+    local head = Instance.new("Part")
+    head.Name = "Head"
+    head.Size = Vector3.new(2, 1, 2)
+    head.Anchored = true
+    head.CanCollide = false
+    head.Color = Color3.fromRGB(90, 200, 90)
+    head.Position = primary.Position + Vector3.new(0, 2, 0)
+    head.Parent = enemyModel
+
+    return enemyModel, primary, head, true
+end
 
 function WaveService.new(mapModel, remotes)
     local self = setmetatable({}, WaveService)
@@ -227,53 +283,48 @@ function WaveService:SpawnWave(waveNumber)
 end
 
 function WaveService:SpawnEnemy(enemyType, config)
-    local enemyModel = Instance.new("Model")
-    enemyModel.Name = enemyType
-
-    local primary = Instance.new("Part")
-    primary.Name = "HumanoidRootPart"
-    primary.Size = Vector3.new(2, 3, 2)
-    primary.Anchored = true
-    primary.CanCollide = false
-    primary.Color = Color3.fromRGB(120, 255, 120)
-    primary.Parent = enemyModel
-
-    enemyModel.PrimaryPart = primary
-
-    local head = Instance.new("Part")
-    head.Name = "Head"
-    head.Size = Vector3.new(2, 1, 2)
-    head.Anchored = true
-    head.CanCollide = false
-    head.Color = Color3.fromRGB(90, 200, 90)
-    head.Position = primary.Position + Vector3.new(0, 2, 0)
-    head.Parent = enemyModel
+    local enemyModel, primary, head, isDefault = buildEnemyModel(enemyType, config)
+    if not enemyModel or not primary then
+        return
+    end
 
     enemyModel.Parent = workspace.Enemies
 
     enemyModel:SetAttribute("MaxHealth", config.Health)
-    local healthValue = Instance.new("NumberValue")
-    healthValue.Name = "HealthValue"
+    local healthValue = enemyModel:FindFirstChild("HealthValue")
+    if not healthValue or not healthValue:IsA("NumberValue") then
+        healthValue = Instance.new("NumberValue")
+        healthValue.Name = "HealthValue"
+        healthValue.Parent = enemyModel
+    end
     healthValue.Value = config.Health
-    healthValue.Parent = enemyModel
 
-    local healthDisplay = Instance.new("BillboardGui")
-    healthDisplay.Name = "HealthDisplay"
+    local healthDisplay = enemyModel:FindFirstChild("HealthDisplay")
+    if not healthDisplay or not healthDisplay:IsA("BillboardGui") then
+        if healthDisplay then
+            healthDisplay:Destroy()
+        end
+        healthDisplay = Instance.new("BillboardGui")
+        healthDisplay.Name = "HealthDisplay"
+        healthDisplay.Parent = enemyModel
+    end
     healthDisplay.AlwaysOnTop = true
     healthDisplay.Enabled = true
     healthDisplay.ExtentsOffsetWorldSpace = Vector3.new(0, 4, 0)
     healthDisplay.Size = UDim2.new(0, 140, 0, 32)
     healthDisplay.Adornee = primary
-    healthDisplay.Parent = enemyModel
 
-    local healthLabel = Instance.new("TextLabel")
+    local healthLabel = healthDisplay:FindFirstChildWhichIsA("TextLabel")
+    if not healthLabel then
+        healthLabel = Instance.new("TextLabel")
+        healthLabel.Parent = healthDisplay
+    end
     healthLabel.BackgroundTransparency = 1
     healthLabel.TextColor3 = Color3.new(1, 1, 1)
     healthLabel.TextStrokeTransparency = 0.2
     healthLabel.Font = Enum.Font.GothamBold
     healthLabel.TextScaled = true
     healthLabel.Size = UDim2.fromScale(1, 1)
-    healthLabel.Parent = healthDisplay
 
     local maxHealth = config.Health
     local function updateHealthLabel()
@@ -288,12 +339,24 @@ function WaveService:SpawnEnemy(enemyType, config)
     updateHealthLabel()
     healthValue:GetPropertyChangedSignal("Value"):Connect(updateHealthLabel)
 
-    if enemyType == "Runner" then
-        primary.Color = Color3.fromRGB(255, 200, 80)
-    elseif enemyType == "Tank" then
-        primary.Color = Color3.fromRGB(80, 120, 255)
-        primary.Size = Vector3.new(3, 4, 3)
-        head.Size = Vector3.new(3, 1.5, 3)
+    if isDefault then
+        if enemyType == "Runner" then
+            primary.Color = Color3.fromRGB(255, 200, 80)
+        elseif enemyType == "Tank" then
+            primary.Color = Color3.fromRGB(80, 120, 255)
+            primary.Size = Vector3.new(3, 4, 3)
+            if head then
+                head.Size = Vector3.new(3, 1.5, 3)
+            end
+        end
+        if head then
+            head.CFrame = primary.CFrame * CFrame.new(0, primary.Size.Y / 2 + head.Size.Y / 2, 0)
+        end
+    end
+
+    local headOffset
+    if head then
+        headOffset = primary.CFrame:ToObjectSpace(head.CFrame)
     end
 
     self.Enemies[enemyModel] = {
@@ -302,7 +365,8 @@ function WaveService:SpawnEnemy(enemyType, config)
         Speed = config.Speed,
         Progress = 1,
         Slow = nil,
-        HealthValue = healthValue
+        HealthValue = healthValue,
+        HeadOffset = headOffset
     }
 
     if self.PathCache.SpawnCFrame then
@@ -342,6 +406,7 @@ function WaveService:MoveEnemy(enemyModel)
     local waypoints = self.PathCache.Waypoints
     local primary = enemyModel.PrimaryPart
     local head = enemyModel:FindFirstChild("Head")
+    local headOffset = enemyData.HeadOffset
 
     while enemyModel.Parent and enemyData.Health > 0 do
         local index = math.floor(enemyData.Progress)
@@ -356,7 +421,11 @@ function WaveService:MoveEnemy(enemyModel)
         local currentPos = startPos:Lerp(endPos, alpha)
         primary.CFrame = CFrame.new(currentPos, endPos)
         if head then
-            head.CFrame = primary.CFrame * CFrame.new(0, 2, 0)
+            if headOffset then
+                head.CFrame = primary.CFrame * headOffset
+            else
+                head.CFrame = primary.CFrame * CFrame.new(0, 2, 0)
+            end
         end
 
         local speed = enemyData.Speed

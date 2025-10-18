@@ -1,4 +1,6 @@
-local TowerConfigs = require(game.ReplicatedStorage.Modules.Config.TowerConfigs)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local TowerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
 
 local TowerService = {}
 TowerService.__index = TowerService
@@ -25,6 +27,8 @@ local function updateTowerAttributes(towerModel, towerData)
     towerModel:SetAttribute("Level", towerData.Level)
     towerModel:SetAttribute("Range", towerData.Config.Range or 0)
     towerModel:SetAttribute("OwnerUserId", towerData.Player and towerData.Player.UserId or 0)
+    local invested = towerData.Invested or 0
+    towerModel:SetAttribute("SellValue", math.floor(math.max(0, invested * 0.5)))
 end
 
 function TowerService.new(mapModel, waveService, remotes)
@@ -49,6 +53,45 @@ local function buildTowerModel(towerType)
         return nil
     end
 
+    local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
+    local towersFolder = assetsFolder and assetsFolder:FindFirstChild("Towers")
+    local modelName = towerConfig.ModelName or towerConfig.Name or towerType
+    if towersFolder and modelName then
+        local template = towersFolder:FindFirstChild(modelName)
+        if template and template:IsA("Model") then
+            local cloned = template:Clone()
+            cloned.Name = towerConfig.Name
+            local base = cloned.PrimaryPart or cloned:FindFirstChild("Base") or cloned:FindFirstChildWhichIsA("BasePart")
+            if base and not cloned.PrimaryPart then
+                cloned.PrimaryPart = base
+            end
+
+            local head = cloned:FindFirstChild("Head")
+            local barrel = cloned:FindFirstChild("Barrel")
+
+            for _, descendant in ipairs(cloned:GetDescendants()) do
+                if descendant:IsA("BasePart") then
+                    descendant.Anchored = true
+                    descendant.CanCollide = false
+                end
+            end
+
+            if base then
+                base.CanCollide = false
+            end
+            if head then
+                head.Anchored = true
+                head.CanCollide = false
+            end
+            if barrel then
+                barrel.Anchored = true
+                barrel.CanCollide = false
+            end
+
+            return cloned, head, barrel
+        end
+    end
+
     local model = Instance.new("Model")
     model.Name = towerConfig.Name
 
@@ -58,6 +101,7 @@ local function buildTowerModel(towerType)
     base.Anchored = true
     base.Material = Enum.Material.SmoothPlastic
     base.Color = Color3.fromRGB(40, 40, 40)
+    base.CanCollide = false
     base.Parent = model
 
     local head = Instance.new("Part")
@@ -170,11 +214,21 @@ function TowerService:AddTower(player, towerType, position)
     end
 
     towerModel.Parent = workspace.Towers
-    towerModel:SetPrimaryPartCFrame(CFrame.new(position.X, position.Y + towerModel.PrimaryPart.Size.Y / 2, position.Z))
 
-    local base = towerModel.PrimaryPart
-    if base and head then
-        head.CFrame = base.CFrame * CFrame.new(0, (base.Size.Y + head.Size.Y) / 2, 0)
+    local primary = towerModel.PrimaryPart or towerModel:FindFirstChild("Base") or towerModel:FindFirstChildWhichIsA("BasePart")
+    if not primary then
+        towerModel:Destroy()
+        return
+    end
+    if towerModel.PrimaryPart ~= primary then
+        towerModel.PrimaryPart = primary
+    end
+
+    local heightOffset = primary.Size.Y / 2
+    towerModel:PivotTo(CFrame.new(position.X, position.Y + heightOffset, position.Z))
+
+    if head then
+        head.CFrame = primary.CFrame * CFrame.new(0, (primary.Size.Y + head.Size.Y) / 2, 0)
     end
     if head and barrel then
         barrel.CFrame = head.CFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
@@ -188,7 +242,8 @@ function TowerService:AddTower(player, towerType, position)
         Head = head,
         Barrel = barrel,
         Cooldown = 0,
-        Level = 1
+        Level = 1,
+        Invested = towerConfig.Cost
     }
 
     self.Towers[towerModel] = towerData
@@ -300,9 +355,30 @@ function TowerService:UpgradeTower(player, towerModel)
     end
 
     towerData.Level += 1
+    towerData.Invested = (towerData.Invested or 0) + nextUpgrade.Cost
     updateTowerAttributes(towerModel, towerData)
 
     self.Remotes.TowerUpgraded:FireClient(player, towerModel, towerData.Level)
+    return true
+end
+
+function TowerService:SellTower(player, towerModel)
+    local towerData = self.Towers[towerModel]
+    if not towerData or towerData.Player ~= player then
+        return false, "You do not own this tower"
+    end
+
+    local refund = math.floor(math.max(0, (towerData.Invested or 0) * 0.5))
+    self.Towers[towerModel] = nil
+
+    if towerModel and towerModel.Parent then
+        towerModel:Destroy()
+    end
+
+    if refund > 0 then
+        self.WaveService:AdjustMoney(player, refund)
+    end
+
     return true
 end
 

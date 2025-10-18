@@ -17,13 +17,14 @@ local placementValid = false
 local hoverBillboard
 local hoverLabel
 local selectedTower
-local rangeAdornment
-local previewRangeAdornment
+local rangeRing
+local previewRangeRing
 local selectedTowerConnections = {}
 local currentMoney = 0
 local showEnemyHP = true
 local gameEnded = false
 local hpToggleButton
+local cancelButton
 
 local towerDetailsFrame
 local towerNameLabel
@@ -32,9 +33,10 @@ local towerStatsLabel
 local ownershipLabel
 local upgradeDescriptionLabel
 local upgradeButton
+local sellButton
 
 local PREVIEW_SIZE = Vector3.new(4, 1, 4)
-local RANGE_ORIENTATION = CFrame.Angles(math.rad(90), 0, 0)
+local RANGE_RING_ROTATION = CFrame.Angles(0, 0, math.rad(90))
 
 local function disconnectSelectedConnections()
     for _, conn in ipairs(selectedTowerConnections) do
@@ -44,17 +46,67 @@ local function disconnectSelectedConnections()
 end
 
 local function destroyRangeIndicator()
-    if rangeAdornment then
-        rangeAdornment:Destroy()
-        rangeAdornment = nil
+    if rangeRing then
+        rangeRing:Destroy()
+        rangeRing = nil
     end
 end
 
 local function destroyPreviewRangeIndicator()
-    if previewRangeAdornment then
-        previewRangeAdornment:Destroy()
-        previewRangeAdornment = nil
+    if previewRangeRing then
+        previewRangeRing:Destroy()
+        previewRangeRing = nil
     end
+end
+
+local function createRangeRing(name, color, transparency)
+    local ring = Instance.new("Part")
+    ring.Name = name
+    ring.Anchored = true
+    ring.CanCollide = false
+    ring.CanQuery = false
+    ring.CanTouch = false
+    ring.CastShadow = false
+    ring.Material = Enum.Material.Neon
+    ring.Transparency = transparency
+    ring.Color = color
+    ring.Shape = Enum.PartType.Cylinder
+    ring.Size = Vector3.new(1, 0.2, 1)
+    ring.Parent = workspace
+    return ring
+end
+
+local function updateRangeRing(ring, radius, position)
+    if not ring then
+        return
+    end
+
+    local diameter = math.max(0.1, radius * 2)
+    ring.Size = Vector3.new(diameter, 0.2, diameter)
+    ring.CFrame = CFrame.new(position) * RANGE_RING_ROTATION
+end
+
+local function updateCancelButtonState()
+    if not cancelButton then
+        return
+    end
+
+    local active = placingTowerType ~= nil
+    cancelButton.AutoButtonColor = active
+    cancelButton.Active = active
+    cancelButton.BackgroundColor3 = active and Color3.fromRGB(120, 120, 255) or Color3.fromRGB(60, 60, 60)
+    cancelButton.TextColor3 = active and Color3.new(0, 0, 0) or Color3.fromRGB(200, 200, 200)
+end
+
+local function cancelPlacement()
+    placingTowerType = nil
+    if previewPart then
+        previewPart:Destroy()
+        previewPart = nil
+    end
+    destroyPreviewRangeIndicator()
+    placementValid = false
+    updateCancelButtonState()
 end
 
 local function applyEnemyBillboardState(enemyModel)
@@ -108,6 +160,9 @@ local function createRaycastParams()
     local ignoreList = { player.Character }
     if previewPart then
         table.insert(ignoreList, previewPart)
+    end
+    if previewRangeRing then
+        table.insert(ignoreList, previewRangeRing)
     end
 
     params.FilterDescendantsInstances = ignoreList
@@ -251,17 +306,9 @@ local function showRangeIndicator(towerModel, range)
         return
     end
 
-    rangeAdornment = Instance.new("CylinderHandleAdornment")
-    rangeAdornment.Name = "TowerRangeIndicator"
-    rangeAdornment.Adornee = base
-    rangeAdornment.Color3 = Color3.fromRGB(80, 200, 255)
-    rangeAdornment.Transparency = 0.25
-    rangeAdornment.AlwaysOnTop = true
-    rangeAdornment.ZIndex = 2
-    rangeAdornment.Height = 0.15
-    rangeAdornment.CFrame = RANGE_ORIENTATION
-    rangeAdornment.Radius = range
-    rangeAdornment.Parent = towerModel
+    rangeRing = createRangeRing("TowerRangeRing", Color3.fromRGB(80, 200, 255), 0.35)
+    local groundY = base.Position.Y - (base.Size.Y / 2) + 0.05
+    updateRangeRing(rangeRing, range, Vector3.new(base.Position.X, groundY, base.Position.Z))
 end
 
 local function updateUpgradeButton(towerType, level, ownerUserId)
@@ -303,6 +350,34 @@ local function updateUpgradeButton(towerType, level, ownerUserId)
     upgradeButton.AutoButtonColor = affordable
     upgradeButton.Active = affordable
     upgradeButton.Visible = true
+end
+
+local function updateSellButton(towerModel, ownerUserId)
+    if not sellButton then
+        return
+    end
+
+    if not towerModel then
+        sellButton.Visible = false
+        return
+    end
+
+    local sellValue = towerModel:GetAttribute("SellValue")
+    if typeof(sellValue) ~= "number" or sellValue <= 0 then
+        sellButton.Visible = false
+        return
+    end
+
+    local refund = math.floor(sellValue + 0.5)
+    sellButton.Text = string.format("Sell (+$%d)", refund)
+    sellButton.Visible = true
+
+    local isOwner = ownerUserId == player.UserId
+    local active = isOwner and not gameEnded
+    sellButton.AutoButtonColor = active
+    sellButton.Active = active
+    sellButton.BackgroundColor3 = active and Color3.fromRGB(220, 120, 120) or Color3.fromRGB(70, 70, 70)
+    sellButton.TextColor3 = active and Color3.new(0, 0, 0) or Color3.fromRGB(200, 200, 200)
 end
 
 local function updateTowerDetails(towerModel)
@@ -368,6 +443,7 @@ local function updateTowerDetails(towerModel)
     towerDetailsFrame.Visible = true
     showRangeIndicator(towerModel, stats and stats.Range)
     updateUpgradeButton(towerType, level, ownerUserId)
+    updateSellButton(towerModel, ownerUserId)
 end
 
 local function createGui()
@@ -379,7 +455,7 @@ local function createGui()
 
     local frame = Instance.new("Frame")
     frame.Name = "Shop"
-    frame.Size = UDim2.new(0, 250, 0, 140)
+    frame.Size = UDim2.new(0, 250, 0, 200)
     frame.Position = UDim2.new(0, 20, 1, -160)
     frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     frame.BackgroundTransparency = 0.2
@@ -427,20 +503,13 @@ local function createGui()
             end
             local config = towerConfigs[placingTowerType]
             if config and config.Range then
-                if not previewRangeAdornment then
-                    previewRangeAdornment = Instance.new("CylinderHandleAdornment")
-                    previewRangeAdornment.Name = "PlacementRange"
-                    previewRangeAdornment.Color3 = Color3.fromRGB(120, 220, 255)
-                    previewRangeAdornment.Transparency = 0.45
-                    previewRangeAdornment.AlwaysOnTop = true
-                    previewRangeAdornment.ZIndex = 2
-                    previewRangeAdornment.Height = 0.15
-                    previewRangeAdornment.CFrame = RANGE_ORIENTATION
+                if not previewRangeRing then
+                    previewRangeRing = createRangeRing("PlacementRange", Color3.fromRGB(120, 220, 255), 0.55)
                 end
-                previewRangeAdornment.Radius = config.Range
-                previewRangeAdornment.Adornee = previewPart
-                previewRangeAdornment.Parent = previewPart
-            elseif previewRangeAdornment then
+                previewRangeRing.Color = Color3.fromRGB(120, 220, 255)
+                previewRangeRing.Transparency = 0.55
+                previewRangeRing.Parent = workspace
+            else
                 destroyPreviewRangeIndicator()
             end
             placementValid = false
@@ -453,8 +522,24 @@ local function createGui()
             if upgradeDescriptionLabel then
                 upgradeDescriptionLabel.Text = ""
             end
+            updateCancelButtonState()
         end)
     end
+
+    cancelButton = Instance.new("TextButton")
+    cancelButton.Name = "CancelPlacementButton"
+    cancelButton.Size = UDim2.new(1, -10, 0, 30)
+    cancelButton.Position = UDim2.new(0, 5, 0, 0)
+    cancelButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    cancelButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    cancelButton.Font = Enum.Font.GothamBold
+    cancelButton.TextSize = 16
+    cancelButton.Text = "Cancel Placement (Esc)"
+    cancelButton.AutoButtonColor = false
+    cancelButton.Parent = frame
+    cancelButton.MouseButton1Click:Connect(function()
+        cancelPlacement()
+    end)
 
     local statusFrame = Instance.new("Frame")
     statusFrame.Name = "Status"
@@ -583,6 +668,9 @@ local function createGui()
         gameEnded = true
         lastVictoryState = victory
         updateStartButtonVisual()
+        if selectedTower then
+            updateTowerDetails(selectedTower)
+        end
     end)
 
     remotes.GameRestarted.OnClientEvent:Connect(function()
@@ -603,7 +691,7 @@ local function createGui()
 
     towerDetailsFrame = Instance.new("Frame")
     towerDetailsFrame.Name = "TowerDetails"
-    towerDetailsFrame.Size = UDim2.new(0, 220, 0, 190)
+    towerDetailsFrame.Size = UDim2.new(0, 220, 0, 260)
     towerDetailsFrame.Position = UDim2.new(1, -240, 0, 160)
     towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     towerDetailsFrame.BackgroundTransparency = 0.2
@@ -672,7 +760,7 @@ local function createGui()
     upgradeButton = Instance.new("TextButton")
     upgradeButton.Name = "UpgradeButton"
     upgradeButton.Size = UDim2.new(1, -10, 0, 32)
-    upgradeButton.Position = UDim2.new(0, 5, 1, -36)
+    upgradeButton.Position = UDim2.new(0, 5, 0, 190)
     upgradeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
     upgradeButton.TextColor3 = Color3.new(1, 1, 1)
     upgradeButton.Font = Enum.Font.GothamBold
@@ -687,8 +775,30 @@ local function createGui()
         end
     end)
 
+    sellButton = Instance.new("TextButton")
+    sellButton.Name = "SellButton"
+    sellButton.Size = UDim2.new(1, -10, 0, 32)
+    sellButton.Position = UDim2.new(0, 5, 0, 226)
+    sellButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    sellButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    sellButton.Font = Enum.Font.GothamBold
+    sellButton.TextSize = 16
+    sellButton.Text = "Sell"
+    sellButton.AutoButtonColor = false
+    sellButton.Visible = false
+    sellButton.Parent = towerDetailsFrame
+    sellButton.MouseButton1Click:Connect(function()
+        if selectedTower then
+            remotes.TowerSellRequested:FireServer(selectedTower)
+        end
+    end)
+
+    updateCancelButtonState()
+
     return screenGui
 end
+
+createGui()
 
 local function clearSelection()
     selectedTower = nil
@@ -699,6 +809,9 @@ local function clearSelection()
     end
     if upgradeDescriptionLabel then
         upgradeDescriptionLabel.Text = ""
+    end
+    if sellButton then
+        sellButton.Visible = false
     end
 end
 
@@ -737,21 +850,14 @@ local function selectTower(towerModel)
             if selectedTower == towerModel then
                 updateTowerDetails(towerModel)
             end
+        end),
+        towerModel:GetAttributeChangedSignal("SellValue"):Connect(function()
+            if selectedTower == towerModel then
+                updateTowerDetails(towerModel)
+            end
         end)
     }
 end
-
-local function cancelPlacement()
-    placingTowerType = nil
-    if previewPart then
-        previewPart:Destroy()
-        previewPart = nil
-    end
-    destroyPreviewRangeIndicator()
-    placementValid = false
-end
-
-createGui()
 
 local function isOnBuildableGround(hitInstance)
     if not hitInstance then
@@ -820,14 +926,30 @@ local function updatePreview()
         local hitPosition = rayResult.Position
         local previewPosition = Vector3.new(hitPosition.X, hitPosition.Y + previewPart.Size.Y / 2, hitPosition.Z)
         previewPart.CFrame = CFrame.new(previewPosition)
-        if previewRangeAdornment then
-            previewRangeAdornment.CFrame = RANGE_ORIENTATION
+        local config = towerConfigs[placingTowerType]
+        if previewRangeRing and config and config.Range then
+            local ringY = hitPosition.Y + 0.05
+            updateRangeRing(previewRangeRing, config.Range, Vector3.new(hitPosition.X, ringY, hitPosition.Z))
         end
         placementValid = computePlacementValidity(hitPosition, rayResult.Instance)
-        previewPart.Color = placementValid and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 100, 100)
+        local validColor = placementValid and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 100, 100)
+        previewPart.Color = validColor
+        if previewRangeRing then
+            if placementValid then
+                previewRangeRing.Color = Color3.fromRGB(120, 220, 255)
+                previewRangeRing.Transparency = 0.45
+            else
+                previewRangeRing.Color = Color3.fromRGB(255, 150, 150)
+                previewRangeRing.Transparency = 0.6
+            end
+        end
     else
         placementValid = false
         previewPart.Color = Color3.fromRGB(255, 100, 100)
+        if previewRangeRing then
+            previewRangeRing.Color = Color3.fromRGB(255, 150, 150)
+            previewRangeRing.Transparency = 0.6
+        end
     end
 end
 
@@ -883,7 +1005,9 @@ UserInputService.InputBegan:Connect(function(input, processed)
                 clearSelection()
             end
         end
-    elseif input.KeyCode == Enum.KeyCode.R then
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        cancelPlacement()
+    elseif input.KeyCode == Enum.KeyCode.R or input.KeyCode == Enum.KeyCode.Escape then
         cancelPlacement()
     end
 end)

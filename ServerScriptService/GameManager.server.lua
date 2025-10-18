@@ -21,6 +21,7 @@ end
 local Remotes = {
     TowerPlaced = getOrCreateRemote("TowerPlaced", "RemoteEvent"),
     TowerUpgradeRequested = getOrCreateRemote("TowerUpgradeRequested", "RemoteEvent"),
+    TowerSellRequested = getOrCreateRemote("TowerSellRequested", "RemoteEvent"),
     MoneyChanged = getOrCreateRemote("MoneyChanged", "RemoteEvent"),
     LivesChanged = getOrCreateRemote("LivesChanged", "RemoteEvent"),
     WaveStarted = getOrCreateRemote("WaveStarted", "RemoteEvent"),
@@ -66,6 +67,10 @@ end)
 
 Remotes.TowerUpgradeRequested.OnServerEvent:Connect(function(player, towerModel)
     towerService:UpgradeTower(player, towerModel)
+end)
+
+Remotes.TowerSellRequested.OnServerEvent:Connect(function(player, towerModel)
+    towerService:SellTower(player, towerModel)
 end)
 
 Remotes.RequestRestart.OnServerEvent:Connect(function(player)

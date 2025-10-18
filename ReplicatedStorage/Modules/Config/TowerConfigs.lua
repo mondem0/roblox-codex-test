@@ -1,6 +1,7 @@
 local TowerConfigs = {
     Archer = {
         Name = "Archer",
+        ModelName = "Archer",
         Cost = 150,
         Range = 18,
         Damage = 8,
@@ -25,6 +26,7 @@ local TowerConfigs = {
     },
     Cannon = {
         Name = "Cannon",
+        ModelName = "Cannon",
         Cost = 250,
         Range = 22,
         Damage = 20,
@@ -52,6 +54,7 @@ local TowerConfigs = {
     },
     FrostMage = {
         Name = "Frost Mage",
+        ModelName = "FrostMage",
         Cost = 200,
         Range = 20,
         Damage = 6,

@@ -42,12 +42,27 @@ Follow these steps to build the play area quickly:
 6. **Cosmetics**: Add any decorative terrain, cliffs, props, or obstacles. Keep towers’ buildable surface open and flat.
 7. **Collision**: Anchor every static part. Ensure the path waypoints themselves are set to `Transparency = 1` and `CanCollide = false` so players and towers do not bump into them.
 
+## Custom Tower & Enemy Models
+
+You can replace the minimalist placeholder geometry with your own creations without touching any scripts.
+
+1. **Create an Assets folder**: Inside `ReplicatedStorage`, add a `Folder` named **`Assets`**. Within it, create two folders: **`Towers`** and **`Enemies`**.
+2. **Tower models**:
+   * Parent each custom tower `Model` to `ReplicatedStorage/Assets/Towers` and name it after the `ModelName` field in [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) (defaults: `Archer`, `Cannon`, `FrostMage`).
+   * Include a `Base` part (set as `PrimaryPart`, anchored, centered on the ground), a `Head` part that pivots toward enemies, and a thin `Barrel` part pointing along the head’s negative Z-axis. Anchor every part and disable collisions so placement remains smooth.
+3. **Enemy models**:
+   * Parent each enemy `Model` to `ReplicatedStorage/Assets/Enemies` using the names in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua) (`Grunt`, `Runner`, `Tank`).
+   * Provide a `HumanoidRootPart` (or assign a `PrimaryPart`) centered on the character plus a `Head` part. Anchor all geometry and disable collisions so enemies glide along the path.
+4. **Adjusting names**: If you use different model names, update the corresponding `ModelName` value in the config table.
+5. **Optional flair**: Accessories, meshes, particles, or lights parented to the model will automatically replicate when towers or enemies spawn.
+
 ## Gameplay Overview
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
 * **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP). Defeating enemies awards cash for all players.
 * **Waves**: Five handcrafted waves. The system automatically starts the next wave when the current one clears. Players can also press the `Start` button before wave 1.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
+* **Tower management**: Sell owned towers for **50%** of the total amount invested (base cost + upgrades) or cancel placement via the UI button, right-click, or the `Esc`/`R` keys.
 
 ## Testing Checklist
 
@@ -55,7 +70,8 @@ Follow these steps to build the play area quickly:
 2. Confirm the UI appears with tower buttons, money, lives, wave counter, and a `Start` button.
 3. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
 4. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers.
-5. Verify money updates when enemies are defeated, and that lives decrease when an enemy reaches the exit.
-6. Upgrade a placed tower via code modifications (optional enhancement: add upgrade UI wired to `Remotes.TowerUpgradeRequested`).
+5. Use the cancel button (or right-click) to exit placement mode without spending money.
+6. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
+7. Upgrade and sell a placed tower to confirm upgrade costs apply and 50% refunds are awarded on sale.
 
 Enjoy customizing the visuals, adding sound effects, or expanding with new towers and waves!
