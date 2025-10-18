@@ -5,12 +5,18 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
+local playerGui = player:WaitForChild("PlayerGui")
 
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local towerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
 
 local placingTowerType
 local previewPart
+local placementValid = false
+local hoverBillboard
+local hoverLabel
+
+local PREVIEW_SIZE = Vector3.new(4, 1, 4)
 
 local function createRaycastParams()
     local params = RaycastParams.new()
@@ -26,12 +32,58 @@ local function createRaycastParams()
     return params
 end
 
+local function getEnemyModelFromInstance(instance)
+    if not instance then
+        return nil
+    end
+
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if not enemiesFolder then
+        return nil
+    end
+
+    local ancestor = instance
+    while ancestor and ancestor ~= workspace do
+        if ancestor:IsA("Model") and ancestor.Parent == enemiesFolder then
+            return ancestor
+        end
+        ancestor = ancestor.Parent
+    end
+
+    return nil
+end
+
+local function ensureHoverBillboard()
+    if hoverBillboard then
+        return hoverBillboard
+    end
+
+    hoverBillboard = Instance.new("BillboardGui")
+    hoverBillboard.Name = "EnemyHoverInfo"
+    hoverBillboard.Size = UDim2.new(0, 140, 0, 40)
+    hoverBillboard.AlwaysOnTop = true
+    hoverBillboard.Enabled = false
+    hoverBillboard.ExtentsOffsetWorldSpace = Vector3.new(0, 2.5, 0)
+    hoverBillboard.Parent = playerGui
+
+    hoverLabel = Instance.new("TextLabel")
+    hoverLabel.BackgroundTransparency = 1
+    hoverLabel.Size = UDim2.fromScale(1, 1)
+    hoverLabel.Font = Enum.Font.GothamBold
+    hoverLabel.TextScaled = true
+    hoverLabel.TextColor3 = Color3.new(1, 1, 1)
+    hoverLabel.TextStrokeTransparency = 0.3
+    hoverLabel.Parent = hoverBillboard
+
+    return hoverBillboard
+end
+
 local function createGui()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "TowerDefenseUI"
     screenGui.ResetOnSpawn = false
     screenGui.IgnoreGuiInset = true
-    screenGui.Parent = player:WaitForChild("PlayerGui")
+    screenGui.Parent = playerGui
 
     local frame = Instance.new("Frame")
     frame.Name = "Shop"
@@ -76,11 +128,12 @@ local function createGui()
                 previewPart.Anchored = true
                 previewPart.CanCollide = false
                 previewPart.Transparency = 0.5
-                previewPart.Color = Color3.fromRGB(0, 170, 255)
-                previewPart.Size = Vector3.new(4, 1, 4)
+                previewPart.Color = Color3.fromRGB(255, 100, 100)
+                previewPart.Size = PREVIEW_SIZE
                 previewPart.Name = "PlacementPreview"
                 previewPart.Parent = workspace
             end
+            placementValid = false
         end)
     end
 
@@ -175,6 +228,7 @@ local function cancelPlacement()
         previewPart:Destroy()
         previewPart = nil
     end
+    placementValid = false
 end
 
 local function isOnBuildableGround(hitInstance)
@@ -199,8 +253,42 @@ local function isOnBuildableGround(hitInstance)
     return hitInstance:IsDescendantOf(ground)
 end
 
+local function isPositionClear(position)
+    local towersFolder = workspace:FindFirstChild("Towers")
+    if not towersFolder then
+        return true
+    end
+
+    for _, tower in ipairs(towersFolder:GetChildren()) do
+        local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
+        if primary then
+            local towerPos = primary.Position
+            local horizontalDistance = (Vector3.new(towerPos.X, 0, towerPos.Z) - Vector3.new(position.X, 0, position.Z)).Magnitude
+            local spacing = (primary.Size.X / 2) + (PREVIEW_SIZE.X / 2)
+            if horizontalDistance < spacing then
+                return false
+            end
+        end
+    end
+
+    return true
+end
+
+local function computePlacementValidity(position, hitInstance)
+    if not hitInstance then
+        return false
+    end
+
+    if not isOnBuildableGround(hitInstance) then
+        return false
+    end
+
+    return isPositionClear(position)
+end
+
 local function updatePreview()
     if not placingTowerType or not previewPart then
+        placementValid = false
         return
     end
 
@@ -208,9 +296,44 @@ local function updatePreview()
     local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
     if rayResult then
         local hitPosition = rayResult.Position
-        previewPart.CFrame = CFrame.new(
-            Vector3.new(hitPosition.X, hitPosition.Y + previewPart.Size.Y / 2, hitPosition.Z)
-        )
+        local previewPosition = Vector3.new(hitPosition.X, hitPosition.Y + previewPart.Size.Y / 2, hitPosition.Z)
+        previewPart.CFrame = CFrame.new(previewPosition)
+        placementValid = computePlacementValidity(hitPosition, rayResult.Instance)
+        previewPart.Color = placementValid and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 100, 100)
+    else
+        placementValid = false
+        previewPart.Color = Color3.fromRGB(255, 100, 100)
+    end
+end
+
+local function updateEnemyHover()
+    local target = mouse.Target
+    local enemyModel = getEnemyModelFromInstance(target)
+    if enemyModel then
+        local billboard = ensureHoverBillboard()
+        local adornee = enemyModel.PrimaryPart or enemyModel:FindFirstChild("HumanoidRootPart") or enemyModel:FindFirstChild("Head")
+        if adornee then
+            billboard.Adornee = adornee
+            local healthValue = enemyModel:FindFirstChild("HealthValue")
+            local maxHealth = enemyModel:GetAttribute("MaxHealth")
+            if healthValue and hoverLabel then
+                local currentHealth = math.max(0, math.floor(healthValue.Value + 0.5))
+                if typeof(maxHealth) == "number" then
+                    hoverLabel.Text = string.format("HP: %d / %d", currentHealth, maxHealth)
+                else
+                    hoverLabel.Text = string.format("HP: %d", currentHealth)
+                end
+            elseif hoverLabel then
+                hoverLabel.Text = "HP: ???"
+            end
+            billboard.Enabled = true
+        else
+            billboard.Enabled = false
+        end
+    else
+        if hoverBillboard then
+            hoverBillboard.Enabled = false
+        end
     end
 end
 
@@ -222,7 +345,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 and placingTowerType then
         local unitRay = mouse.UnitRay
         local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
-        if rayResult and isOnBuildableGround(rayResult.Instance) then
+        if rayResult and computePlacementValidity(rayResult.Position, rayResult.Instance) then
             remotes.TowerPlaced:FireServer(placingTowerType, rayResult.Position)
             cancelPlacement()
         end
@@ -231,5 +354,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
-RunService.RenderStepped:Connect(updatePreview)
+RunService.RenderStepped:Connect(function()
+    updatePreview()
+    updateEnemyHover()
+end)
 

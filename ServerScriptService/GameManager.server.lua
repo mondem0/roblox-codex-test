@@ -49,9 +49,14 @@ Remotes.TowerPlaced.OnServerEvent:Connect(function(player, towerType, position)
         return
     end
 
-    if towerService:CanAfford(player, towerType) then
+    if not towerService:CanAfford(player, towerType) then
+        Remotes.MoneyChanged:FireClient(player, waveService:GetPlayerStats(player).Money)
+        return
+    end
+
+    local towerModel = towerService:AddTower(player, towerType, position)
+    if towerModel then
         towerService:ChargePlayer(player, config.Cost)
-        towerService:AddTower(player, towerType, position)
     else
         Remotes.MoneyChanged:FireClient(player, waveService:GetPlayerStats(player).Money)
     end

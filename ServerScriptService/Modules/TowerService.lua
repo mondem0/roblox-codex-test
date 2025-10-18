@@ -6,6 +6,8 @@ local TowerService = {}
 TowerService.__index = TowerService
 
 local PROJECTILE_FOLDER_NAME = "Projectiles"
+local PROJECTILE_SPEED = 60
+local TOWER_BASE_HALF_SIZE = 2
 
 local function cloneTowerConfig(config)
     local newConfig = {}
@@ -48,7 +50,7 @@ local function buildTowerModel(towerType)
 
     local base = Instance.new("Part")
     base.Name = "Base"
-    base.Size = Vector3.new(4, 1, 4)
+    base.Size = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
     base.Anchored = true
     base.Material = Enum.Material.SmoothPlastic
     base.Color = Color3.fromRGB(40, 40, 40)
@@ -95,9 +97,64 @@ function TowerService:ChargePlayer(player, amount)
     self.WaveService:AdjustMoney(player, -amount)
 end
 
+function TowerService:IsPlacementValid(position)
+    if not position then
+        return false
+    end
+
+    local map = workspace:FindFirstChild("Map")
+    local ground = map and map:FindFirstChild("PathGround")
+    if ground then
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Blacklist
+        params.IgnoreWater = true
+
+        local ignoreList = {}
+        if self.ProjectilesFolder then
+            table.insert(ignoreList, self.ProjectilesFolder)
+        end
+        local towersFolderInstance = workspace:FindFirstChild("Towers")
+        if towersFolderInstance then
+            table.insert(ignoreList, towersFolderInstance)
+        end
+
+        params.FilterDescendantsInstances = ignoreList
+
+        local rayOrigin = Vector3.new(position.X, position.Y + 50, position.Z)
+        local rayDirection = Vector3.new(0, -200, 0)
+        local result = workspace:Raycast(rayOrigin, rayDirection, params)
+        if not result or (result.Instance ~= ground and not result.Instance:IsDescendantOf(ground)) then
+            return false
+        end
+    end
+
+    local towersFolder = workspace:FindFirstChild("Towers")
+    if not towersFolder then
+        return true
+    end
+
+    for _, tower in ipairs(towersFolder:GetChildren()) do
+        local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
+        if primary then
+            local otherPos = primary.Position
+            local horizontalDistance = (Vector3.new(otherPos.X, 0, otherPos.Z) - Vector3.new(position.X, 0, position.Z)).Magnitude
+            local spacing = (primary.Size.X / 2) + TOWER_BASE_HALF_SIZE
+            if horizontalDistance < spacing then
+                return false
+            end
+        end
+    end
+
+    return true
+end
+
 function TowerService:AddTower(player, towerType, position)
     local towerConfig = TowerConfigs[towerType]
     if not towerConfig then
+        return
+    end
+
+    if not self:IsPlacementValid(position) then
         return
     end
 
@@ -158,7 +215,7 @@ function TowerService:SpawnProjectile(towerData, target)
 
     local direction = (target.PrimaryPart.Position - projectile.Position).Unit
     local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Velocity = direction * 120
+    bodyVelocity.Velocity = direction * PROJECTILE_SPEED
     bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
     bodyVelocity.Parent = projectile
 

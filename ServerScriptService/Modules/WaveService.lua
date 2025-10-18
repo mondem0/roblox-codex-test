@@ -129,6 +129,9 @@ function WaveService:DamageEnemy(enemyModel, towerData)
 
     local appliedDamage = math.min(damageAmount, enemyData.Health)
     enemyData.Health -= appliedDamage
+    if enemyData.HealthValue then
+        enemyData.HealthValue.Value = enemyData.Health
+    end
 
     if towerData.Player then
         self:AdjustMoney(towerData.Player, appliedDamage)
@@ -158,6 +161,9 @@ function WaveService:SplashDamage(origin, radius, towerData)
 end
 
 function WaveService:KillEnemy(enemyModel, enemyData)
+    if enemyData and enemyData.HealthValue then
+        enemyData.HealthValue.Value = 0
+    end
     if enemyModel.Parent then
         local reward = EnemyConfigs[enemyData.Type].Reward
         for player in pairs(self.PlayerStats) do
@@ -244,6 +250,12 @@ function WaveService:SpawnEnemy(enemyType, config)
 
     enemyModel.Parent = workspace.Enemies
 
+    enemyModel:SetAttribute("MaxHealth", config.Health)
+    local healthValue = Instance.new("NumberValue")
+    healthValue.Name = "HealthValue"
+    healthValue.Value = config.Health
+    healthValue.Parent = enemyModel
+
     if enemyType == "Runner" then
         primary.Color = Color3.fromRGB(255, 200, 80)
     elseif enemyType == "Tank" then
@@ -257,7 +269,8 @@ function WaveService:SpawnEnemy(enemyType, config)
         Health = config.Health,
         Speed = config.Speed,
         Progress = 1,
-        Slow = nil
+        Slow = nil,
+        HealthValue = healthValue
     }
 
     if self.PathCache.SpawnCFrame then
@@ -321,6 +334,9 @@ end
 function WaveService:EnemyReachedGoal(enemyModel)
     local enemyData = self.Enemies[enemyModel]
     if enemyData then
+        if enemyData.HealthValue then
+            enemyData.HealthValue.Value = 0
+        end
         self:DamageBase(1)
         enemyModel:Destroy()
         self.Enemies[enemyModel] = nil
