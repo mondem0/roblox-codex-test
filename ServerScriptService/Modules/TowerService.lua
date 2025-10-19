@@ -9,6 +9,81 @@ TowerService.__index = TowerService
 local TOWER_BASE_HALF_SIZE = 2
 local DEFAULT_BASE_SIZE = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
 local TowerFootprints = {}
+local TowerLimits = {}
+
+local function sanitizeLimitValue(value)
+    local numeric = tonumber(value)
+    if not numeric then
+        return nil
+    end
+
+    numeric = math.floor(numeric)
+    if numeric <= 0 then
+        return nil
+    end
+
+    return numeric
+end
+
+local function resolvePlacementLimit(towerType)
+    local cached = TowerLimits[towerType]
+    if cached ~= nil then
+        if cached == false then
+            return nil
+        end
+        return cached
+    end
+
+    local towerConfig = TowerConfigs[towerType]
+    if not towerConfig then
+        TowerLimits[towerType] = false
+        return nil
+    end
+
+    local raw = towerConfig.PlacementLimit or towerConfig.TowerLimit or towerConfig.MaxPlaced
+    local limit
+
+    if typeof(raw) == "number" then
+        local perPlayer = sanitizeLimitValue(raw)
+        if perPlayer then
+            limit = {
+                PerPlayer = perPlayer,
+            }
+        end
+    elseif typeof(raw) == "table" then
+        local normalized = {}
+
+        local perPlayer = raw.PerPlayer or raw.perPlayer or raw.Player or raw.PlayerLimit or raw.MaxPerPlayer or raw.MaxOwned
+        local globalLimit = raw.Global or raw.global or raw.Total or raw.total or raw.MaxTotal or raw.MaxGlobal
+
+        perPlayer = sanitizeLimitValue(perPlayer)
+        globalLimit = sanitizeLimitValue(globalLimit)
+
+        if perPlayer then
+            normalized.PerPlayer = perPlayer
+        end
+
+        if globalLimit then
+            normalized.Global = globalLimit
+        end
+
+        if next(normalized) then
+            limit = normalized
+        end
+    end
+
+    TowerLimits[towerType] = limit or false
+    return limit
+end
+
+local function getPlacementLimit(towerType)
+    local limit = resolvePlacementLimit(towerType)
+    if not limit then
+        return nil
+    end
+
+    return limit
+end
 
 local function getTowerPrimaryPart(model)
     if not model then
@@ -167,6 +242,8 @@ function TowerService.new(mapModel, waveService, remotes)
     self.WaveService = waveService
     self.Remotes = remotes
     self.Towers = {}
+
+    TowerLimits = {}
 
     if waveService and typeof(waveService) == "table" and waveService.SetTowerService then
         waveService:SetTowerService(self)
@@ -343,12 +420,57 @@ function TowerService:CanAfford(player, towerType)
     if not towerConfig then
         return false
     end
+
+    if self:HasReachedTowerLimit(player, towerType) then
+        return false
+    end
+
     local stats = self.WaveService:GetPlayerStats(player)
     return stats and stats.Money >= towerConfig.Cost
 end
 
 function TowerService:ChargePlayer(player, amount)
     self.WaveService:AdjustMoney(player, -amount)
+end
+
+function TowerService:GetTowerCount(towerType, player)
+    if not towerType then
+        return 0
+    end
+
+    local count = 0
+    for _, towerData in pairs(self.Towers) do
+        if towerData and towerData.Type == towerType then
+            if not player or towerData.Player == player then
+                count += 1
+            end
+        end
+    end
+
+    return count
+end
+
+function TowerService:HasReachedTowerLimit(player, towerType)
+    local limit = getPlacementLimit(towerType)
+    if not limit then
+        return false
+    end
+
+    if limit.PerPlayer and player then
+        local ownedCount = self:GetTowerCount(towerType, player)
+        if ownedCount >= limit.PerPlayer then
+            return true
+        end
+    end
+
+    if limit.Global then
+        local totalCount = self:GetTowerCount(towerType)
+        if totalCount >= limit.Global then
+            return true
+        end
+    end
+
+    return false
 end
 
 function TowerService:IsPlacementValid(position, towerType)
@@ -409,6 +531,10 @@ end
 function TowerService:AddTower(player, towerType, position)
     local towerConfig = TowerConfigs[towerType]
     if not towerConfig then
+        return
+    end
+
+    if self:HasReachedTowerLimit(player, towerType) then
         return
     end
 
@@ -983,6 +1109,8 @@ function TowerService:Reset()
         towersFolder:ClearAllChildren()
     end
     self.Towers = {}
+
+    TowerLimits = {}
 end
 
 return TowerService

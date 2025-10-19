@@ -469,6 +469,33 @@ TowerConfigs.Cannon = {
 
 Leave any of these fields `nil` to disable the corresponding cue. The helper automatically destroys temporary parts/sounds once playback finishes, so repeated spawns and shots will not clutter the workspace.
 
+### Tower placement limits
+
+Add `PlacementLimit` to a tower entry to restrict how many copies can exist at once. Provide a single number to cap each player individually or supply a table with `PerPlayer` and/or `Global` keys if you also want a shared limit across the entire server. When the limit is reached the server rejects additional placement requests without charging the player.
+
+```lua
+TowerConfigs.Archer = {
+    Name = "Archer",
+    Cost = 150,
+    PlacementLimit = 12, -- each player can own up to 12 Archers
+    Range = 18,
+    Damage = 8,
+}
+
+TowerConfigs.Cannon = {
+    Name = "Cannon",
+    Cost = 250,
+    PlacementLimit = {
+        PerPlayer = 4, -- each player may own four Cannons
+        Global = 12,   -- no more than twelve Cannons across all players combined
+    },
+    SplashRadius = 6,
+    Damage = 20,
+}
+```
+
+Omit the field or set it to `nil` when you want unlimited copies of a tower type.
+
 ### Tower upgrade model swaps
 
 Swapping tower visuals no longer requires scripting. Add any of the following fields to an upgrade table inside [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) and the server will rebuild the tower with the new geometry as soon as the purchase completes:
