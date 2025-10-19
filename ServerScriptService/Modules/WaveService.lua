@@ -196,6 +196,18 @@ local function normalizeSpawnEntries(raw)
     return normalized
 end
 
+local function toVector3(value)
+    if typeof(value) == "Vector3" then
+        return value
+    elseif type(value) == "table" then
+        local x = value.X or value.x or value[1] or 0
+        local y = value.Y or value.y or value[2] or 0
+        local z = value.Z or value.z or value[3] or 0
+        return Vector3.new(x, y, z)
+    end
+    return nil
+end
+
 local function setModelPrimaryCFrame(enemyModel, primary, cframe, partOffsets)
     if not (enemyModel and primary and cframe) then
         return
@@ -631,18 +643,6 @@ end
 
 function WaveService:NormalizeEnemyAbilities(rawAbilities)
     return normalizeAbilities(rawAbilities)
-end
-
-local function toVector3(value)
-    if typeof(value) == "Vector3" then
-        return value
-    elseif type(value) == "table" then
-        local x = value.X or value.x or value[1] or 0
-        local y = value.Y or value.y or value[2] or 0
-        local z = value.Z or value.z or value[3] or 0
-        return Vector3.new(x, y, z)
-    end
-    return nil
 end
 
 local function toColor3(value)
