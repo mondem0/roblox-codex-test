@@ -1901,16 +1901,26 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 end)
 
-remotes.TowerUpgraded.OnClientEvent:Connect(function(towerModel)
-	if selectedTower and towerModel == selectedTower then
-		updateTowerDetails(towerModel)
-	end
+remotes.TowerUpgraded.OnClientEvent:Connect(function(towerModel, _, previousModel)
+        if not towerModel then
+                return
+        end
+
+        if selectedTower and (towerModel == selectedTower or previousModel == selectedTower) then
+                selectTower(towerModel)
+        end
 end)
 
 if remotes:FindFirstChild("SplashFired") then
-	remotes.SplashFired.OnClientEvent:Connect(function(position, radius, color)
-		showExplosion(position, radius, color)
-	end)
+        remotes.SplashFired.OnClientEvent:Connect(function(position, radius, color)
+                showExplosion(position, radius, color)
+        end)
+end
+
+if remotes:FindFirstChild("TowerStunPulse") then
+        remotes.TowerStunPulse.OnClientEvent:Connect(function(position, radius, color)
+                showExplosion(position, radius, color or Color3.fromRGB(140, 225, 255))
+        end)
 end
 
 RunService.RenderStepped:Connect(function()
