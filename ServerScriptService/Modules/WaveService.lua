@@ -1010,6 +1010,27 @@ function WaveService:TriggerStunPulse(stunConfig, enemyModel)
         options.SoundName = soundName
     end
 
+    local pulseSound =
+        stunConfig.PulseSound
+        or stunConfig.PulseSoundId
+        or stunConfig.ActivationSound
+        or stunConfig.AbilitySound
+        or stunConfig.CastSound
+
+    if pulseSound then
+        options.PulseSound = pulseSound
+    end
+
+    local pulseSoundName =
+        stunConfig.PulseSoundName
+        or stunConfig.ActivationSoundName
+        or stunConfig.AbilitySoundName
+        or stunConfig.CastSoundName
+
+    if pulseSoundName and pulseSoundName ~= "" then
+        options.PulseSoundName = pulseSoundName
+    end
+
     if stunConfig.ForceLoop ~= nil then
         options.Loop = stunConfig.ForceLoop
     end

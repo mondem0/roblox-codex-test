@@ -647,12 +647,31 @@ function TowerService:ApplyTowerStun(origin, radius, duration, config)
     end
 
     local effectColor
+    local pulseSound
+    local pulseSoundName
+
     if type(config) == "table" then
         effectColor = config.EffectColor or config.Color or config.StunColor
+        pulseSound = config.PulseSound or config.PulseSoundId
+        pulseSoundName = config.PulseSoundName
     end
 
     if not effectColor then
         effectColor = Color3.fromRGB(140, 225, 255)
+    end
+
+    if pulseSound then
+        local soundOptions = {
+            Position = origin,
+        }
+
+        if pulseSoundName and pulseSoundName ~= "" then
+            soundOptions.Name = pulseSoundName
+        else
+            soundOptions.Name = "StunPulseSound"
+        end
+
+        SoundEffects.Play(nil, pulseSound, soundOptions)
     end
 
     if self.Remotes and self.Remotes.TowerStunPulse then

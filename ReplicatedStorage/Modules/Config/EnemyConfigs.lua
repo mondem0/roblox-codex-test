@@ -96,6 +96,11 @@ local EnemyConfigs = {
                 Radius = 18,
                 Duration = 4.5,
                 EffectColor = { 170, 80, 255 },
+                PulseSound = {
+                    SoundId = "rbxassetid://1234567903",
+                    Volume = 1.15,
+                },
+                PulseSoundName = "RiftbreakerStunPulse",
                 Sound = {
                     SoundId = "rbxassetid://1234567902",
                     Volume = 1.15,
@@ -114,6 +119,11 @@ local EnemyConfigs = {
         TowerStunOnDeath = {
             Radius = 14,
             Duration = 4.5,
+            PulseSound = {
+                SoundId = "rbxassetid://1234567897",
+                Volume = 1,
+            },
+            PulseSoundName = "FrostWardenPulse",
             Sound = {
                 SoundId = "rbxassetid://1234567896",
                 Volume = 0.95,

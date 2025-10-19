@@ -236,6 +236,8 @@ Supported fields inside the stun table:
 * `Duration` &mdash; how long the stun lasts in seconds (required).
 * `Sound` or `StunSound` &mdash; optional sound descriptor to loop from every stunned tower. Use the same format as other sound fields (`rbxassetid://...`, a table of `Sound` properties, or a `Sound` instance). Include `StartTime` / `TimePosition` if you want the loop to begin mid-track.
 * `SoundName` &mdash; optional custom name applied to the looping sound instance.
+* `PulseSound` (aliases `PulseSoundId`, `ActivationSound`, `AbilitySound`, or `CastSound`) &mdash; optional descriptor that plays once from the stun origin when the pulse triggers. Supply any of the formats above.
+* `PulseSoundName` &mdash; optional label for the one-shot activation sound.
 * `Loop` &mdash; set to `false` if you prefer a one-shot cue; the default automatically loops while the tower is stunned.
 * `Freeze` &mdash; set to `false` to let towers keep rotating while stunned. By default towers are frozen in place and cannot turn until the effect ends.
 * `EffectColor` (aliases `Color`, `StunColor`, or `PulseColor`) &mdash; optional RGB/hex/`Color3` value that tints the stun explosion. When omitted the pulse defaults to a frosty blue.
@@ -250,6 +252,11 @@ EnemyConfigs.FrostWarden = {
     TowerStunOnDeath = {
         Radius = 14,
         Duration = 4.5,
+        PulseSound = {
+            SoundId = "rbxassetid://1234567897",
+            Volume = 1,
+        },
+        PulseSoundName = "FrostWardenPulse",
         Sound = {
             SoundId = "rbxassetid://1234567896",
             Volume = 0.95,
@@ -273,7 +280,7 @@ Hook mid-fight behaviour to an enemy by adding an `Abilities` table. Each entry 
   * `Pathfind` is `true` by default. The wave service computes a `PathfindingService` route from the enemy’s current position to the target waypoint and temporarily follows that path. Set `Pathfind = false` to travel in a straight line or `Teleport = true`/`Instant = true` to snap directly to the destination. Optional `AgentRadius`, `AgentHeight`, `AgentCanJump`, and `AgentCanClimb` values forward to the path query.
   * Supply `SpeedMultiplier` / `SpeedBoost` to accelerate (or slow) the dash, and `Sound` / `SoundId` to play an effect as the warp begins.
 * `StunPulse` &mdash; emits a tower-stunning shockwave while the enemy is still alive.
-  * Accepts the same fields as `TowerStunOnDeath` (`Radius`, `Duration`, `Sound`, `EffectColor`, etc.) plus the trigger fields listed above. Towers caught inside the pulse freeze exactly like the Frost Warden’s death blast.
+  * Accepts the same fields as `TowerStunOnDeath` (`Radius`, `Duration`, `PulseSound`, `Sound`, `EffectColor`, etc.) plus the trigger fields listed above. Towers caught inside the pulse freeze exactly like the Frost Warden’s death blast.
 
 The new Riftbreaker boss demonstrates both abilities:
 
@@ -301,7 +308,16 @@ EnemyConfigs.Riftbreaker = {
             Radius = 18,
             Duration = 4.5,
             EffectColor = { 170, 80, 255 },
-            Sound = "rbxassetid://1234567902",
+            PulseSound = {
+                SoundId = "rbxassetid://1234567903",
+                Volume = 1.15,
+            },
+            PulseSoundName = "RiftbreakerStunPulse",
+            Sound = {
+                SoundId = "rbxassetid://1234567902",
+                Volume = 1.15,
+                StartTime = 0.35,
+            },
             SoundName = "RiftbreakerStun",
         },
     },
