@@ -12,8 +12,10 @@ Create the folders in **Explorer** exactly as listed. If a folder already exists
 3. Insert a `ModuleScript` named **`TowerConfigs`** and paste the contents of [`ReplicatedStorage/Modules/Config/TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua).
 4. Insert a `ModuleScript` named **`EnemyConfigs`** and paste the contents of [`ReplicatedStorage/Modules/Config/EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua).
 5. Insert a `ModuleScript` named **`WaveConfigs`** and paste [`ReplicatedStorage/Modules/Config/WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua).
-6. In `Modules`, add a `ModuleScript` named **`PathService`** and paste [`ReplicatedStorage/Modules/PathService.lua`](ReplicatedStorage/Modules/PathService.lua).
-7. Create a `Folder` named `Remotes`. You do **not** need to add RemoteEvents manually; [`ServerScriptService/GameManager.server.lua`](ServerScriptService/GameManager.server.lua) will generate them if missing.
+6. Add a `ModuleScript` named **`LobbyConfig`** beside the other config modules and paste [`ReplicatedStorage/Modules/Config/LobbyConfig.lua`](ReplicatedStorage/Modules/Config/LobbyConfig.lua). This file controls the lobby round sizes and the available map pool.
+7. (Optional) Create a `Folder` named **`Maps`** inside `ReplicatedStorage`. Parent any playable map models here; [`ServerScriptService/GameManager.server.lua`](ServerScriptService/GameManager.server.lua) clones the selected map from this folder and positions it at `(0, 1000, 0)` when a round begins. Map names must match the `ModelName` entries in `LobbyConfig`.
+8. In `Modules`, add a `ModuleScript` named **`PathService`** and paste [`ReplicatedStorage/Modules/PathService.lua`](ReplicatedStorage/Modules/PathService.lua).
+9. Create a `Folder` named `Remotes`. You do **not** need to add RemoteEvents manually; [`ServerScriptService/GameManager.server.lua`](ServerScriptService/GameManager.server.lua) will generate them if missing.
 
 ### ServerScriptService
 1. Add a `Folder` called `Modules`.
@@ -67,10 +69,12 @@ You can replace the minimalist placeholder geometry with your own creations with
 
 The `TowerClient` LocalScript now fabricates every interface element at runtime, so you can drop the scripts into a clean experience and press Play without wiring any Gui objects by hand. Out of the box you get:
 
-* A pre-game **tower selection screen** that lists every entry from `TowerConfigs`, lets creators pick three unique towers for their loadout, and prevents placement until all slots are filled.
-* A bottom **shop bar** that shows the chosen towers, previews their cost, and blocks interaction until the loadout is confirmed.
-* A top-left **status panel** with money, lives, and the current wave, plus a separate Start/Restart button that appears near the panel once the loadout is confirmed.
-* A top-right **tower details** window that displays range, damage, slow/splash stats, upgrade descriptions, and live sell values. Upgrade (`E`) and sell (`X`) hotkeys stay in sync with the buttons and dim when you cannot afford an action.
+* A pre-game **lobby screen** with a horizontal shop sorted by tower cost. Players fill five loadout slots (no duplicates) before they can queue for a round, and the selection automatically syncs to the server.
+* A right-side **round selector** that exposes one-, two-, three-, and four-player waiting rooms. Joining a room reveals Ready/Leave buttons, and once every participant readies up a 10 second countdown begins automatically.
+* A mid-match **map vote** overlay that pops up after the lobby countdown. The server picks three random entries from `LobbyConfig.MapPool`, shows live vote totals, and tiebreaks automatically when everyone has voted.
+* A bottom **shop bar** that still reflects the chosen loadout, previews tower prices, and only allows placement while a round is active.
+* A top-left **status panel** with money, lives, current wave, total tower counts, and a dedicated pre-round countdown label. The old Start/Restart button is gone—waves launch on their own once the countdown expires. Restarting from the pause menu still works through the existing remote.
+* A center-right **tower details** window that hugs the screen edge so it no longer overlaps other HUD elements. It continues to show stats, upgrade descriptions, and live sell values while responding to `E`/`X` hotkeys.
 * A cursor-following **enemy hover card** that always shows the hovered enemy’s name and health for quick debugging.
 
 If you want a bespoke layout, you can still duplicate the generated Gui objects in play mode, tweak them in Studio, and then update the script to match your custom hierarchy. The default skins are intentionally minimalist so you can ship immediately or treat them as a starting point for further styling.
@@ -588,9 +592,9 @@ Make sure those upgrade models exist under `ReplicatedStorage/Assets/Towers` (or
 ## Gameplay Overview
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
-* **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
+* **Loadouts**: Players build a five-slot loadout from the center shop, which is automatically sorted left-to-right by base price. Each slot must contain a unique tower, and you need at least one tower assigned before you can join a waiting room. Once every player in a waiting room is ready, a 10 second countdown begins and the group is sent to map voting.
 * **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), Frost Wardens (collapse into tower-stunning pulses), Shades (stealthed units that only hidden-detection towers can hit), Warcallers (summon reinforcements with `SpawnUnits` abilities), and three boss variants (Boss1, LightningBoss, and the Riftbreaker that warps ahead mid-fight and stuns towers at low health). These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
-* **Waves**: Eleven sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the later encounters showcase Riftbreaker’s mid-fight waypoint skip alongside hidden Shades, tower-stunning support units, and Warcallers that spawn extra attackers while under fire.
+* **Waves**: Eleven sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and the lobby kicks off wave 1 after the pre-round countdown completes. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the later encounters showcase Riftbreaker’s mid-fight waypoint skip alongside hidden Shades, tower-stunning support units, and Warcallers that spawn extra attackers while under fire.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 * **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.
@@ -598,12 +602,13 @@ Make sure those upgrade models exist under `ReplicatedStorage/Assets/Towers` (or
 ## Testing Checklist
 
 1. Publish the game or run **Play** in Studio.
-2. When Play starts, the auto-generated HUD should appear with tower slots, money, lives, and a wave counter. The Start button should be hidden for now.
-3. Use the tower selection screen that pops up to assign three different towers to the slots and confirm the loadout. The shop buttons should update to the towers you chose, and the Start button should appear near the status panel.
-4. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
-5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers. Groups that define a `Streams` array release several enemy types at once, each honoring its own spawn interval.
-6. Press **`X`** while aiming the preview to cancel placement without spending money.
-7. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
-8. With one of your towers selected, press **`E`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.
+2. When Play starts, the lobby interface should appear: a centered shop sorted by tower price, the waiting-room selector on the right, and the five loadout slots beneath it. The in-round status HUD remains hidden (and no longer shows a Start button) until a match begins.
+3. Use the loadout panel to assign up to five unique towers. You need at least one slot filled before joining a waiting room; duplicate picks should be rejected.
+4. Join a waiting room that matches your group size, ready up, and watch the 10 second countdown trigger once every participant is ready. When the countdown finishes, a three-map voting overlay should appear with live vote counts.
+5. After the vote resolves, confirm that the chosen map spawns at `(0, 1000, 0)`, everyone is teleported, and the pre-round countdown plays on screen. Wave 1 should begin automatically once the countdown hits zero.
+6. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
+7. Press **`X`** while aiming the preview to cancel placement without spending money.
+8. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
+9. With one of your towers selected, press **`E`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.
 
 Enjoy customizing the visuals, adding sound effects, or expanding with new towers and waves!

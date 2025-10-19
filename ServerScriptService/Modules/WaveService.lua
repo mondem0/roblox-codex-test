@@ -786,6 +786,7 @@ function WaveService.new(mapModel, remotes)
     self.LastTick = tick()
     self.GameEnded = false
     self.TowerService = nil
+    self.RoundFinishedCallback = nil
 
     local towersFolder = Instance.new("Folder")
     towersFolder.Name = "Towers"
@@ -812,6 +813,15 @@ end
 
 function WaveService:SetTowerService(towerService)
     self.TowerService = towerService
+end
+
+function WaveService:SetMapModel(mapModel)
+    self.MapModel = mapModel
+    self.PathCache = PathService:CreatePathCache(mapModel)
+end
+
+function WaveService:SetRoundFinishedCallback(callback)
+    self.RoundFinishedCallback = callback
 end
 
 function WaveService:SetupPlayer(player)
@@ -863,12 +873,18 @@ function WaveService:GameOver()
         self.Enemies[enemyModel] = nil
     end
     self.Remotes.GameEnded:FireAllClients(false)
+    if self.RoundFinishedCallback then
+        pcall(self.RoundFinishedCallback, false)
+    end
 end
 
 function WaveService:WinGame()
     self.IsSpawning = false
     self.GameEnded = true
     self.Remotes.GameEnded:FireAllClients(true)
+    if self.RoundFinishedCallback then
+        pcall(self.RoundFinishedCallback, true)
+    end
 end
 
 function WaveService:ActivateEnemyAbility(enemyModel, enemyData, abilityEntry)

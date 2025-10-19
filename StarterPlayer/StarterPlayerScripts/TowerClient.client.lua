@@ -27,7 +27,6 @@ local statusFrame
 local moneyLabel
 local livesLabel
 local waveLabel
-local startButton
 local rangeRing
 local rangeRingAdornment
 local previewRangeRing
@@ -88,10 +87,27 @@ local selectionTowerList
 local selectionSlotButtons = {}
 local selectionSlotOriginalText = {}
 local selectionActiveSlot
-local selectionConfirmButton
-local selectionConfirmButtonOriginalAutoButtonColor
 local loadoutSelection = {}
-local selectionComplete = false
+local lastSyncedLoadout
+
+local lobbyCountdownLabel
+local readyButton
+local leaveButton
+local roundButtons = {}
+local lobbyStatusLabel
+local lobbyPhase = "lobby"
+local lobbyStateSnapshot
+local lobbyReadyState = false
+local lobbyRoundList
+
+local mapSelectionGui
+local mapSelectionFrame
+local mapOptionButtons = {}
+local mapVoteLabels = {}
+local mapSelectionStatusLabel
+local mapOptionsContainer
+
+local preRoundCountdownLabel
 
 local DEFAULT_PREVIEW_SIZE = Vector3.new(4, 1, 4)
 local DEFAULT_PREVIEW_RADIUS = math.max(DEFAULT_PREVIEW_SIZE.X, DEFAULT_PREVIEW_SIZE.Z) / 2
@@ -408,32 +424,6 @@ function beginPlacement(towerType)
 	end
 end
 
-local function updateStartButtonVisual()
-	if not startButton or not startButton.Parent then
-		return
-	end
-
-	local autoText = startButton:GetAttribute("AutoText")
-	local autoStyle = startButton:GetAttribute("AutoStyle")
-
-	if gameEnded then
-		local text = "Restart"
-		if lastVictoryState == true then
-			text = "Victory! Restart"
-		elseif lastVictoryState == false then
-			text = "Defeat! Restart"
-		end
-
-		if autoText ~= false then
-			startButton.Text = text
-		end
-	else
-		if autoText ~= false then
-			startButton.Text = "Start"
-		end
-	end
-end
-
 local function createRaycastParams()
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Blacklist
@@ -589,21 +579,23 @@ local function hasAnySelectedTowers()
 end
 
 local function updateConfirmButtonState()
-        if not selectionConfirmButton then
-                return
-        end
+        syncLoadoutWithServer()
 
         local ready = hasAnySelectedTowers()
 
-	if selectionConfirmButtonOriginalAutoButtonColor == nil then
-		selectionConfirmButtonOriginalAutoButtonColor = selectionConfirmButton.AutoButtonColor
-	end
+        if readyButton then
+                readyButton.Active = ready
+                readyButton.AutoButtonColor = ready
+                readyButton.TextTransparency = ready and 0 or 0.35
+        end
 
-	selectionConfirmButton.Active = ready
-	if selectionConfirmButtonOriginalAutoButtonColor ~= nil then
-		selectionConfirmButton.AutoButtonColor = ready and selectionConfirmButtonOriginalAutoButtonColor or false
-	end
-	selectionConfirmButton:SetAttribute("SelectionReady", ready)
+        if lobbyStatusLabel then
+                if ready then
+                        lobbyStatusLabel.Text = ""
+                else
+                        lobbyStatusLabel.Text = "Select at least one tower to join a round."
+                end
+        end
 end
 
 local function updateSelectionSlotDisplay(slotIndex)
@@ -642,18 +634,61 @@ local function setActiveSelectionSlot(slotIndex)
 end
 
 local function findFirstEmptySlot()
-        for i = 1, LOADOUT_SLOT_COUNT do
-                if not loadoutSelection[i] then
-                        return i
-                end
+    for i = 1, LOADOUT_SLOT_COUNT do
+        if not loadoutSelection[i] then
+            return i
         end
-        return nil
+    end
+    return nil
+end
+
+local function buildLoadoutPayload()
+    local payload = {}
+    for i = 1, LOADOUT_SLOT_COUNT do
+        local towerType = loadoutSelection[i]
+        if towerType and towerConfigs[towerType] then
+            table.insert(payload, towerType)
+        end
+    end
+    return payload
+end
+
+local function payloadsMatch(a, b)
+    if a == b then
+        return true
+    end
+    if not a or not b then
+        return false
+    end
+    if #a ~= #b then
+        return false
+    end
+    for index = 1, #a do
+        if a[index] ~= b[index] then
+            return false
+        end
+    end
+    return true
+end
+
+local function syncLoadoutWithServer()
+    if not remotes.SubmitLoadout then
+        return
+    end
+
+    local payload = buildLoadoutPayload()
+    if payloadsMatch(payload, lastSyncedLoadout) then
+        return
+    end
+
+    lastSyncedLoadout = payload
+    remotes.SubmitLoadout:FireServer(payload)
 end
 
 local function assignTowerToSlot(slotIndex, towerType)
-        if not (slotIndex and towerType and towerConfigs[towerType]) then
-		return
-	end
+    if not (slotIndex and towerType and towerConfigs[towerType]) then
+        return
+    end
 
 	-- Prevent duplicate towers in the loadout by clearing any other slot that already
 	-- contains the requested tower before assigning it to the active slot.
@@ -669,21 +704,21 @@ local function assignTowerToSlot(slotIndex, towerType)
 
 	local nextEmpty = findFirstEmptySlot()
 	if nextEmpty then
-		setActiveSelectionSlot(nextEmpty)
-	end
+        setActiveSelectionSlot(nextEmpty)
+    end
 
-	updateConfirmButtonState()
+    updateConfirmButtonState()
 end
 
 local function clearSlot(slotIndex)
-	if not slotIndex then
-		return
-	end
+    if not slotIndex then
+        return
+    end
 
-	loadoutSelection[slotIndex] = nil
-	updateSelectionSlotDisplay(slotIndex)
-	setActiveSelectionSlot(slotIndex)
-	updateConfirmButtonState()
+    loadoutSelection[slotIndex] = nil
+    updateSelectionSlotDisplay(slotIndex)
+    setActiveSelectionSlot(slotIndex)
+    updateConfirmButtonState()
 end
 
 local function applyLoadoutToShop()
@@ -753,10 +788,10 @@ local function populateTowerSelectionButtons()
         table.sort(keys, function(a, b)
                 local configA = towerConfigs[a]
                 local configB = towerConfigs[b]
-                local orderA = configA and configA.SelectionOrder or math.huge
-                local orderB = configB and configB.SelectionOrder or math.huge
-                if orderA ~= orderB then
-                        return orderA < orderB
+                local costA = configA and configA.Cost or math.huge
+                local costB = configB and configB.Cost or math.huge
+                if costA ~= costB then
+                        return costA < costB
                 end
                 local nameA = configA and configA.Name or a
                 local nameB = configB and configB.Name or b
@@ -768,19 +803,21 @@ local function populateTowerSelectionButtons()
                 if typeof(config) == "table" and config.Cost then
                         local button = Instance.new("TextButton")
                         button.Name = string.format("%sSelectButton", towerType)
-                        button.Size = UDim2.fromOffset(500, 56)
-                        button.Position = UDim2.new(0, 5, 0, 0)
+                        button.Size = UDim2.fromOffset(210, 90)
                         button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
                         button.BorderSizePixel = 0
                         button.TextColor3 = Color3.new(1, 1, 1)
                         button.Font = Enum.Font.Gotham
-                        button.TextSize = 20
+                        button.TextSize = 18
                         button.AutoButtonColor = true
-                        button.LayoutOrder = typeof(config.SelectionOrder) == "number" and config.SelectionOrder or 0
+                        button.TextWrapped = true
+                        button.LayoutOrder = config.Cost or 0
                         button.Parent = selectionTowerList
                         button:SetAttribute("TowerType", towerType)
                         button:SetAttribute("TowerClientGenerated", true)
-                        button.Text = config.Name or towerType
+                        local cost = tonumber(config.Cost) or 0
+                        local displayName = config.Name or towerType
+                        button.Text = string.format("%s\n$%d", displayName, cost)
 
                         button.MouseButton1Click:Connect(function()
                                 local slotIndex = selectionActiveSlot or findFirstEmptySlot() or 1
@@ -789,178 +826,625 @@ local function populateTowerSelectionButtons()
                 end
         end
 
-        local layout = selectionTowerList:FindFirstChildWhichIsA("UIListLayout")
+        local layout = selectionTowerList:FindFirstChildWhichIsA("UIGridLayout")
         if selectionTowerList:IsA("ScrollingFrame") and layout then
-                selectionTowerList.CanvasSize = UDim2.fromOffset(0, layout.AbsoluteContentSize.Y + 10)
+                local contentSize = layout.AbsoluteContentSize
+                selectionTowerList.CanvasSize = UDim2.fromOffset(contentSize.X, contentSize.Y)
         end
 end
 
 local function createSelectionGui()
-	if selectionScreenGui then
-		return selectionScreenGui
-	end
+        if selectionScreenGui then
+                return selectionScreenGui
+        end
 
-	selectionScreenGui = Instance.new("ScreenGui")
-	selectionScreenGui.Name = "TowerSelectionUI"
-	selectionScreenGui.ResetOnSpawn = false
-	selectionScreenGui.IgnoreGuiInset = true
-	selectionScreenGui.DisplayOrder = 5
-	selectionScreenGui.Enabled = true
-	selectionScreenGui.Parent = playerGui
+        selectionScreenGui = Instance.new("ScreenGui")
+        selectionScreenGui.Name = "TowerLobbyUI"
+        selectionScreenGui.ResetOnSpawn = false
+        selectionScreenGui.IgnoreGuiInset = true
+        selectionScreenGui.DisplayOrder = 5
+        selectionScreenGui.Enabled = true
+        selectionScreenGui.Parent = playerGui
 
-	selectionFrame = Instance.new("Frame")
-	selectionFrame.Name = "SelectionFrame"
-        selectionFrame.Size = UDim2.fromOffset(620, 420)
-	selectionFrame.Position = UDim2.fromOffset(0, 0)
-	selectionFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-	selectionFrame.BorderSizePixel = 0
-	selectionFrame.Parent = selectionScreenGui
+        selectionFrame = Instance.new("Frame")
+        selectionFrame.Name = "LobbyFrame"
+        selectionFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        selectionFrame.Size = UDim2.fromOffset(1140, 520)
+        selectionFrame.Position = UDim2.fromScale(0.5, 0.5)
+        selectionFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        selectionFrame.BackgroundTransparency = 0.15
+        selectionFrame.BorderSizePixel = 0
+        selectionFrame.Parent = selectionScreenGui
 
-	local frameCorner = Instance.new("UICorner")
-	frameCorner.CornerRadius = UDim.new(0, 12)
-	frameCorner.Parent = selectionFrame
+        local frameCorner = Instance.new("UICorner")
+        frameCorner.CornerRadius = UDim.new(0, 16)
+        frameCorner.Parent = selectionFrame
 
-	local title = Instance.new("TextLabel")
-	title.Name = "TitleLabel"
-	title.Size = UDim2.fromOffset(400, 40)
-	title.Position = UDim2.new(0, 10, 0, 10)
-	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.GothamBold
-	title.TextColor3 = Color3.new(1, 1, 1)
-	title.TextScaled = true
-	title.Text = "Select Your Towers"
-	title.Parent = selectionFrame
+        local shopPanel = Instance.new("Frame")
+        shopPanel.Name = "TowerShopPanel"
+        shopPanel.Size = UDim2.fromOffset(700, 400)
+        shopPanel.Position = UDim2.new(0, 24, 0.5, -200)
+        shopPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+        shopPanel.BackgroundTransparency = 0.05
+        shopPanel.BorderSizePixel = 0
+        shopPanel.Parent = selectionFrame
 
-	selectionTowerList = Instance.new("ScrollingFrame")
-	selectionTowerList.Name = "TowerList"
-        selectionTowerList.Size = UDim2.fromOffset(600, 230)
-	selectionTowerList.Position = UDim2.new(0, 10, 0, 60)
-	selectionTowerList.CanvasSize = UDim2.fromOffset(0, 0)
-	selectionTowerList.ScrollBarThickness = 6
-	selectionTowerList.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-	selectionTowerList.BorderSizePixel = 0
-	selectionTowerList.Parent = selectionFrame
+        local shopCorner = Instance.new("UICorner")
+        shopCorner.CornerRadius = UDim.new(0, 12)
+        shopCorner.Parent = shopPanel
 
-	local listCorner = Instance.new("UICorner")
-	listCorner.CornerRadius = UDim.new(0, 8)
-	listCorner.Parent = selectionTowerList
+        local shopTitle = Instance.new("TextLabel")
+        shopTitle.Name = "ShopTitle"
+        shopTitle.Size = UDim2.new(1, -24, 0, 40)
+        shopTitle.Position = UDim2.new(0, 12, 0, 12)
+        shopTitle.BackgroundTransparency = 1
+        shopTitle.Font = Enum.Font.GothamBold
+        shopTitle.TextSize = 26
+        shopTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        shopTitle.TextXAlignment = Enum.TextXAlignment.Left
+        shopTitle.Text = "Tower Shop"
+        shopTitle.Parent = shopPanel
 
-	local listLayout = Instance.new("UIListLayout")
-	listLayout.Padding = UDim.new(0, 6)
-	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	listLayout.Parent = selectionTowerList
+        selectionTowerList = Instance.new("ScrollingFrame")
+        selectionTowerList.Name = "TowerList"
+        selectionTowerList.BackgroundTransparency = 1
+        selectionTowerList.BorderSizePixel = 0
+        selectionTowerList.Size = UDim2.new(1, -24, 1, -96)
+        selectionTowerList.Position = UDim2.new(0, 12, 0, 60)
+        selectionTowerList.CanvasSize = UDim2.fromOffset(0, 0)
+        selectionTowerList.ScrollBarThickness = 8
+        selectionTowerList.Parent = shopPanel
 
-	local slotsLabel = Instance.new("TextLabel")
-	slotsLabel.Name = "SlotsLabel"
-        slotsLabel.Size = UDim2.fromOffset(600, 24)
-	slotsLabel.Position = UDim2.new(0, 10, 0, 290)
-	slotsLabel.BackgroundTransparency = 1
-	slotsLabel.Font = Enum.Font.Gotham
-	slotsLabel.TextSize = 18
-	slotsLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
-        slotsLabel.Text = string.format("Assign up to %d towers to your loadout (minimum one):", LOADOUT_SLOT_COUNT)
-	slotsLabel.TextXAlignment = Enum.TextXAlignment.Left
-	slotsLabel.Parent = selectionFrame
+        local shopGrid = Instance.new("UIGridLayout")
+        shopGrid.CellSize = UDim2.fromOffset(210, 90)
+        shopGrid.CellPadding = UDim2.fromOffset(12, 12)
+        shopGrid.FillDirection = Enum.FillDirection.Horizontal
+        shopGrid.SortOrder = Enum.SortOrder.LayoutOrder
+        shopGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        shopGrid.Parent = selectionTowerList
 
-	local slotsFrame = Instance.new("Frame")
-	slotsFrame.Name = "SlotsContainer"
-        slotsFrame.Size = UDim2.fromOffset(600, 48)
-	slotsFrame.Position = UDim2.new(0, 10, 0, 315)
-	slotsFrame.BackgroundTransparency = 1
-	slotsFrame.Parent = selectionFrame
+        lobbyStatusLabel = Instance.new("TextLabel")
+        lobbyStatusLabel.Name = "LobbyStatus"
+        lobbyStatusLabel.Size = UDim2.new(1, -24, 0, 24)
+        lobbyStatusLabel.Position = UDim2.new(0, 12, 1, -32)
+        lobbyStatusLabel.BackgroundTransparency = 1
+        lobbyStatusLabel.Font = Enum.Font.Gotham
+        lobbyStatusLabel.TextSize = 18
+        lobbyStatusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        lobbyStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+        lobbyStatusLabel.Text = ""
+        lobbyStatusLabel.Parent = shopPanel
 
-	local slotsLayout = Instance.new("UIListLayout")
-	slotsLayout.FillDirection = Enum.FillDirection.Horizontal
-	slotsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	slotsLayout.Padding = UDim.new(0, 8)
-	slotsLayout.Parent = slotsFrame
+        local roundPanel = Instance.new("Frame")
+        roundPanel.Name = "RoundPanel"
+        roundPanel.Size = UDim2.fromOffset(360, 220)
+        roundPanel.Position = UDim2.new(1, -380, 0, 24)
+        roundPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+        roundPanel.BackgroundTransparency = 0.05
+        roundPanel.BorderSizePixel = 0
+        roundPanel.Parent = selectionFrame
 
-	selectionSlotButtons = {}
-	selectionSlotOriginalText = {}
+        local roundCorner = Instance.new("UICorner")
+        roundCorner.CornerRadius = UDim.new(0, 12)
+        roundCorner.Parent = roundPanel
+
+        local roundTitle = Instance.new("TextLabel")
+        roundTitle.Name = "RoundTitle"
+        roundTitle.Size = UDim2.new(1, -24, 0, 32)
+        roundTitle.Position = UDim2.new(0, 12, 0, 12)
+        roundTitle.BackgroundTransparency = 1
+        roundTitle.Font = Enum.Font.GothamBold
+        roundTitle.TextSize = 22
+        roundTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        roundTitle.TextXAlignment = Enum.TextXAlignment.Left
+        roundTitle.Text = "Select Round Type"
+        roundTitle.Parent = roundPanel
+
+        lobbyCountdownLabel = Instance.new("TextLabel")
+        lobbyCountdownLabel.Name = "CountdownLabel"
+        lobbyCountdownLabel.Size = UDim2.new(1, -24, 0, 24)
+        lobbyCountdownLabel.Position = UDim2.new(0, 12, 0, 48)
+        lobbyCountdownLabel.BackgroundTransparency = 1
+        lobbyCountdownLabel.Font = Enum.Font.Gotham
+        lobbyCountdownLabel.TextSize = 18
+        lobbyCountdownLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+        lobbyCountdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+        lobbyCountdownLabel.Text = ""
+        lobbyCountdownLabel.Parent = roundPanel
+
+        lobbyRoundList = Instance.new("Frame")
+        lobbyRoundList.Name = "RoundList"
+        lobbyRoundList.Size = UDim2.new(1, -24, 0, 120)
+        lobbyRoundList.Position = UDim2.new(0, 12, 0, 76)
+        lobbyRoundList.BackgroundTransparency = 1
+        lobbyRoundList.Parent = roundPanel
+
+        local roundLayout = Instance.new("UIListLayout")
+        roundLayout.FillDirection = Enum.FillDirection.Horizontal
+        roundLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        roundLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+        roundLayout.Padding = UDim.new(0, 12)
+        roundLayout.Parent = lobbyRoundList
+
+        local loadoutPanel = Instance.new("Frame")
+        loadoutPanel.Name = "LoadoutPanel"
+        loadoutPanel.Size = UDim2.fromOffset(360, 160)
+        loadoutPanel.Position = UDim2.new(1, -380, 0, 260)
+        loadoutPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+        loadoutPanel.BackgroundTransparency = 0.05
+        loadoutPanel.BorderSizePixel = 0
+        loadoutPanel.Parent = selectionFrame
+
+        local loadoutCorner = Instance.new("UICorner")
+        loadoutCorner.CornerRadius = UDim.new(0, 12)
+        loadoutCorner.Parent = loadoutPanel
+
+        local loadoutTitle = Instance.new("TextLabel")
+        loadoutTitle.Name = "LoadoutTitle"
+        loadoutTitle.Size = UDim2.new(1, -24, 0, 28)
+        loadoutTitle.Position = UDim2.new(0, 12, 0, 12)
+        loadoutTitle.BackgroundTransparency = 1
+        loadoutTitle.Font = Enum.Font.GothamBold
+        loadoutTitle.TextSize = 20
+        loadoutTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        loadoutTitle.TextXAlignment = Enum.TextXAlignment.Left
+        loadoutTitle.Text = string.format("Your Towers (%d slots)", LOADOUT_SLOT_COUNT)
+        loadoutTitle.Parent = loadoutPanel
+
+        local slotsFrame = Instance.new("Frame")
+        slotsFrame.Name = "SlotsFrame"
+        slotsFrame.Size = UDim2.new(1, -24, 0, 64)
+        slotsFrame.Position = UDim2.new(0, 12, 0, 48)
+        slotsFrame.BackgroundTransparency = 1
+        slotsFrame.Parent = loadoutPanel
+
+        local slotsLayout = Instance.new("UIListLayout")
+        slotsLayout.FillDirection = Enum.FillDirection.Horizontal
+        slotsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        slotsLayout.Padding = UDim.new(0, 8)
+        slotsLayout.Parent = slotsFrame
+
+        selectionSlotButtons = {}
+        selectionSlotOriginalText = {}
         for i = 1, LOADOUT_SLOT_COUNT do
                 local button = Instance.new("TextButton")
                 button.Name = string.format("Slot%d", i)
-                button.Size = UDim2.fromOffset(112, 48)
+                button.Size = UDim2.fromOffset(60, 60)
                 button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
                 button.BorderSizePixel = 0
-                button.Font = Enum.Font.Gotham
-                button.TextSize = 18
-                button.TextColor3 = Color3.new(1, 1, 1)
                 button.AutoButtonColor = true
+                button.Font = Enum.Font.Gotham
+                button.TextSize = 16
+                button.TextWrapped = true
+                button.TextColor3 = Color3.new(1, 1, 1)
                 button.Text = string.format("Slot %d", i)
                 button.Parent = slotsFrame
-                button.LayoutOrder = i
                 button:SetAttribute("SlotIndex", i)
                 selectionSlotButtons[i] = button
                 selectionSlotOriginalText[i] = button.Text
 
-		button.MouseButton1Click:Connect(function()
-			setActiveSelectionSlot(i)
-		end)
-		button.MouseButton2Click:Connect(function()
-			clearSlot(i)
-		end)
-	end
+                button.MouseButton1Click:Connect(function()
+                        setActiveSelectionSlot(i)
+                end)
+                button.MouseButton2Click:Connect(function()
+                        clearSlot(i)
+                end)
+        end
 
-	selectionConfirmButton = Instance.new("TextButton")
-	selectionConfirmButton.Name = "ConfirmButton"
-        selectionConfirmButton.Size = UDim2.fromOffset(200, 44)
-        selectionConfirmButton.Position = UDim2.new(0.5, -100, 0, 370)
-	selectionConfirmButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
-	selectionConfirmButton.BorderSizePixel = 0
-	selectionConfirmButton.Font = Enum.Font.GothamBold
-	selectionConfirmButton.TextSize = 20
-	selectionConfirmButton.TextColor3 = Color3.new(1, 1, 1)
-	selectionConfirmButton.AutoButtonColor = true
-	selectionConfirmButton.Text = "Confirm Loadout"
-	selectionConfirmButton.Parent = selectionFrame
-	selectionConfirmButtonOriginalAutoButtonColor = selectionConfirmButton.AutoButtonColor
+        readyButton = Instance.new("TextButton")
+        readyButton.Name = "ReadyButton"
+        readyButton.Size = UDim2.new(0.5, -18, 0, 40)
+        readyButton.Position = UDim2.new(0, 12, 0, 118)
+        readyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
+        readyButton.BorderSizePixel = 0
+        readyButton.Font = Enum.Font.GothamBold
+        readyButton.TextSize = 20
+        readyButton.TextColor3 = Color3.new(1, 1, 1)
+        readyButton.Text = "Ready Up"
+        readyButton.AutoButtonColor = true
+        readyButton.Parent = loadoutPanel
 
-        selectionConfirmButton.MouseButton1Click:Connect(function()
-                if selectionComplete or not selectionConfirmButton.Active then
+        readyButton.MouseButton1Click:Connect(function()
+                if not remotes.RequestReadyStatus then
                         return
                 end
-
-                if not hasAnySelectedTowers() then
-                        return
-                end
-
-                selectionComplete = true
-                selectionScreenGui.Enabled = false
-                applyLoadoutToShop()
+                remotes.RequestReadyStatus:FireServer(not lobbyReadyState)
         end)
 
-	local function updateSelectionLayout()
-		if not selectionScreenGui or not selectionFrame then
-			return
-		end
+        leaveButton = Instance.new("TextButton")
+        leaveButton.Name = "LeaveButton"
+        leaveButton.Size = UDim2.new(0.5, -18, 0, 40)
+        leaveButton.Position = UDim2.new(0.5, 6, 0, 118)
+        leaveButton.BackgroundColor3 = Color3.fromRGB(150, 80, 80)
+        leaveButton.BorderSizePixel = 0
+        leaveButton.Font = Enum.Font.GothamBold
+        leaveButton.TextSize = 20
+        leaveButton.TextColor3 = Color3.new(1, 1, 1)
+        leaveButton.Text = "Leave Round"
+        leaveButton.AutoButtonColor = true
+        leaveButton.Visible = false
+        leaveButton.Parent = loadoutPanel
 
-		local absoluteSize = selectionScreenGui.AbsoluteSize
-		local frameSize = selectionFrame.AbsoluteSize
-		local posX = math.max(math.floor((absoluteSize.X - frameSize.X) * 0.5), 0)
-		local posY = math.max(math.floor((absoluteSize.Y - frameSize.Y) * 0.5), 0)
-		selectionFrame.Position = UDim2.fromOffset(posX, posY)
-	end
+        leaveButton.MouseButton1Click:Connect(function()
+                if remotes.RequestLeaveRound then
+                        remotes.RequestLeaveRound:FireServer()
+                end
+        end)
 
-	updateSelectionLayout()
-	task.defer(updateSelectionLayout)
-	selectionScreenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateSelectionLayout)
+        populateTowerSelectionButtons()
+        for index in pairs(selectionSlotButtons) do
+                updateSelectionSlotDisplay(index)
+        end
+        setActiveSelectionSlot(findFirstEmptySlot() or 1)
+        updateConfirmButtonState()
 
-	selectionComplete = false
-	populateTowerSelectionButtons()
-	for index in pairs(selectionSlotButtons) do
-		updateSelectionSlotDisplay(index)
-	end
-	setActiveSelectionSlot(findFirstEmptySlot() or 1)
-	updateConfirmButtonState()
+        return selectionScreenGui
+end
 
-	return selectionScreenGui
+local function updateInterfaceVisibility()
+        if selectionScreenGui then
+                selectionScreenGui.Enabled = lobbyPhase == "lobby"
+        end
+
+        if mapSelectionGui then
+                mapSelectionGui.Enabled = lobbyPhase == "mapSelection"
+        end
+
+        if screenGui then
+                screenGui.Enabled = lobbyPhase == "inRound"
+        end
+end
+
+local function updateRoundButtons(rounds, playerRound, hasLoadout)
+        if not selectionScreenGui then
+                createSelectionGui()
+        end
+
+        if not lobbyRoundList then
+                return
+        end
+
+        local existing = {}
+        for index, round in ipairs(rounds or {}) do
+                local roundKey = round.Key or tostring(index)
+                existing[roundKey] = true
+
+                local button = roundButtons[roundKey]
+                if not button then
+                        button = Instance.new("TextButton")
+                        button.Name = string.format("Round%sButton", roundKey)
+                        button.Size = UDim2.fromOffset(150, 120)
+                        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                        button.BorderSizePixel = 0
+                        button.Font = Enum.Font.Gotham
+                        button.TextSize = 18
+                        button.TextColor3 = Color3.new(1, 1, 1)
+                        button.TextWrapped = true
+                        button.AutoButtonColor = true
+                        button.Parent = lobbyRoundList
+                        button:SetAttribute("RoundKey", roundKey)
+                        button.MouseButton1Click:Connect(function()
+                                local key = button:GetAttribute("RoundKey")
+                                if key and remotes.RequestJoinRound then
+                                        remotes.RequestJoinRound:FireServer(key)
+                                end
+                        end)
+                        roundButtons[roundKey] = button
+                end
+
+                button.LayoutOrder = round.RequiredPlayers or index
+                button:SetAttribute("RoundKey", roundKey)
+                button.Active = hasLoadout
+                button.AutoButtonColor = hasLoadout
+                button.TextTransparency = hasLoadout and 0 or 0.25
+
+                local players = round.Players or {}
+                local occupantCount = #players
+                local readyCount = 0
+                local names = {}
+                for _, occupant in ipairs(players) do
+                        if occupant.Ready then
+                                readyCount += 1
+                        end
+                        if occupant.Name then
+                                table.insert(names, occupant.Name)
+                        end
+                end
+
+                local lines = {
+                        round.DisplayName or roundKey,
+                        string.format("%d/%d players", occupantCount, round.RequiredPlayers or 0),
+                }
+
+                if readyCount > 0 then
+                        table.insert(lines, string.format("%d ready", readyCount))
+                end
+
+                if round.Countdown and round.Countdown > 0 then
+                        table.insert(lines, string.format("Countdown: %ds", round.Countdown))
+                end
+
+                if #names > 0 then
+                        table.insert(lines, table.concat(names, ", "))
+                end
+
+                button.Text = table.concat(lines, "\n")
+
+                if playerRound == roundKey then
+                        button.BackgroundColor3 = Color3.fromRGB(90, 110, 160)
+                else
+                        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                end
+        end
+
+        for key, button in pairs(roundButtons) do
+                if not existing[key] then
+                        button:Destroy()
+                        roundButtons[key] = nil
+                end
+        end
+end
+
+local function applyLobbyState(state)
+        lobbyStateSnapshot = state
+        lobbyPhase = state and state.Phase or lobbyPhase
+        lobbyReadyState = state and state.Player and state.Player.Ready or false
+
+        updateInterfaceVisibility()
+
+        if lobbyPhase ~= "lobby" then
+                return
+        end
+
+        createSelectionGui()
+
+        local playerInfo = state and state.Player or {}
+        local playerRound = playerInfo.CurrentRound
+        local hasLoadout = playerInfo.HasLoadout ~= false
+
+        updateRoundButtons(state and state.Rounds or {}, playerRound, hasLoadout)
+
+        if lobbyCountdownLabel then
+                local countdownText = ""
+                for _, round in ipairs(state and state.Rounds or {}) do
+                        if round.Key == playerRound and round.Countdown and round.Countdown > 0 then
+                                countdownText = string.format("Countdown: %ds", round.Countdown)
+                                break
+                        end
+                end
+                lobbyCountdownLabel.Text = countdownText
+        end
+
+        if readyButton then
+                readyButton.Text = lobbyReadyState and "Unready" or "Ready Up"
+                readyButton.BackgroundColor3 = lobbyReadyState and Color3.fromRGB(110, 90, 160) or Color3.fromRGB(70, 130, 90)
+                local canReady = hasLoadout and playerRound ~= nil
+                readyButton.Active = canReady
+                readyButton.AutoButtonColor = canReady
+                readyButton.TextTransparency = canReady and 0 or 0.35
+        end
+
+        if leaveButton then
+                local canLeave = playerRound ~= nil
+                leaveButton.Visible = canLeave
+                leaveButton.Active = canLeave
+                leaveButton.AutoButtonColor = canLeave
+        end
+
+        if lobbyStatusLabel then
+                if not hasLoadout or not hasAnySelectedTowers() then
+                        lobbyStatusLabel.Text = "Select at least one tower to join a round."
+                elseif not playerRound then
+                        lobbyStatusLabel.Text = "Choose a round to enter the waiting room."
+                else
+                        lobbyStatusLabel.Text = ""
+                end
+        end
+end
+
+local function createMapSelectionGui()
+        if mapSelectionGui then
+                return mapSelectionGui
+        end
+
+        mapSelectionGui = Instance.new("ScreenGui")
+        mapSelectionGui.Name = "MapSelectionUI"
+        mapSelectionGui.ResetOnSpawn = false
+        mapSelectionGui.IgnoreGuiInset = true
+        mapSelectionGui.DisplayOrder = 6
+        mapSelectionGui.Enabled = false
+        mapSelectionGui.Parent = playerGui
+
+        mapSelectionFrame = Instance.new("Frame")
+        mapSelectionFrame.Name = "MapSelectionFrame"
+        mapSelectionFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        mapSelectionFrame.Size = UDim2.fromOffset(720, 420)
+        mapSelectionFrame.Position = UDim2.fromScale(0.5, 0.5)
+        mapSelectionFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        mapSelectionFrame.BackgroundTransparency = 0.1
+        mapSelectionFrame.BorderSizePixel = 0
+        mapSelectionFrame.Parent = mapSelectionGui
+
+        local frameCorner = Instance.new("UICorner")
+        frameCorner.CornerRadius = UDim.new(0, 16)
+        frameCorner.Parent = mapSelectionFrame
+
+        local title = Instance.new("TextLabel")
+        title.Name = "MapSelectionTitle"
+        title.Size = UDim2.new(1, -32, 0, 48)
+        title.Position = UDim2.new(0, 16, 0, 16)
+        title.BackgroundTransparency = 1
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 28
+        title.TextColor3 = Color3.new(1, 1, 1)
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.Text = "Vote for a Map"
+        title.Parent = mapSelectionFrame
+
+        mapSelectionStatusLabel = Instance.new("TextLabel")
+        mapSelectionStatusLabel.Name = "StatusLabel"
+        mapSelectionStatusLabel.Size = UDim2.new(1, -32, 0, 24)
+        mapSelectionStatusLabel.Position = UDim2.new(0, 16, 0, 64)
+        mapSelectionStatusLabel.BackgroundTransparency = 1
+        mapSelectionStatusLabel.Font = Enum.Font.Gotham
+        mapSelectionStatusLabel.TextSize = 18
+        mapSelectionStatusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        mapSelectionStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+        mapSelectionStatusLabel.Text = "Choose one of the available battlegrounds."
+        mapSelectionStatusLabel.Parent = mapSelectionFrame
+
+        mapOptionsContainer = Instance.new("Frame")
+        mapOptionsContainer.Name = "OptionsContainer"
+        mapOptionsContainer.Size = UDim2.new(1, -32, 1, -120)
+        mapOptionsContainer.Position = UDim2.new(0, 16, 0, 96)
+        mapOptionsContainer.BackgroundTransparency = 1
+        mapOptionsContainer.Parent = mapSelectionFrame
+
+        local layout = Instance.new("UIListLayout")
+        layout.FillDirection = Enum.FillDirection.Horizontal
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.Padding = UDim.new(0, 16)
+        layout.Parent = mapOptionsContainer
+
+        return mapSelectionGui
+end
+
+local function clearMapOptions()
+        for _, button in ipairs(mapOptionButtons) do
+                if button then
+                        button:Destroy()
+                end
+        end
+        mapOptionButtons = {}
+        mapVoteLabels = {}
+end
+
+local function showMapSelection(options, totalPlayers)
+        createMapSelectionGui()
+        clearMapOptions()
+
+        for index, option in ipairs(options or {}) do
+                local container = Instance.new("Frame")
+                container.Name = string.format("Option%d", index)
+                container.Size = UDim2.fromOffset(200, 220)
+                container.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+                container.BackgroundTransparency = 0.05
+                container.BorderSizePixel = 0
+                container.Parent = mapOptionsContainer
+
+                local corner = Instance.new("UICorner")
+                corner.CornerRadius = UDim.new(0, 12)
+                corner.Parent = container
+
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.Name = "NameLabel"
+                nameLabel.Size = UDim2.new(1, -24, 0, 60)
+                nameLabel.Position = UDim2.new(0, 12, 0, 12)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Font = Enum.Font.GothamBold
+                nameLabel.TextSize = 20
+                nameLabel.TextColor3 = Color3.new(1, 1, 1)
+                nameLabel.TextWrapped = true
+                nameLabel.Text = option.Name or string.format("Map %d", index)
+                nameLabel.Parent = container
+
+                local descriptionLabel = Instance.new("TextLabel")
+                descriptionLabel.Name = "DescriptionLabel"
+                descriptionLabel.Size = UDim2.new(1, -24, 0, 60)
+                descriptionLabel.Position = UDim2.new(0, 12, 0, 80)
+                descriptionLabel.BackgroundTransparency = 1
+                descriptionLabel.Font = Enum.Font.Gotham
+                descriptionLabel.TextSize = 16
+                descriptionLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+                descriptionLabel.TextWrapped = true
+                descriptionLabel.Text = option.Description or ""
+                descriptionLabel.Parent = container
+
+                local voteButton = Instance.new("TextButton")
+                voteButton.Name = "VoteButton"
+                voteButton.Size = UDim2.new(1, -24, 0, 44)
+                voteButton.Position = UDim2.new(0, 12, 0, 150)
+                voteButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
+                voteButton.BorderSizePixel = 0
+                voteButton.Font = Enum.Font.GothamBold
+                voteButton.TextSize = 18
+                voteButton.TextColor3 = Color3.new(1, 1, 1)
+                voteButton.Text = "Vote"
+                voteButton.AutoButtonColor = true
+                voteButton.Parent = container
+
+                local voteLabel = Instance.new("TextLabel")
+                voteLabel.Name = "VoteLabel"
+                voteLabel.Size = UDim2.new(1, -24, 0, 24)
+                voteLabel.Position = UDim2.new(0, 12, 0, 198)
+                voteLabel.BackgroundTransparency = 1
+                voteLabel.Font = Enum.Font.Gotham
+                voteLabel.TextSize = 16
+                voteLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+                voteLabel.Text = "0 votes"
+                voteLabel.Parent = container
+
+                voteButton.MouseButton1Click:Connect(function()
+                        if remotes.MapVoteSubmitted then
+                                remotes.MapVoteSubmitted:FireServer(index)
+                        end
+                end)
+
+                mapOptionButtons[index] = {
+                        Container = container,
+                        Button = voteButton,
+                        Option = option,
+                }
+                mapVoteLabels[index] = voteLabel
+        end
+
+        if mapSelectionStatusLabel then
+                if totalPlayers and totalPlayers > 0 then
+                        mapSelectionStatusLabel.Text = string.format("Vote for a map (%d players)", totalPlayers)
+                else
+                        mapSelectionStatusLabel.Text = "Vote for a map"
+                end
+        end
+
+        mapSelectionGui.Enabled = true
+end
+
+local function updateMapVoteCounts(counts, totalPlayers)
+        for index, label in pairs(mapVoteLabels) do
+                        local votes = counts and counts[index] or 0
+                        if label then
+                                label.Text = string.format("%d / %d votes", votes, totalPlayers or 0)
+                        end
+        end
+end
+
+local function finalizeMapSelection(selectedIndex, option)
+        for index, entry in ipairs(mapOptionButtons) do
+                if entry.Button then
+                        entry.Button.Active = false
+                        entry.Button.AutoButtonColor = false
+                        if index == selectedIndex then
+                                entry.Button.Text = "Selected"
+                                entry.Button.BackgroundColor3 = Color3.fromRGB(110, 90, 160)
+                        else
+                                entry.Button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+                        end
+                end
+        end
+
+        if mapSelectionStatusLabel then
+                if option and option.Name then
+                        mapSelectionStatusLabel.Text = string.format("%s will be loaded.", option.Name)
+                else
+                        mapSelectionStatusLabel.Text = "Map selected."
+                end
+        end
 end
 
 local function ensureHoverGui()
-	if hoverGui then
-		return hoverGui
-	end
+        if hoverGui then
+                return hoverGui
+        end
 
 	hoverGuiContainer = Instance.new("ScreenGui")
 	hoverGuiContainer.Name = "EnemyHoverUI"
@@ -1484,26 +1968,18 @@ local function createGui()
         teamTowerTotalLabel.Text = "Team Towers: 0 / ∞"
         teamTowerTotalLabel.Parent = statusFrame
 
-        startButton = Instance.new("TextButton")
-        startButton.Name = "StartButton"
-        startButton.Size = UDim2.fromOffset(296, 44)
-        startButton.Position = UDim2.new(0, 12, 0, 168)
-        startButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
-	startButton.BorderSizePixel = 0
-	startButton.Font = Enum.Font.GothamBold
-	startButton.TextSize = 18
-	startButton.TextColor3 = Color3.new(1, 1, 1)
-	startButton.Text = "Start Wave"
-	startButton.AutoButtonColor = true
-	startButton.Parent = statusFrame
-
-	startButton.MouseButton1Click:Connect(function()
-		if gameEnded then
-			remotes.RequestRestart:FireServer()
-		else
-			remotes.RequestWaveStart:FireServer()
-		end
-	end)
+        preRoundCountdownLabel = Instance.new("TextLabel")
+        preRoundCountdownLabel.Name = "CountdownLabel"
+        preRoundCountdownLabel.BackgroundTransparency = 1
+        preRoundCountdownLabel.Position = UDim2.new(0, 12, 0, 168)
+        preRoundCountdownLabel.Size = UDim2.fromOffset(296, 24)
+        preRoundCountdownLabel.Font = Enum.Font.GothamBold
+        preRoundCountdownLabel.TextSize = 18
+        preRoundCountdownLabel.TextColor3 = Color3.fromRGB(255, 220, 120)
+        preRoundCountdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+        preRoundCountdownLabel.Text = ""
+        preRoundCountdownLabel.Visible = false
+        preRoundCountdownLabel.Parent = statusFrame
 
 	towerDetailsFrame = Instance.new("Frame")
 	towerDetailsFrame.Name = "TowerDetails"
@@ -1691,12 +2167,13 @@ local function createGui()
 			statusFrame.Position = UDim2.fromOffset(statusX, statusY)
 		end
 
-		if towerDetailsFrame then
-			local detailsSize = towerDetailsFrame.AbsoluteSize
-			local detailsX = math.max(absoluteSize.X - detailsSize.X - 20, 0)
-			towerDetailsFrame.Position = UDim2.fromOffset(detailsX, 20)
-		end
-	end
+                if towerDetailsFrame then
+                        local detailsSize = towerDetailsFrame.AbsoluteSize
+                        local detailsX = math.max(absoluteSize.X - detailsSize.X - 20, 0)
+                        local detailsY = math.max(math.floor((absoluteSize.Y - detailsSize.Y) * 0.5), 0)
+                        towerDetailsFrame.Position = UDim2.fromOffset(detailsX, detailsY)
+                end
+        end
 
 	updateHudLayout()
 	task.defer(updateHudLayout)
@@ -1718,7 +2195,6 @@ local function showTowerSelection()
 		return
 	end
 
-        selectionComplete = false
         for i = 1, LOADOUT_SLOT_COUNT do
                 loadoutSelection[i] = nil
                 if selectionSlotButtons[i] then
@@ -2002,35 +2478,101 @@ if remotes:FindFirstChild("LivesChanged") then
 end
 
 if remotes:FindFirstChild("WaveStarted") then
-	remotes.WaveStarted.OnClientEvent:Connect(function(waveNumber)
-		if waveLabel then
-			waveLabel.Text = string.format("Wave: %d", waveNumber or 1)
-		end
-		gameEnded = false
-		updateStartButtonVisual()
-	end)
+        remotes.WaveStarted.OnClientEvent:Connect(function(waveNumber)
+                if waveLabel then
+                        waveLabel.Text = string.format("Wave: %d", waveNumber or 1)
+                end
+                gameEnded = false
+                if preRoundCountdownLabel then
+                        preRoundCountdownLabel.Visible = false
+                        preRoundCountdownLabel.Text = ""
+                end
+        end)
 end
 
 if remotes:FindFirstChild("GameEnded") then
-	remotes.GameEnded.OnClientEvent:Connect(function(victory)
-		gameEnded = true
-		lastVictoryState = victory
-		updateStartButtonVisual()
-	end)
+        remotes.GameEnded.OnClientEvent:Connect(function(victory)
+                gameEnded = true
+                lastVictoryState = victory
+                if preRoundCountdownLabel then
+                        preRoundCountdownLabel.Visible = false
+                        preRoundCountdownLabel.Text = ""
+                end
+        end)
 end
 
 if remotes:FindFirstChild("GameRestarted") then
-	remotes.GameRestarted.OnClientEvent:Connect(function()
-		gameEnded = false
-		lastVictoryState = nil
-		updateStartButtonVisual()
-		clearSelection()
-		showTowerSelection()
-	end)
+        remotes.GameRestarted.OnClientEvent:Connect(function()
+                gameEnded = false
+                lastVictoryState = nil
+                lobbyPhase = "lobby"
+                updateInterfaceVisibility()
+                clearSelection()
+                showTowerSelection()
+        end)
+end
+
+if remotes:FindFirstChild("LobbyStateUpdated") then
+        remotes.LobbyStateUpdated.OnClientEvent:Connect(function(state)
+                applyLobbyState(state)
+        end)
+end
+
+if remotes:FindFirstChild("MapSelectionStarted") then
+        remotes.MapSelectionStarted.OnClientEvent:Connect(function(payload)
+                lobbyPhase = "mapSelection"
+                updateInterfaceVisibility()
+                showMapSelection(payload and payload.Options or {}, payload and payload.TotalPlayers)
+        end)
+end
+
+if remotes:FindFirstChild("MapVoteUpdated") then
+        remotes.MapVoteUpdated.OnClientEvent:Connect(function(payload)
+                updateMapVoteCounts(payload and payload.Counts, payload and payload.TotalPlayers)
+        end)
+end
+
+if remotes:FindFirstChild("MapSelectionFinalized") then
+        remotes.MapSelectionFinalized.OnClientEvent:Connect(function(payload)
+                finalizeMapSelection(payload and payload.SelectedIndex, payload and payload.Option)
+        end)
+end
+
+if remotes:FindFirstChild("RoundSetupComplete") then
+        remotes.RoundSetupComplete.OnClientEvent:Connect(function(payload)
+                lobbyPhase = "inRound"
+                updateInterfaceVisibility()
+                if mapSelectionGui then
+                        mapSelectionGui.Enabled = false
+                end
+                createGui()
+                applyLoadoutToShop()
+                if payload and payload.MapName and preRoundCountdownLabel then
+                        preRoundCountdownLabel.Text = string.format("%s selected", payload.MapName)
+                        preRoundCountdownLabel.Visible = true
+                end
+        end)
+end
+
+if remotes:FindFirstChild("RoundCountdownUpdated") then
+        remotes.RoundCountdownUpdated.OnClientEvent:Connect(function(payload)
+                if not preRoundCountdownLabel then
+                        return
+                end
+
+                local remaining = payload and payload.Remaining or 0
+                if remaining and remaining > 0 then
+                        preRoundCountdownLabel.Text = string.format("Round starts in %ds", remaining)
+                        preRoundCountdownLabel.Visible = true
+                else
+                        preRoundCountdownLabel.Visible = false
+                        preRoundCountdownLabel.Text = ""
+                end
+        end)
 end
 
 createGui()
-updateStartButtonVisual()
+updateInterfaceVisibility()
 showTowerSelection()
 
 UserInputService.InputBegan:Connect(function(input, processed)
@@ -2042,7 +2584,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
         if slotIndex then
                 if selectionScreenGui and selectionScreenGui.Enabled then
                         setActiveSelectionSlot(math.clamp(slotIndex, 1, LOADOUT_SLOT_COUNT))
-                else
+                elseif lobbyPhase == "inRound" then
                         local button = shopSlotButtons[slotIndex]
                         if button and button.Active then
                                 local towerType = getTowerTypeForButton(button)
@@ -2055,9 +2597,12 @@ UserInputService.InputBegan:Connect(function(input, processed)
         end
 
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if lobbyPhase ~= "inRound" then
+                        return
+                end
                 if placingTowerType then
                         local unitRay = mouse.UnitRay
-			local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
+                        local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
 			if rayResult and computePlacementValidity(rayResult.Position, rayResult.Instance) then
 				remotes.TowerPlaced:FireServer(placingTowerType, rayResult.Position)
 				cancelPlacement()
@@ -2070,19 +2615,25 @@ UserInputService.InputBegan:Connect(function(input, processed)
 				clearSelection()
 			end
 		end
-	elseif input.KeyCode == Enum.KeyCode.X then
-		if placingTowerType then
-			cancelPlacement()
-		elseif selectedTower and not placingTowerType then
+        elseif input.KeyCode == Enum.KeyCode.X then
+                if lobbyPhase ~= "inRound" then
+                        return
+                end
+                if placingTowerType then
+                        cancelPlacement()
+                elseif selectedTower and not placingTowerType then
 			local ownerId = selectedTower:GetAttribute("OwnerUserId")
 			if ownerId == player.UserId and not gameEnded then
 				remotes.TowerSellRequested:FireServer(selectedTower)
 			end
 		end
-	elseif input.KeyCode == Enum.KeyCode.E then
-		if not placingTowerType and selectedTower then
-			local ownerId = selectedTower:GetAttribute("OwnerUserId")
-			if ownerId == player.UserId and not gameEnded then
+        elseif input.KeyCode == Enum.KeyCode.E then
+                if lobbyPhase ~= "inRound" then
+                        return
+                end
+                if not placingTowerType and selectedTower then
+                        local ownerId = selectedTower:GetAttribute("OwnerUserId")
+                        if ownerId == player.UserId and not gameEnded then
 				remotes.TowerUpgradeRequested:FireServer(selectedTower)
 			end
 		end
