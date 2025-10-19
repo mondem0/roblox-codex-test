@@ -116,6 +116,14 @@ local previewFootprintRadius = DEFAULT_PREVIEW_RADIUS
 local footprintCache = {}
 local RANGE_RING_HEIGHT = 0.05
 
+local function updateStartButtonVisual()
+        -- The manual wave start button is no longer present in the HUD.
+        -- This placeholder keeps legacy calls harmless while the lobby
+        -- workflow drives round countdowns automatically.
+end
+
+local syncLoadoutWithServer = function() end
+
 local function formatCountLimit(count, limit)
         local numericCount = tonumber(count) or 0
         local numericLimit = tonumber(limit)
@@ -671,7 +679,7 @@ local function payloadsMatch(a, b)
     return true
 end
 
-local function syncLoadoutWithServer()
+syncLoadoutWithServer = function()
     if not remotes.SubmitLoadout then
         return
     end

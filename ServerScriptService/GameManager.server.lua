@@ -80,6 +80,50 @@ local function isActivePlayer(player)
     return activeRoundPlayers[player] == true
 end
 
+local function ensureInvisiblePart(parent, name, position)
+    local part = parent:FindFirstChild(name)
+    if not (part and part:IsA("BasePart")) then
+        part = Instance.new("Part")
+        part.Name = name
+        part.Anchored = true
+        part.CanCollide = false
+        part.Transparency = 1
+        part.Size = Vector3.new(4, 1, 4)
+        part.Parent = parent
+    end
+
+    part.Position = position
+    part.Anchored = true
+    part.CanCollide = false
+    part.Transparency = 1
+
+    return part
+end
+
+local function ensureFallbackPath(model)
+    if model:FindFirstChild("Path") then
+        return
+    end
+
+    local pathFolder = Instance.new("Folder")
+    pathFolder.Name = "Path"
+    pathFolder.Parent = model
+
+    local startPosition = Vector3.new(0, 1000, 0)
+    local endPosition = Vector3.new(0, 1000, 120)
+
+    ensureInvisiblePart(pathFolder, "1", startPosition)
+    ensureInvisiblePart(pathFolder, "2", endPosition)
+
+    if not model:FindFirstChild("EnemySpawn") then
+        ensureInvisiblePart(model, "EnemySpawn", startPosition)
+    end
+
+    if not model:FindFirstChild("Exit") then
+        ensureInvisiblePart(model, "Exit", endPosition)
+    end
+end
+
 local function cloneMap(option)
     local mapsFolder = ReplicatedStorage:FindFirstChild("Maps")
     local model
@@ -135,6 +179,12 @@ local function cloneMap(option)
 
     if not success then
         model:MoveTo(Vector3.new(0, 1000, 0))
+    end
+
+    ensureFallbackPath(model)
+
+    if not model:FindFirstChild("PlayerSpawn") then
+        ensureInvisiblePart(model, "PlayerSpawn", Vector3.new(0, 1000, -12))
     end
 
     return model
@@ -193,11 +243,13 @@ local function cancelCountdown()
     end
 end
 
-waveService:SetRoundFinishedCallback(function()
-    cancelCountdown()
-    clearActivePlayers()
-    lobbyService:RoundEnded()
-end)
+if waveService.SetRoundFinishedCallback then
+    waveService:SetRoundFinishedCallback(function()
+        cancelCountdown()
+        clearActivePlayers()
+        lobbyService:RoundEnded()
+    end)
+end
 
 local function beginRound(groupInfo)
     cancelCountdown()
