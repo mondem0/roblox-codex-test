@@ -305,8 +305,10 @@ function WaveService:DamageEnemy(enemyModel, towerData)
         enemyData.HealthValue.Value = enemyData.Health
     end
 
-    if towerData.Player then
-        self:AdjustMoney(towerData.Player, appliedDamage)
+    if appliedDamage > 0 then
+        for player in pairs(self.PlayerStats) do
+            self:AdjustMoney(player, appliedDamage)
+        end
     end
 
     if towerData.Config.SlowPercent and not enemyImmuneTo(enemyData, "Slow") then
