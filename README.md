@@ -149,7 +149,7 @@ EnemyConfigs.ParagonChampion = {
 1. Open **`WaveConfigs`**. The module now exposes a small helper named `AddWave` that registers each wave, assigns it both a numeric index, and stores optional metadata such as rewards or descriptions.
 2. A wave is still a list of spawn groups. Each group can spawn one enemy type sequentially or mix several types at the same time:
    * For a **single-type group**, set `Type`, `Count`, and `Delay` (seconds to wait between each enemy; use `0` for no delay).
-   * For a **multi-type group**, provide a `Spawns` array. Each entry in the array needs a `Type` and an optional `Count` (defaults to `1`). Include `Repeat` (or `Repeats`) to send the combined set multiple times, and use `Delay` to control the gap between each repeated set.
+   * For a **multi-type group**, provide a `Streams` array. Each entry represents a continuous spawn stream for a single enemy type and supports its own timing. Specify `Type`, optional `Count`, and either an `Interval` (seconds between spawns) or `Rate` (spawns per second). Add `StartDelay` (or `InitialDelay`) to stagger when a stream begins, and set `Delay` on the group to pause before the next group starts.
 3. Duplicate one of the `AddWave({ ... })` blocks (or insert a new one) to introduce additional waves. Change the `Name`, `Reward`, `Description`, or any custom metadata you want to track, then edit the `Groups` array to control the actual spawns.
 
 ```lua
@@ -160,12 +160,11 @@ WaveConfigs.AddWave({
     Groups = {
         { Type = "Runner", Count = 20, Delay = 0.45 },
         {
-            Spawns = {
-                { Type = "Runner", Count = 2 },
-                { Type = "Shielder", Count = 1 },
+            Streams = {
+                { Type = "Runner", Count = 12, Interval = 0.6 },
+                { Type = "Shielder", Count = 6, Interval = 0.9, StartDelay = 0.45 },
             },
-            Repeat = 3,
-            Delay = 1.6,
+            Delay = 1.4,
         },
     },
 })
@@ -239,7 +238,7 @@ Leave any of these fields `nil` to disable the corresponding cue. The helper aut
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
 * **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
 * **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
-* **Waves**: Six sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Spawns` will emit multiple enemy types simultaneously.
+* **Waves**: Six sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 * **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.
@@ -250,7 +249,7 @@ Leave any of these fields `nil` to disable the corresponding cue. The helper aut
 2. When Play starts, the auto-generated HUD should appear with tower slots, money, lives, and a wave counter. The Start button should be hidden for now.
 3. Use the tower selection screen that pops up to assign three different towers to the slots and confirm the loadout. The shop buttons should update to the towers you chose, and the Start button should appear near the status panel.
 4. Click a tower button, position the preview over the ground, and click to place it. Towers should appear under the `workspace.Towers` folder.
-5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers. Groups that define a `Spawns` array will release several enemy types at the same moment.
+5. Start the waves. Enemies spawn at `EnemySpawn`, follow your waypoint path, and take damage from towers. Groups that define a `Streams` array release several enemy types at once, each honoring its own spawn interval.
 6. Press **`X`** while aiming the preview to cancel placement without spending money.
 7. Verify money updates when enemies are defeated, towers deal damage as expected, and that lives decrease when an enemy reaches the exit.
 8. With one of your towers selected, press **`E`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.

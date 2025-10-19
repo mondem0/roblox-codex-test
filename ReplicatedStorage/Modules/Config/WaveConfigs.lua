@@ -68,12 +68,11 @@ addWave({
         { Type = "Grunt", Count = 14, Delay = 0.7 },
         { Type = "Runner", Count = 6, Delay = 0.6 },
         {
-            Spawns = {
-                { Type = "Grunt", Count = 2 },
-                { Type = "Runner", Count = 1 },
+            Streams = {
+                { Type = "Grunt", Count = 10, Interval = 0.8 },
+                { Type = "Runner", Count = 10, Interval = 0.6, StartDelay = 0.4 },
             },
-            Repeat = 4,
-            Delay = 0.65,
+            Delay = 1,
         },
     },
 })
@@ -84,12 +83,11 @@ addWave({
     Reward = 90,
     Groups = {
         {
-            Spawns = {
-                { Type = "Runner", Count = 2 },
-                { Type = "Grunt", Count = 1 },
+            Streams = {
+                { Type = "Runner", Count = 12, Interval = 0.5 },
+                { Type = "Grunt", Count = 6, Interval = 0.7, StartDelay = 0.35 },
             },
-            Repeat = 6,
-            Delay = 0.55,
+            Delay = 0.8,
         },
         { Type = "Grunt", Count = 16, Delay = 0.65 },
     },
@@ -102,12 +100,11 @@ addWave({
     Groups = {
         { Type = "Tank", Count = 6, Delay = 1.3 },
         {
-            Spawns = {
-                { Type = "Runner", Count = 2 },
-                { Type = "Grunt", Count = 1 },
+            Streams = {
+                { Type = "Runner", Count = 10, Interval = 0.55 },
+                { Type = "Grunt", Count = 5, Interval = 0.75, StartDelay = 0.3 },
             },
-            Repeat = 5,
-            Delay = 0.6,
+            Delay = 0.9,
         },
     },
 })
@@ -119,12 +116,11 @@ addWave({
     Groups = {
         { Type = "Runner", Count = 10, Delay = 0.6 },
         {
-            Spawns = {
-                { Type = "Shielder", Count = 1 },
-                { Type = "Tank", Count = 1 },
+            Streams = {
+                { Type = "Shielder", Count = 5, Interval = 1.25 },
+                { Type = "Tank", Count = 5, Interval = 1.1, StartDelay = 0.6 },
             },
-            Repeat = 5,
-            Delay = 1.1,
+            Delay = 1.4,
         },
         { Type = "Grunt", Count = 12, Delay = 0.5 },
     },
@@ -136,12 +132,11 @@ addWave({
     Reward = 260,
     Groups = {
         {
-            Spawns = {
-                { Type = "Shielder", Count = 1 },
-                { Type = "Tank", Count = 1 },
+            Streams = {
+                { Type = "Shielder", Count = 3, Interval = 1.5 },
+                { Type = "Tank", Count = 3, Interval = 1.1, StartDelay = 0.75 },
             },
-            Repeat = 3,
-            Delay = 1.4,
+            Delay = 1.6,
         },
         { Type = "Boss1", Count = 2, Delay = 2.5 },
         { Type = "LightningBoss", Count = 1 },

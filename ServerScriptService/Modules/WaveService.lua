@@ -331,34 +331,68 @@ function WaveService:SpawnGroup(group)
         return
     end
 
-    if group.Spawns then
-        local repeatCount = math.max(1, group.Repeat or group.Repeats or 1)
-        local delay = group.Delay or 0
+    if group.Streams then
+        local completionEvent = Instance.new("BindableEvent")
+        local activeStreams = 0
 
-        for iteration = 1, repeatCount do
-            for _, spawn in ipairs(group.Spawns) do
-                if self.GameEnded then
-                    return
-                end
-
-                local spawnType = spawn.Type
-                local config = spawnType and EnemyConfigs[spawnType]
-                if config then
-                    local count = math.max(1, spawn.Count or 1)
-                    for _ = 1, count do
-                        if self.GameEnded then
-                            return
-                        end
-                        self:SpawnEnemy(spawnType, config)
-                    end
-                end
-            end
-
-            if iteration < repeatCount and delay > 0 then
-                task.wait(delay)
+        local function markStreamFinished()
+            activeStreams -= 1
+            if activeStreams <= 0 then
+                completionEvent:Fire()
             end
         end
 
+        for _, stream in ipairs(group.Streams) do
+            local spawnType = stream.Type
+            local config = spawnType and EnemyConfigs[spawnType]
+            if config then
+                activeStreams += 1
+                task.spawn(function()
+                    local count = math.max(1, stream.Count or 1)
+                    local interval = 0
+                    if type(stream.Interval) == "number" then
+                        interval = math.max(0, stream.Interval)
+                    elseif type(stream.Rate) == "number" and stream.Rate > 0 then
+                        interval = 1 / stream.Rate
+                    elseif type(stream.Delay) == "number" then
+                        interval = math.max(0, stream.Delay)
+                    end
+
+                    local startDelay = 0
+                    if type(stream.StartDelay) == "number" then
+                        startDelay = math.max(0, stream.StartDelay)
+                    elseif type(stream.InitialDelay) == "number" then
+                        startDelay = math.max(0, stream.InitialDelay)
+                    end
+
+                    if startDelay > 0 then
+                        task.wait(startDelay)
+                    end
+
+                    for index = 1, count do
+                        if self.GameEnded then
+                            break
+                        end
+
+                        self:SpawnEnemy(spawnType, config)
+
+                        if index < count and interval > 0 then
+                            task.wait(interval)
+                        end
+                    end
+
+                    markStreamFinished()
+                end)
+            end
+        end
+
+        if activeStreams > 0 then
+            completionEvent.Event:Wait()
+        end
+
+        completionEvent:Destroy()
+
+        local delay = group.Delay or 0
         if delay > 0 then
             task.wait(delay)
         end
