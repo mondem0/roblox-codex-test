@@ -27,6 +27,14 @@ local EnemyConfigs = {
         Speed = 9,
         Reward = 60,
         DebuffImmunities = { Explosion = true },
+        SpawnSound = {
+            SoundId = "rbxassetid://1234567890",
+            Volume = 0.8,
+        },
+        DeathSound = {
+            SoundId = "rbxassetid://1234567891",
+            Volume = 1.1,
+        },
     },
     Boss1 = {
         Name = "Obsidian Colossus",
@@ -35,6 +43,11 @@ local EnemyConfigs = {
         Speed = 10,
         Reward = 150,
         DebuffImmunities = { Slow = true },
+        SpawnSound = {
+            SoundId = "rbxassetid://1234567892",
+            Volume = 1.2,
+        },
+        DeathSound = "rbxassetid://1234567893",
     },
     LightningBoss = {
         Name = "Storm Tyrant",
@@ -43,6 +56,11 @@ local EnemyConfigs = {
         Speed = 12,
         Reward = 225,
         DebuffImmunities = { Slow = true },
+        SpawnSound = "rbxassetid://1234567894",
+        DeathSound = {
+            SoundId = "rbxassetid://1234567895",
+            Volume = 1.3,
+        },
     }
 }
 

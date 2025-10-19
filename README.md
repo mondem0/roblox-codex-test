@@ -17,9 +17,10 @@ Create the folders in **Explorer** exactly as listed. If a folder already exists
 
 ### ServerScriptService
 1. Add a `Folder` called `Modules`.
-2. Inside that folder create two `ModuleScript` objects:
+2. Inside that folder create three `ModuleScript` objects:
    * **`TowerService`** → [`ServerScriptService/Modules/TowerService.lua`](ServerScriptService/Modules/TowerService.lua)
    * **`WaveService`** → [`ServerScriptService/Modules/WaveService.lua`](ServerScriptService/Modules/WaveService.lua)
+   * **`SoundEffects`** → [`ServerScriptService/Modules/SoundEffects.lua`](ServerScriptService/Modules/SoundEffects.lua)
 3. Add a `Script` named **`GameManager`** in `ServerScriptService` and paste [`ServerScriptService/GameManager.server.lua`](ServerScriptService/GameManager.server.lua).
 
 ### StarterPlayerScripts
@@ -171,6 +172,67 @@ WaveConfigs.AddWave({
 ```
 
 > Tip: keep the last wave challenging—clearing the final wave ends the game with a victory. You can add an unlimited number of waves, and any metadata you include remains accessible through `WaveConfigs.Definitions` for custom progression logic.
+
+## Configuring Sound Effects
+
+The shared [`SoundEffects` module](ServerScriptService/Modules/SoundEffects.lua) centralizes every audio cue so creators can attach custom sounds without editing gameplay logic. Each sound field accepts either:
+
+* A plain string containing a `rbxassetid://` identifier.
+* A table with `SoundId` plus any extra `Sound` properties (for example `Volume`, `PlaybackSpeed`, or `RollOffMaxDistance`).
+* A pre-built `Sound` instance, which will be cloned before playback.
+
+### Enemy spawn & death hooks
+
+Add `SpawnSound` and/or `DeathSound` to an entry in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua). The wave service plays the spawn clip from the enemy’s root part and moves death audio to an invisible anchor so it can finish even after the model is destroyed.
+
+```lua
+EnemyConfigs.Shielder = {
+    Name = "Bulwark Captain",
+    ModelName = "Shielder",
+    Health = 320,
+    Speed = 9,
+    Reward = 60,
+    DebuffImmunities = { Explosion = true },
+    SpawnSound = {
+        SoundId = "rbxassetid://1234567890",
+        Volume = 0.8,
+    },
+    DeathSound = {
+        SoundId = "rbxassetid://1234567891",
+        Volume = 1.1,
+    },
+}
+```
+
+### Tower fire sounds
+
+Set `FireSound` on a tower inside [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) to trigger audio each time the tower attacks. Upgrades can override the base sound by defining their own `FireSound` entry—otherwise the tower keeps using the previous value.
+
+```lua
+TowerConfigs.Cannon = {
+    Name = "Cannon",
+    ModelName = "Cannon",
+    Cost = 250,
+    Range = 22,
+    Damage = 20,
+    FireRate = 1.5,
+    SplashRadius = 6,
+    FireSound = {
+        SoundId = "rbxassetid://2234567891",
+        Volume = 1.2,
+        PlaybackSpeed = 0.9,
+    },
+    Upgrades = {
+        {
+            Cost = 300,
+            Damage = 28,
+            FireSound = "rbxassetid://5566778899",
+        },
+    },
+}
+```
+
+Leave any of these fields `nil` to disable the corresponding cue. The helper automatically destroys temporary parts/sounds once playback finishes, so repeated spawns and shots will not clutter the workspace.
 
 ## Gameplay Overview
 

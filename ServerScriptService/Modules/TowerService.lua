@@ -1,6 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local TowerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
+local SoundEffects = require(script.Parent.SoundEffects)
 
 local TowerService = {}
 TowerService.__index = TowerService
@@ -485,6 +486,37 @@ function TowerService:Tick(dt)
                             end
                         else
                             self.WaveService:DamageEnemy(target, towerData)
+                        end
+
+                        if towerData.Config.FireSound then
+                            local soundParent
+                            local soundPosition
+                            local barrel = towerData.Barrel
+                            if barrel and barrel.Parent then
+                                soundParent = barrel
+                                if barrel:IsA("BasePart") then
+                                    soundPosition = barrel.Position
+                                end
+                            end
+
+                            if not soundParent then
+                                local primary = towerModel.PrimaryPart
+                                if primary and primary.Parent then
+                                    soundParent = primary
+                                    if primary:IsA("BasePart") then
+                                        soundPosition = primary.Position
+                                    end
+                                end
+                            end
+
+                            if not soundPosition and headInfo and headInfo.HeadPivot then
+                                soundPosition = headInfo.HeadPivot.Position
+                            end
+
+                            SoundEffects.Play(soundParent, towerData.Config.FireSound, {
+                                Name = string.format("%sFire", towerData.Type),
+                                Position = soundPosition,
+                            })
                         end
                     end
                 end

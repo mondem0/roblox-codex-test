@@ -8,6 +8,7 @@ local TowerConfigs = {
         Damage = 8,
         FireRate = 0.75,
         Targeting = "First",
+        FireSound = "rbxassetid://2234567890",
         Upgrades = {
             {
                 Cost = 200,
@@ -36,6 +37,10 @@ local TowerConfigs = {
         SplashRadius = 6,
         SplashColor = Color3.fromRGB(255, 170, 95),
         Targeting = "Strong",
+        FireSound = {
+            SoundId = "rbxassetid://2234567891",
+            Volume = 1.2,
+        },
         Upgrades = {
             {
                 Cost = 300,
@@ -66,6 +71,10 @@ local TowerConfigs = {
         SlowDuration = 2.5,
         SlowPercent = 0.35,
         Targeting = "First",
+        FireSound = {
+            SoundId = "rbxassetid://2234567892",
+            Volume = 0.9,
+        },
         Upgrades = {
             {
                 Cost = 280,

@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local EnemyConfigs = require(ReplicatedStorage.Modules.Config.EnemyConfigs)
 local WaveConfigs = require(ReplicatedStorage.Modules.Config.WaveConfigs)
 local PathService = require(ReplicatedStorage.Modules.PathService)
+local SoundEffects = require(script.Parent.SoundEffects)
 local RunService = game:GetService("RunService")
 
 local WaveService = {}
@@ -251,7 +252,18 @@ function WaveService:KillEnemy(enemyModel, enemyData)
         enemyData.HealthValue.Value = 0
     end
     if enemyModel.Parent then
-        local reward = EnemyConfigs[enemyData.Type].Reward
+        local enemyConfig = EnemyConfigs[enemyData.Type] or {}
+
+        if enemyConfig.DeathSound then
+            local primary = enemyModel.PrimaryPart
+            local soundPosition = primary and primary.Position or nil
+            SoundEffects.Play(nil, enemyConfig.DeathSound, {
+                Name = string.format("%sDeath", enemyData.Type),
+                Position = soundPosition,
+            })
+        end
+
+        local reward = enemyConfig.Reward or 0
         for player in pairs(self.PlayerStats) do
             self:AdjustMoney(player, reward)
         end
@@ -384,6 +396,12 @@ function WaveService:SpawnEnemy(enemyType, config)
     end
 
     enemyModel.Parent = workspace.Enemies
+
+    if config.SpawnSound then
+        SoundEffects.Play(primary, config.SpawnSound, {
+            Name = string.format("%sSpawn", enemyType),
+        })
+    end
 
     local displayName = config.Name or enemyType
     enemyModel:SetAttribute("MaxHealth", config.Health)
