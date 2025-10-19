@@ -671,15 +671,15 @@ local function populateTowerSelectionButtons()
 
 	for _, towerType in ipairs(keys) do
 		local config = towerConfigs[towerType]
-		local button = Instance.new("TextButton")
-		button.Name = string.format("%sSelectButton", towerType)
-		button.Size = UDim2.fromOffset(500, 36)
+local button = Instance.new("TextButton")
+button.Name = string.format("%sSelectButton", towerType)
+button.Size = UDim2.fromOffset(500, 56)
 		button.Position = UDim2.new(0, 5, 0, 0)
 		button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
 		button.BorderSizePixel = 0
 		button.TextColor3 = Color3.new(1, 1, 1)
 		button.Font = Enum.Font.Gotham
-		button.TextSize = 18
+button.TextSize = 20
 		button.AutoButtonColor = true
 		button.LayoutOrder = typeof(config.SelectionOrder) == "number" and config.SelectionOrder or 0
 		button.Parent = selectionTowerList
