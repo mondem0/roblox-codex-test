@@ -11,6 +11,35 @@ WaveService.__index = WaveService
 
 local Players = game:GetService("Players")
 
+local function clamp(value, minValue, maxValue)
+    if value < minValue then
+        return minValue
+    elseif value > maxValue then
+        return maxValue
+    end
+    return value
+end
+
+local function shallowCopyTable(source)
+    local copy = {}
+    for key, value in pairs(source) do
+        copy[key] = value
+    end
+    return copy
+end
+
+local function toVector3(value)
+    if typeof(value) == "Vector3" then
+        return value
+    elseif type(value) == "table" then
+        local x = value.X or value.x or value[1] or 0
+        local y = value.Y or value.y or value[2] or 0
+        local z = value.Z or value.z or value[3] or 0
+        return Vector3.new(x, y, z)
+    end
+    return nil
+end
+
 local function normalizeImmunityMap(raw)
     if type(raw) == "string" then
         local map = {}
@@ -267,6 +296,9 @@ function WaveService:KillEnemy(enemyModel, enemyData)
         for player in pairs(self.PlayerStats) do
             self:AdjustMoney(player, reward)
         end
+
+        self:SpawnSplitChildren(enemyConfig, enemyData, enemyModel)
+
         enemyModel:Destroy()
     end
     self.Enemies[enemyModel] = nil
@@ -423,7 +455,121 @@ function WaveService:SpawnGroup(group)
     end
 end
 
-function WaveService:SpawnEnemy(enemyType, config)
+function WaveService:ClampProgress(progress)
+    local waypoints = self.PathCache and self.PathCache.Waypoints
+    if not waypoints or #waypoints <= 1 then
+        return 1
+    end
+
+    local maxProgress = #waypoints - 0.001
+    return clamp(progress or 1, 1, maxProgress)
+end
+
+function WaveService:GetPathCFrame(progress)
+    local waypoints = self.PathCache and self.PathCache.Waypoints
+    if not waypoints or #waypoints == 0 then
+        return nil
+    end
+
+    if #waypoints == 1 then
+        return CFrame.new(waypoints[1])
+    end
+
+    local clampedProgress = self:ClampProgress(progress)
+    local index = clamp(math.floor(clampedProgress), 1, #waypoints - 1)
+    local nextIndex = clamp(index + 1, 1, #waypoints)
+    local startPos = waypoints[index]
+    local endPos = waypoints[nextIndex] or startPos
+    local alpha = clampedProgress - index
+    local position = startPos:Lerp(endPos, alpha)
+    return CFrame.new(position, endPos)
+end
+
+function WaveService:SpawnSplitChildren(enemyConfig, enemyData, enemyModel)
+    if self.GameEnded then
+        return
+    end
+
+    local splitConfig = enemyConfig.SplitChildren or enemyConfig.SplitOnDeath
+    if type(splitConfig) ~= "table" then
+        return
+    end
+
+    local entries
+    if #splitConfig > 0 then
+        entries = splitConfig
+    else
+        entries = {}
+        for childType, entry in pairs(splitConfig) do
+            if typeof(childType) == "string" then
+                if type(entry) == "number" then
+                    table.insert(entries, { Type = childType, Count = entry })
+                elseif type(entry) == "table" then
+                    local copy = shallowCopyTable(entry)
+                    copy.Type = copy.Type or childType
+                    table.insert(entries, copy)
+                end
+            end
+        end
+    end
+
+    if not entries or #entries == 0 then
+        return
+    end
+
+    local baseProgress = enemyData and enemyData.Progress or 1
+    baseProgress = self:ClampProgress(baseProgress)
+    local baseCFrame = nil
+    if enemyModel and enemyModel.PrimaryPart then
+        baseCFrame = enemyModel.PrimaryPart.CFrame
+    end
+    local hasPathWaypoints = self.PathCache and self.PathCache.Waypoints and #self.PathCache.Waypoints > 1
+
+    for _, entry in ipairs(entries) do
+        local childType = entry.Type or entry.Enemy or entry[1]
+        local childConfig = childType and EnemyConfigs[childType]
+        if childConfig then
+            local count = math.max(1, entry.Count or entry.Quantity or 1)
+            local progressOffset = tonumber(entry.ProgressOffset) or 0
+            local spacing = entry.ProgressSpacing
+            if spacing == nil and count > 1 then
+                spacing = 0.04
+            end
+            spacing = spacing or 0
+
+            local positionOffset = toVector3(entry.Offset or entry.PositionOffset)
+            local offsetRadius = tonumber(entry.OffsetRadius)
+            local playSpawnSound = entry.PlaySpawnSound == true or entry.UseSpawnSound == true
+
+            for index = 1, count do
+                local spawnProgress = self:ClampProgress(baseProgress + progressOffset + spacing * (index - 1))
+                local spawnOptions = {
+                    Progress = spawnProgress,
+                    SkipSpawnSound = not playSpawnSound,
+                }
+
+                if baseCFrame and not hasPathWaypoints then
+                    spawnOptions.CFrame = baseCFrame
+                end
+
+                if positionOffset then
+                    spawnOptions.PositionOffset = positionOffset
+                elseif offsetRadius and offsetRadius > 0 then
+                    local angle = (index - 1) / count * math.pi * 2
+                    spawnOptions.PositionOffset = Vector3.new(math.cos(angle) * offsetRadius, 0, math.sin(angle) * offsetRadius)
+                end
+
+                self:SpawnEnemy(childType, childConfig, spawnOptions)
+            end
+        end
+    end
+end
+
+function WaveService:SpawnEnemy(enemyType, config, options)
+    if self.GameEnded then
+        return
+    end
+
     local enemyModel, primary, head, isDefault = buildEnemyModel(enemyType, config)
     if not enemyModel or not primary then
         return
@@ -431,7 +577,8 @@ function WaveService:SpawnEnemy(enemyType, config)
 
     enemyModel.Parent = workspace.Enemies
 
-    if config.SpawnSound then
+    local skipSpawnSound = options and options.SkipSpawnSound
+    if config.SpawnSound and not skipSpawnSound then
         SoundEffects.Play(primary, config.SpawnSound, {
             Name = string.format("%sSpawn", enemyType),
         })
@@ -472,22 +619,54 @@ function WaveService:SpawnEnemy(enemyType, config)
         end
     end
 
+    local spawnProgress
+    if options and options.Progress then
+        spawnProgress = self:ClampProgress(options.Progress)
+    end
+
     self.Enemies[enemyModel] = {
         Type = enemyType,
         Health = config.Health,
         Speed = config.Speed,
-        Progress = 1,
+        Progress = spawnProgress or 1,
         Slow = nil,
         HealthValue = healthValue,
         PartOffsets = partOffsets,
         DebuffImmunities = normalizeImmunityMap(config.DebuffImmunities),
     }
 
-    if self.PathCache.SpawnCFrame then
-        primary.CFrame = self.PathCache.SpawnCFrame
-    elseif self.PathCache.Waypoints and self.PathCache.Waypoints[1] then
-        primary.CFrame = CFrame.new(self.PathCache.Waypoints[1])
+    local appliedCFrame
+    local pathCFrame
+
+    if spawnProgress then
+        pathCFrame = self:GetPathCFrame(spawnProgress)
     end
+
+    if options and options.CFrame then
+        appliedCFrame = options.CFrame
+    elseif pathCFrame then
+        appliedCFrame = pathCFrame
+    elseif self.PathCache.SpawnCFrame then
+        appliedCFrame = self.PathCache.SpawnCFrame
+    elseif self.PathCache.Waypoints and self.PathCache.Waypoints[1] then
+        appliedCFrame = CFrame.new(self.PathCache.Waypoints[1])
+    end
+
+    local offset = options and options.PositionOffset
+    if offset then
+        offset = toVector3(offset) or offset
+        if typeof(offset) == "Vector3" then
+            if not appliedCFrame then
+                appliedCFrame = CFrame.new(primary.Position)
+            end
+            appliedCFrame = appliedCFrame * CFrame.new(offset)
+        end
+    end
+
+    if appliedCFrame then
+        primary.CFrame = appliedCFrame
+    end
+
     task.spawn(function()
         self:MoveEnemy(enemyModel)
     end)

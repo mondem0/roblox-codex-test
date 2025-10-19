@@ -61,6 +61,35 @@ local EnemyConfigs = {
             SoundId = "rbxassetid://1234567895",
             Volume = 1.3,
         },
+    },
+    Broodling = {
+        Name = "Broodling",
+        ModelName = "Runner",
+        Health = 30,
+        Speed = 18,
+        Reward = 10,
+    },
+    Broodmother = {
+        Name = "Broodmother",
+        ModelName = "Tank",
+        Health = 320,
+        Speed = 9,
+        Reward = 95,
+        SplitChildren = {
+            {
+                Type = "Runner",
+                Count = 2,
+                ProgressSpacing = 0.05,
+                OffsetRadius = 3,
+            },
+            {
+                Type = "Broodling",
+                Count = 3,
+                ProgressOffset = -0.04,
+                ProgressSpacing = 0.05,
+                PlaySpawnSound = true,
+            },
+        },
     }
 }
 

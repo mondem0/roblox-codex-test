@@ -146,6 +146,29 @@ addWave({
     },
 })
 
+addWave({
+    Name = "wave7",
+    Description = "Broodmothers split into fresh attackers the moment they fall.",
+    Reward = 210,
+    Groups = {
+        {
+            Streams = {
+                { Type = "Broodmother", Count = 4, Interval = 2.4 },
+                { Type = "Runner", Count = 12, Interval = 0.7, StartDelay = 1.2 },
+            },
+            Delay = 1.8,
+        },
+        {
+            Type = "Broodmother",
+            Count = 3,
+            Delay = 2.8,
+        },
+    },
+    Metadata = {
+        Notes = "Broodmothers split into Broodlings and Runners—keep splash damage ready to mop up.",
+    },
+})
+
 waves.Definitions = waveDefinitions
 waves.AddWave = addWave
 waves.DefaultNamePattern = defaultNamePattern

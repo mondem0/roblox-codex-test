@@ -144,6 +144,50 @@ EnemyConfigs.ParagonChampion = {
 
 > In the sample content, both **Boss1** and **LightningBoss** ignore slow effects so Frost Mage towers cannot stall them, while the new **Shielder** archetype shrugs off splash damage unless directly targeted. Use the combined example above if you want a single enemy to benefit from both defenses.
 
+##### Splitting enemies on death
+
+Set `SplitChildren` (or the alias `SplitOnDeath`) on an enemy entry to automatically emit additional enemies the instant the original unit is destroyed. Each child entry can include:
+
+* `Type` &mdash; the enemy key to spawn (required).
+* `Count` &mdash; how many copies to emit (defaults to `1`).
+* `ProgressOffset` &mdash; shifts the child forward/backward along the path relative to where the parent died.
+* `ProgressSpacing` &mdash; extra spacing to apply between each child in the same entry so they do not stack.
+* `OffsetRadius` or `PositionOffset` &mdash; optional world offsets to spread the new spawns around the parent.
+* `PlaySpawnSound` &mdash; set to `true` if you want the child to reuse its configured `SpawnSound` when it appears (children are silent by default to avoid audio spam).
+
+Children inherit the parent's current waypoint progress and immediately continue moving down the path. The helper accepts either an array of child definitions or a dictionary keyed by enemy type, which makes quick tweaks (like "spawn two Runners") painless.
+
+```lua
+EnemyConfigs.Broodmother = {
+    Name = "Broodmother",
+    ModelName = "Tank",
+    Health = 320,
+    Speed = 9,
+    Reward = 95,
+    SplitChildren = {
+        -- Array style declaration
+        {
+            Type = "Runner",
+            Count = 2,
+            ProgressSpacing = 0.05,
+            OffsetRadius = 3,
+        },
+        {
+            Type = "Broodling",
+            Count = 3,
+            ProgressOffset = -0.04,
+            ProgressSpacing = 0.05,
+            PlaySpawnSound = true,
+        },
+        -- Dictionary style works too:
+        -- Runner = 2,
+        -- Broodling = { Count = 3, ProgressSpacing = 0.05 },
+    },
+}
+```
+
+The sample waves now include a late-game Broodmother pack so you can see the split behavior in action.
+
 ### Creating or editing waves
 
 1. Open **`WaveConfigs`**. The module now exposes a small helper named `AddWave` that registers each wave, assigns it both a numeric index, and stores optional metadata such as rewards or descriptions.
@@ -237,8 +281,8 @@ Leave any of these fields `nil` to disable the corresponding cue. The helper aut
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
 * **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
-* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
-* **Waves**: Six sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences.
+* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
+* **Waves**: Seven sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the new late-game wave showcases Broodmothers splitting into fresh attackers.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 * **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.
