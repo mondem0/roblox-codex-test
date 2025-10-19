@@ -8,12 +8,15 @@ local TowerConfigs = {
         Damage = 8,
         FireRate = 0.75,
         Targeting = "First",
+        HiddenDetection = true,
+        FireSound = "rbxassetid://2234567890",
         Upgrades = {
             {
                 Cost = 200,
                 Range = 20,
                 Damage = 12,
                 FireRate = 0.65,
+                ModelName = "ArcherTier2",
                 Description = "+4 damage, +2 range, slightly faster"
             },
             {
@@ -21,6 +24,7 @@ local TowerConfigs = {
                 Range = 24,
                 Damage = 18,
                 FireRate = 0.5,
+                ModelName = "ArcherTier3",
                 Description = "+6 damage, +4 range, much faster"
             }
         }
@@ -36,6 +40,11 @@ local TowerConfigs = {
         SplashRadius = 6,
         SplashColor = Color3.fromRGB(255, 170, 95),
         Targeting = "Strong",
+        FireSound = {
+            SoundId = "rbxassetid://2234567891",
+            Volume = 1.2,
+            StartTime = 0.1,
+        },
         Upgrades = {
             {
                 Cost = 300,
@@ -43,6 +52,7 @@ local TowerConfigs = {
                 Damage = 28,
                 SplashRadius = 7,
                 FireRate = 1.35,
+                ModelName = "CannonMk2",
                 Description = "Bigger explosion, more damage"
             },
             {
@@ -51,6 +61,7 @@ local TowerConfigs = {
                 Damage = 40,
                 SplashRadius = 8,
                 FireRate = 1.1,
+                ModelName = "CannonMk3",
                 Description = "Heavy shells devastate clusters"
             }
         }
@@ -66,6 +77,11 @@ local TowerConfigs = {
         SlowDuration = 2.5,
         SlowPercent = 0.35,
         Targeting = "First",
+        FireSound = {
+            SoundId = "rbxassetid://2234567892",
+            Volume = 0.9,
+            TimePosition = 0.2,
+        },
         Upgrades = {
             {
                 Cost = 280,
@@ -73,6 +89,7 @@ local TowerConfigs = {
                 Damage = 8,
                 SlowDuration = 3,
                 SlowPercent = 0.4,
+                ModelName = "FrostMageAdept",
                 Description = "Longer slows and extra damage"
             },
             {
@@ -81,6 +98,7 @@ local TowerConfigs = {
                 Damage = 11,
                 SlowDuration = 3.5,
                 SlowPercent = 0.5,
+                ModelName = "FrostMageArchon",
                 Description = "Freezing blasts cripple enemies"
             }
         }
