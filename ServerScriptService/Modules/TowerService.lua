@@ -430,7 +430,7 @@ function TowerService:AddTower(player, towerType, position)
     return towerModel
 end
 
-local function getFarthestEnemyInRange(towerPosition, range, enemies)
+local function getFarthestEnemyInRange(towerPosition, range, enemies, waveService, towerData)
     if not range or range <= 0 then
         return nil
     end
@@ -441,6 +441,9 @@ local function getFarthestEnemyInRange(towerPosition, range, enemies)
 
     for enemyModel, enemyData in pairs(enemies) do
         if enemyModel and enemyModel.PrimaryPart and enemyData.Health > 0 then
+            if waveService and not waveService:TowerCanAffectEnemy(towerData, enemyData) then
+                continue
+            end
             local distance = (towerPosition - enemyModel.PrimaryPart.Position).Magnitude
             if distance <= range then
                 local progress = enemyData.Progress or 0
@@ -684,7 +687,9 @@ function TowerService:Tick(dt)
                         local target = getFarthestEnemyInRange(
                             headPivot.Position,
                             towerData.Config.Range,
-                            self.WaveService.Enemies
+                            self.WaveService.Enemies,
+                            self.WaveService,
+                            towerData
                         )
                         if target then
                             local targetPrimary = target.PrimaryPart

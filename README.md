@@ -88,6 +88,7 @@ You can expand the roster and pacing without editing any gameplay scripts—just
    * `Speed`: How fast the enemy moves along the path (studs per second).
    * `Reward`: How much cash each player earns when this enemy dies.
    * `DebuffImmunities`: Optional table or array of status names that the enemy should ignore (e.g. `{ Slow = true }` or `{ "Explosion" }`).
+   * `Hidden`: Set to `true` (or use the alias `IsHidden`) to mark an enemy as invisible to towers that lack hidden detection.
    * Additional custom fields can be added; scripts ignore unknown keys you store for your own systems.
 3. If the enemy uses a custom model, add it to `ReplicatedStorage/Assets/Enemies` and match the `ModelName` value.
 
@@ -143,6 +144,42 @@ EnemyConfigs.ParagonChampion = {
 ```
 
 > In the sample content, both **Boss1** and **LightningBoss** ignore slow effects so Frost Mage towers cannot stall them, while the new **Shielder** archetype shrugs off splash damage unless directly targeted. Use the combined example above if you want a single enemy to benefit from both defenses.
+
+#### Hidden enemies & detection
+
+Set the `Hidden` flag on an enemy to make it invisible to towers that do not have hidden detection. Hidden enemies still follow the path and trigger base damage if they escape, but only towers with `HiddenDetection = true` (either on the base config or added through an upgrade) can target or damage them. This includes direct attacks and splash damage.
+
+```lua
+EnemyConfigs.Shade = {
+    Name = "Umbral Shade",
+    ModelName = "Shade",
+    Health = 140,
+    Speed = 16,
+    Reward = 65,
+    Hidden = true,
+}
+
+TowerConfigs.Archer = {
+    Name = "Archer",
+    Cost = 150,
+    Range = 18,
+    Damage = 8,
+    HiddenDetection = true,
+    Upgrades = {
+        {
+            Cost = 200,
+            Range = 20,
+        },
+        {
+            Cost = 350,
+            Range = 24,
+            -- You can toggle detection later by setting HiddenDetection = true/false here as well.
+        },
+    },
+}
+```
+
+Add the same `HiddenDetection` field to any tower upgrade that should gain or lose the ability. Towers without the flag will automatically ignore hidden enemies when picking targets and when applying splash damage.
 
 ##### Splitting enemies on death
 
@@ -326,8 +363,8 @@ Leave any of these fields `nil` to disable the corresponding cue. The helper aut
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
 * **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
-* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), Frost Wardens (collapse into tower-stunning pulses), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
-* **Waves**: Eight sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the final sample wave highlights Frost Wardens stunning nearby towers when they fall.
+* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), Frost Wardens (collapse into tower-stunning pulses), Shades (stealthed units that only hidden-detection towers can hit), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
+* **Waves**: Nine sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the final sample wave highlights hidden Shades sneaking in alongside Frost Wardens that stun nearby towers when they fall.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 * **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.

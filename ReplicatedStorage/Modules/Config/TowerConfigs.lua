@@ -8,6 +8,7 @@ local TowerConfigs = {
         Damage = 8,
         FireRate = 0.75,
         Targeting = "First",
+        HiddenDetection = true,
         FireSound = "rbxassetid://2234567890",
         Upgrades = {
             {

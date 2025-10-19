@@ -120,6 +120,21 @@ local function enemyImmuneTo(enemyData, debuffType)
     return immunities[string.lower(debuffType)] == true
 end
 
+function WaveService:TowerCanAffectEnemy(towerData, enemyData)
+    if not enemyData then
+        return false
+    end
+
+    if enemyData.Hidden then
+        local config = towerData and towerData.Config
+        if not (config and config.HiddenDetection) then
+            return false
+        end
+    end
+
+    return true
+end
+
 local function buildEnemyModel(enemyType, config)
     local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
     local enemiesFolder = assetsFolder and assetsFolder:FindFirstChild("Enemies")
@@ -275,6 +290,10 @@ function WaveService:DamageEnemy(enemyModel, towerData)
         return
     end
 
+    if not self:TowerCanAffectEnemy(towerData, enemyData) then
+        return
+    end
+
     local damageAmount = towerData.Config.Damage or 0
     if damageAmount <= 0 then
         return
@@ -305,6 +324,9 @@ end
 function WaveService:SplashDamage(origin, radius, towerData, targetEnemy)
     for enemyModel, enemyData in pairs(self.Enemies) do
         if enemyModel.PrimaryPart then
+            if not self:TowerCanAffectEnemy(towerData, enemyData) then
+                continue
+            end
             local distance = (enemyModel.PrimaryPart.Position - origin).Magnitude
             if distance <= radius then
                 local isPrimaryTarget = not targetEnemy or enemyModel == targetEnemy
@@ -722,6 +744,19 @@ function WaveService:SpawnEnemy(enemyType, config, options)
         spawnProgress = self:ClampProgress(options.Progress)
     end
 
+    local hidden = false
+    if config.Hidden ~= nil then
+        hidden = config.Hidden and true or false
+    elseif config.IsHidden ~= nil then
+        hidden = config.IsHidden and true or false
+    end
+
+    if hidden then
+        enemyModel:SetAttribute("IsHidden", true)
+    else
+        enemyModel:SetAttribute("IsHidden", false)
+    end
+
     self.Enemies[enemyModel] = {
         Type = enemyType,
         Health = config.Health,
@@ -731,6 +766,7 @@ function WaveService:SpawnEnemy(enemyType, config, options)
         HealthValue = healthValue,
         PartOffsets = partOffsets,
         DebuffImmunities = normalizeImmunityMap(config.DebuffImmunities),
+        Hidden = hidden,
     }
 
     local appliedCFrame

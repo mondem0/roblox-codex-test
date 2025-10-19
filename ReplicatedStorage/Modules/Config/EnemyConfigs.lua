@@ -81,6 +81,23 @@ local EnemyConfigs = {
             EffectColor = { 130, 220, 255 },
         },
     },
+    Shade = {
+        Name = "Umbral Shade",
+        ModelName = "Shade",
+        Health = 140,
+        Speed = 16,
+        Reward = 65,
+        Hidden = true,
+        SpawnSound = {
+            SoundId = "rbxassetid://1234567897",
+            Volume = 0.7,
+            StartTime = 0.2,
+        },
+        DeathSound = {
+            SoundId = "rbxassetid://1234567898",
+            Volume = 0.9,
+        },
+    },
     Broodling = {
         Name = "Broodling",
         ModelName = "Runner",

@@ -193,6 +193,32 @@ addWave({
     },
 })
 
+addWave({
+    Name = "wave9",
+    Description = "Stealthed Shades slip past defenses until a detector spots them.",
+    Reward = 320,
+    Groups = {
+        {
+            Streams = {
+                { Type = "Shade", Count = 12, Interval = 0.7 },
+                { Type = "Runner", Count = 8, Interval = 0.6, StartDelay = 0.8 },
+            },
+            Delay = 1.2,
+        },
+        { Type = "Shade", Count = 8, Delay = 0.9 },
+        {
+            Streams = {
+                { Type = "FrostWarden", Count = 2, Interval = 2.8 },
+                { Type = "Shade", Count = 6, Interval = 1.5, StartDelay = 1.1 },
+            },
+            Delay = 2.4,
+        },
+    },
+    Metadata = {
+        Notes = "Pair at least one HiddenDetection tower with splash coverage so Shades can't waltz into the base.",
+    },
+})
+
 waves.Definitions = waveDefinitions
 waves.AddWave = addWave
 waves.DefaultNamePattern = defaultNamePattern
