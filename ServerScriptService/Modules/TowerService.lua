@@ -1,3 +1,4 @@
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local TowerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
@@ -156,6 +157,24 @@ local function getOverallPlacementLimit()
     end
 
     return limit
+end
+
+local function getTrackedPlayers(towerService)
+    local players = {}
+
+    if towerService and towerService.WaveService and towerService.WaveService.PlayerStats then
+        for player in pairs(towerService.WaveService.PlayerStats) do
+            if player and player.Parent then
+                table.insert(players, player)
+            end
+        end
+    end
+
+    if #players > 0 then
+        return players
+    end
+
+    return Players:GetPlayers()
 end
 
 local function getTowerPrimaryPart(model)
@@ -329,7 +348,63 @@ function TowerService.new(mapModel, waveService, remotes)
         towersFolder.Parent = workspace
     end
 
+    self:BroadcastTowerCounts()
+
     return self
+end
+
+function TowerService:BuildTowerCountSnapshot(player)
+    local snapshot = {
+        Total = {
+            PlayerCount = self:GetOverallTowerCount(player),
+            GlobalCount = self:GetOverallTowerCount(),
+        },
+        Towers = {},
+    }
+
+    local overallLimit = getOverallPlacementLimit()
+    if overallLimit then
+        snapshot.Total.PlayerLimit = overallLimit.PerPlayer
+        snapshot.Total.GlobalLimit = overallLimit.Global
+    end
+
+    for towerType, config in pairs(TowerConfigs) do
+        if typeof(config) == "table" and config.Cost then
+            local entry = {
+                PlayerCount = self:GetTowerCount(towerType, player),
+                GlobalCount = self:GetTowerCount(towerType),
+            }
+
+            local limit = getPlacementLimit(towerType)
+            if limit then
+                entry.PlayerLimit = limit.PerPlayer
+                entry.GlobalLimit = limit.Global
+            end
+
+            snapshot.Towers[towerType] = entry
+        end
+    end
+
+    return snapshot
+end
+
+function TowerService:SendTowerCounts(player)
+    if not (player and self.Remotes and self.Remotes.TowerCountsUpdated) then
+        return
+    end
+
+    local payload = self:BuildTowerCountSnapshot(player)
+    self.Remotes.TowerCountsUpdated:FireClient(player, payload)
+end
+
+function TowerService:BroadcastTowerCounts()
+    if not (self.Remotes and self.Remotes.TowerCountsUpdated) then
+        return
+    end
+
+    for _, player in ipairs(getTrackedPlayers(self)) do
+        self:SendTowerCounts(player)
+    end
 end
 
 local function buildTowerModel(towerType, overrideConfig)
@@ -692,6 +767,7 @@ function TowerService:AddTower(player, towerType, position)
     self.Towers[towerModel] = towerData
     ensureHeadGeometry(towerData)
     updateTowerAttributes(towerModel, towerData)
+    self:BroadcastTowerCounts()
     return towerModel
 end
 
@@ -932,11 +1008,13 @@ end
 
 function TowerService:Tick(dt)
     local now = tick()
+    local countsDirty = false
 
     for towerModel, towerData in pairs(self.Towers) do
         if not towerModel.Parent then
             self:ClearTowerStun(towerModel, towerData, true)
             self.Towers[towerModel] = nil
+            countsDirty = true
         else
             local stunnedUntil = towerData.StunnedUntil
             if stunnedUntil and stunnedUntil > now then
@@ -1058,6 +1136,10 @@ function TowerService:Tick(dt)
                 end
             end
         end
+    end
+
+    if countsDirty then
+        self:BroadcastTowerCounts()
     end
 end
 
@@ -1198,6 +1280,8 @@ function TowerService:SellTower(player, towerModel)
         self.WaveService:AdjustMoney(player, refund)
     end
 
+    self:BroadcastTowerCounts()
+
     return true
 end
 
@@ -1217,6 +1301,8 @@ function TowerService:Reset()
 
     TowerLimits = {}
     OverallPlacementLimitCache = nil
+
+    self:BroadcastTowerCounts()
 end
 
 return TowerService

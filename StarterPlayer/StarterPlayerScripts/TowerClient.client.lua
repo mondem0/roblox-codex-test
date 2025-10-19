@@ -40,6 +40,7 @@ local shopButtonConnections = {}
 local shopSlotButtons = {}
 local shopSlotOriginalText = {}
 local shopSlotPriceLabels = {}
+local shopSlotCountLabels = {}
 local beginPlacement
 
 local towerDetailsFrame
@@ -62,6 +63,10 @@ local upgradeButtonOriginalAutoButtonColor
 local sellButtonOriginalAutoButtonColor
 local priceLabelsCanShow = false
 local GREY_COLOR = Color3.new(0.5, 0.5, 0.5)
+
+local playerTowerTotalLabel
+local teamTowerTotalLabel
+local towerCountSnapshot
 
 local LOADOUT_SLOT_COUNT = 5
 local SLOT_KEY_CODES = {
@@ -94,6 +99,86 @@ local previewFootprintSize = DEFAULT_PREVIEW_SIZE
 local previewFootprintRadius = DEFAULT_PREVIEW_RADIUS
 local footprintCache = {}
 local RANGE_RING_HEIGHT = 0.05
+
+local function formatCountLimit(count, limit)
+        local numericCount = tonumber(count) or 0
+        local numericLimit = tonumber(limit)
+
+        if numericLimit and numericLimit > 0 then
+                return string.format("%d / %d", numericCount, numericLimit)
+        end
+
+        return string.format("%d / ∞", numericCount)
+end
+
+local function getTowerCountEntry(towerType)
+        if not towerType then
+                return nil
+        end
+
+        if not towerCountSnapshot or typeof(towerCountSnapshot) ~= "table" then
+                return nil
+        end
+
+        local towers = towerCountSnapshot.Towers
+        if not towers or typeof(towers) ~= "table" then
+                return nil
+        end
+
+        return towers[towerType]
+end
+
+local function updateOverallTowerTotals()
+        if not (playerTowerTotalLabel or teamTowerTotalLabel) then
+                return
+        end
+
+        local totalInfo = towerCountSnapshot and towerCountSnapshot.Total
+
+        local playerText = formatCountLimit(totalInfo and totalInfo.PlayerCount, totalInfo and totalInfo.PlayerLimit)
+        if playerTowerTotalLabel then
+                playerTowerTotalLabel.Text = string.format("Your Towers: %s", playerText)
+        end
+
+        if teamTowerTotalLabel then
+                local teamText = formatCountLimit(totalInfo and totalInfo.GlobalCount, totalInfo and totalInfo.GlobalLimit)
+                teamTowerTotalLabel.Text = string.format("Team Towers: %s", teamText)
+        end
+end
+
+local function updateShopSlotCountDisplay(slotIndex)
+        local label = shopSlotCountLabels[slotIndex]
+        if not label then
+                return
+        end
+
+        local towerType = loadoutSelection[slotIndex]
+        if not (towerType and towerConfigs[towerType]) then
+                label.Text = ""
+                label.Visible = false
+                return
+        end
+
+        local entry = getTowerCountEntry(towerType)
+        local playerCount = entry and entry.PlayerCount
+        local playerLimit = entry and entry.PlayerLimit
+        local globalCount = entry and entry.GlobalCount
+        local globalLimit = entry and entry.GlobalLimit
+
+        local lines = {
+                string.format("You: %s", formatCountLimit(playerCount, playerLimit)),
+                string.format("Team: %s", formatCountLimit(globalCount, globalLimit)),
+        }
+
+        label.Text = table.concat(lines, "\n")
+        label.Visible = true
+end
+
+local function updateAllShopSlotCounts()
+        for slotIndex = 1, LOADOUT_SLOT_COUNT do
+                updateShopSlotCountDisplay(slotIndex)
+        end
+end
 
 local function disconnectSelectedConnections()
 	for _, conn in ipairs(selectedTowerConnections) do
@@ -607,11 +692,16 @@ local function applyLoadoutToShop()
                 if button and button:IsA("GuiButton") then
                         local towerType = loadoutSelection[slotIndex]
                         local priceLabel = shopSlotPriceLabels[slotIndex]
+                        local countLabel = shopSlotCountLabels[slotIndex]
+                        if countLabel then
+                                countLabel.Text = ""
+                                countLabel.Visible = false
+                        end
                         if towerType and towerConfigs[towerType] then
                                 disconnectShopButton(button)
-				button:SetAttribute("TowerType", towerType)
-				local config = towerConfigs[towerType]
-				if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
+                                button:SetAttribute("TowerType", towerType)
+                                local config = towerConfigs[towerType]
+                                if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
 					button.Text = config.Name or towerType
 				end
 				if priceLabel and priceLabel:IsA("TextLabel") then
@@ -633,11 +723,13 @@ local function applyLoadoutToShop()
 				if priceLabel and priceLabel:IsA("TextLabel") then
 					priceLabel.Text = ""
 					priceLabel.Visible = false
-				end
-				button.Active = false
-			end
-		end
-	end
+                                end
+                                button.Active = false
+                        end
+                end
+        end
+
+        updateAllShopSlotCounts()
 end
 
 local function populateTowerSelectionButtons()
@@ -1236,9 +1328,9 @@ local function createGui()
 	screenGui.DisplayOrder = 4
 	screenGui.Parent = playerGui
 
-	shopFrame = Instance.new("Frame")
-	shopFrame.Name = "Shop"
-        shopFrame.Size = UDim2.fromOffset(720, 140)
+        shopFrame = Instance.new("Frame")
+        shopFrame.Name = "Shop"
+        shopFrame.Size = UDim2.fromOffset(720, 164)
 	shopFrame.Position = UDim2.fromOffset(0, 0)
 	shopFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 	shopFrame.BackgroundTransparency = 0.1
@@ -1257,16 +1349,17 @@ local function createGui()
 	slotLayout.Padding = UDim.new(0, 12)
 	slotLayout.Parent = shopFrame
 
-	shopSlotButtons = {}
-	shopSlotOriginalText = {}
+        shopSlotButtons = {}
+        shopSlotOriginalText = {}
+        shopSlotCountLabels = {}
         for i = 1, LOADOUT_SLOT_COUNT do
                 local slotContainer = Instance.new("Frame")
                 slotContainer.Name = string.format("ShopSlotContainer%d", i)
-		slotContainer.Size = UDim2.fromOffset(120, 108)
-		slotContainer.BackgroundTransparency = 1
-		slotContainer.BorderSizePixel = 0
-		slotContainer.LayoutOrder = i
-		slotContainer.Parent = shopFrame
+                slotContainer.Size = UDim2.fromOffset(120, 140)
+                slotContainer.BackgroundTransparency = 1
+                slotContainer.BorderSizePixel = 0
+                slotContainer.LayoutOrder = i
+                slotContainer.Parent = shopFrame
 
 		local priceLabel = Instance.new("TextLabel")
 		priceLabel.Name = "PriceLabel"
@@ -1285,26 +1378,42 @@ local function createGui()
 		priceLabel.Parent = slotContainer
 		shopSlotPriceLabels[i] = priceLabel
 
-		local button = Instance.new("TextButton")
-		button.Name = string.format("ShopSlot%d", i)
-		button.Size = UDim2.fromOffset(120, 80)
-		button.Position = UDim2.fromOffset(0, 24)
-		button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-		button.BorderSizePixel = 0
-		button.Font = Enum.Font.Gotham
-		button.TextSize = 18
-		button.TextColor3 = Color3.new(1, 1, 1)
-		button.Text = string.format("Slot %d", i)
-		button.AutoButtonColor = true
-		button.Parent = slotContainer
-		button:SetAttribute("SlotIndex", i)
-		shopSlotButtons[i] = button
-		shopSlotOriginalText[i] = button.Text
-	end
+                local button = Instance.new("TextButton")
+                button.Name = string.format("ShopSlot%d", i)
+                button.Size = UDim2.fromOffset(120, 82)
+                button.Position = UDim2.fromOffset(0, 24)
+                button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                button.BorderSizePixel = 0
+                button.Font = Enum.Font.Gotham
+                button.TextSize = 18
+                button.TextColor3 = Color3.new(1, 1, 1)
+                button.Text = string.format("Slot %d", i)
+                button.AutoButtonColor = true
+                button.Parent = slotContainer
+                button:SetAttribute("SlotIndex", i)
+                shopSlotButtons[i] = button
+                shopSlotOriginalText[i] = button.Text
 
-	statusFrame = Instance.new("Frame")
-	statusFrame.Name = "Status"
-	statusFrame.Size = UDim2.fromOffset(320, 180)
+                local countLabel = Instance.new("TextLabel")
+                countLabel.Name = "CountLabel"
+                countLabel.BackgroundTransparency = 1
+                countLabel.Size = UDim2.fromOffset(120, 32)
+                countLabel.Position = UDim2.fromOffset(0, 108)
+                countLabel.Font = Enum.Font.Gotham
+                countLabel.TextSize = 14
+                countLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                countLabel.TextXAlignment = Enum.TextXAlignment.Center
+                countLabel.TextYAlignment = Enum.TextYAlignment.Center
+                countLabel.TextWrapped = true
+                countLabel.Text = ""
+                countLabel.Visible = false
+                countLabel.Parent = slotContainer
+                shopSlotCountLabels[i] = countLabel
+        end
+
+        statusFrame = Instance.new("Frame")
+        statusFrame.Name = "Status"
+        statusFrame.Size = UDim2.fromOffset(320, 236)
 	statusFrame.Position = UDim2.fromOffset(0, 0)
 	statusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 	statusFrame.BackgroundTransparency = 0.1
@@ -1348,14 +1457,38 @@ local function createGui()
 	waveLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
 	waveLabel.TextSize = 18
 	waveLabel.TextXAlignment = Enum.TextXAlignment.Left
-	waveLabel.Text = "Wave: 1"
-	waveLabel.Parent = statusFrame
+        waveLabel.Text = "Wave: 1"
+        waveLabel.Parent = statusFrame
 
-	startButton = Instance.new("TextButton")
-	startButton.Name = "StartButton"
-	startButton.Size = UDim2.fromOffset(296, 36)
-	startButton.Position = UDim2.new(0, 12, 0, 112)
-	startButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
+        playerTowerTotalLabel = Instance.new("TextLabel")
+        playerTowerTotalLabel.Name = "PlayerTowerTotal"
+        playerTowerTotalLabel.BackgroundTransparency = 1
+        playerTowerTotalLabel.Position = UDim2.new(0, 12, 0, 108)
+        playerTowerTotalLabel.Size = UDim2.fromOffset(296, 20)
+        playerTowerTotalLabel.Font = Enum.Font.Gotham
+        playerTowerTotalLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        playerTowerTotalLabel.TextSize = 18
+        playerTowerTotalLabel.TextXAlignment = Enum.TextXAlignment.Left
+        playerTowerTotalLabel.Text = "Your Towers: 0 / ∞"
+        playerTowerTotalLabel.Parent = statusFrame
+
+        teamTowerTotalLabel = Instance.new("TextLabel")
+        teamTowerTotalLabel.Name = "TeamTowerTotal"
+        teamTowerTotalLabel.BackgroundTransparency = 1
+        teamTowerTotalLabel.Position = UDim2.new(0, 12, 0, 132)
+        teamTowerTotalLabel.Size = UDim2.fromOffset(296, 20)
+        teamTowerTotalLabel.Font = Enum.Font.Gotham
+        teamTowerTotalLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        teamTowerTotalLabel.TextSize = 18
+        teamTowerTotalLabel.TextXAlignment = Enum.TextXAlignment.Left
+        teamTowerTotalLabel.Text = "Team Towers: 0 / ∞"
+        teamTowerTotalLabel.Parent = statusFrame
+
+        startButton = Instance.new("TextButton")
+        startButton.Name = "StartButton"
+        startButton.Size = UDim2.fromOffset(296, 44)
+        startButton.Position = UDim2.new(0, 12, 0, 168)
+        startButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
 	startButton.BorderSizePixel = 0
 	startButton.Font = Enum.Font.GothamBold
 	startButton.TextSize = 18
@@ -1573,9 +1706,10 @@ local function createGui()
 		connectShopButton(button)
 	end
 
-	applyLoadoutToShop()
+        applyLoadoutToShop()
+        updateOverallTowerTotals()
 
-	return screenGui
+        return screenGui
 end
 
 local function showTowerSelection()
@@ -1782,9 +1916,9 @@ local function updatePreview()
 end
 
 local function updateEnemyHover()
-	local target = mouse.Target
-	local enemyModel = getEnemyModelFromInstance(target)
-	if enemyModel then
+        local target = mouse.Target
+        local enemyModel = getEnemyModelFromInstance(target)
+        if enemyModel then
 		local guiObject = ensureHoverGui()
 		if not (guiObject and guiObject:IsA("GuiObject")) then
 			return
@@ -1829,14 +1963,28 @@ local function updateEnemyHover()
 		if hoverGui and hoverGui:IsA("GuiObject") then
 			hoverGui.Visible = false
 		end
-	end
+        end
+end
+
+local towerCountsEvent = remotes:FindFirstChild("TowerCountsUpdated")
+if towerCountsEvent and towerCountsEvent:IsA("RemoteEvent") then
+        towerCountsEvent.OnClientEvent:Connect(function(payload)
+                if typeof(payload) == "table" then
+                        towerCountSnapshot = payload
+                else
+                        towerCountSnapshot = nil
+                end
+
+                updateOverallTowerTotals()
+                updateAllShopSlotCounts()
+        end)
 end
 
 if remotes:FindFirstChild("MoneyChanged") then
-	remotes.MoneyChanged.OnClientEvent:Connect(function(amount)
-		currentMoney = math.max(0, math.floor((amount or 0) + 0.5))
-		if moneyLabel then
-			moneyLabel.Text = string.format("$%d", currentMoney)
+        remotes.MoneyChanged.OnClientEvent:Connect(function(amount)
+                currentMoney = math.max(0, math.floor((amount or 0) + 0.5))
+                if moneyLabel then
+                        moneyLabel.Text = string.format("$%d", currentMoney)
 		end
 		if selectedTower then
 			updateTowerDetails(selectedTower)

@@ -818,6 +818,9 @@ function WaveService:SetupPlayer(player)
     self.PlayerStats[player] = { Money = 350, Lives = self.BaseHealth }
     self.Remotes.MoneyChanged:FireClient(player, self.PlayerStats[player].Money)
     self.Remotes.LivesChanged:FireClient(player, self.BaseHealth)
+    if self.TowerService and self.TowerService.SendTowerCounts then
+        self.TowerService:SendTowerCounts(player)
+    end
 end
 
 function WaveService:GetPlayerStats(player)

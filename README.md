@@ -546,6 +546,8 @@ TowerConfigs.OverallPlacementLimit = {
 
 Leave either key out (or `nil`) to disable that specific restriction—for example, set only `Global` to enforce a shared limit while allowing players to claim as many slots as the lobby permits.
 
+Creators and testers can see these limits in action inside the game. Each shop slot now shows `You` and `Team` counters so you can track how many copies of that tower are in play versus the configured caps, and the status panel lists the same totals for every tower you have placed overall. The numbers update immediately whenever anyone places or sells a tower, making it easy to spot who is approaching a limit before the server rejects a placement.
+
 ### Tower upgrade model swaps
 
 Swapping tower visuals no longer requires scripting. Add any of the following fields to an upgrade table inside [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) and the server will rebuild the tower with the new geometry as soon as the purchase completes:
