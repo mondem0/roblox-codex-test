@@ -611,13 +611,30 @@ function AbilityHandlers.SpawnUnits(self, enemyModel, enemyData, abilityEntry)
                         break
                     end
 
-                    local spawnProgress = self:ClampProgress(baseProgress + progressOffset + spacing * (index - 1))
+                    if not (enemyModel and enemyModel.Parent) then
+                        break
+                    end
+
+                    local sourceData = enemyData
+                    if not (sourceData and self.Enemies[enemyModel] == sourceData) then
+                        sourceData = self.Enemies[enemyModel]
+                    end
+
+                    local currentProgress = baseProgress
+                    if sourceData and sourceData.Progress then
+                        currentProgress = sourceData.Progress
+                    end
+
+                    local spawnProgress = self:ClampProgress(currentProgress + progressOffset + spacing * (index - 1))
                     local spawnOptions = {
                         Progress = spawnProgress,
                         SkipSpawnSound = not useSpawnSound,
                     }
 
-                    if baseCFrame and not hasPathWaypoints then
+                    local sourcePrimary = enemyModel.PrimaryPart
+                    if sourcePrimary then
+                        spawnOptions.CFrame = sourcePrimary.CFrame
+                    elseif baseCFrame and not hasPathWaypoints then
                         spawnOptions.CFrame = baseCFrame
                     end
 
