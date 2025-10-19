@@ -265,6 +265,24 @@ local function getEnemySpeed(enemyData)
     return speed
 end
 
+local function appendAbilityEntry(destination, typeHint, abilityConfig)
+    if type(abilityConfig) ~= "table" then
+        return
+    end
+
+    if abilityConfig[1] ~= nil and not abilityConfig.Type and not abilityConfig.Ability then
+        for _, nestedConfig in ipairs(abilityConfig) do
+            appendAbilityEntry(destination, typeHint, nestedConfig)
+        end
+        return
+    end
+
+    local entry = normalizeAbilityEntry(typeHint, abilityConfig)
+    if entry then
+        table.insert(destination, entry)
+    end
+end
+
 local function normalizeAbilities(rawAbilities)
     if type(rawAbilities) ~= "table" then
         return nil
@@ -274,17 +292,11 @@ local function normalizeAbilities(rawAbilities)
 
     if #rawAbilities > 0 then
         for _, abilityConfig in ipairs(rawAbilities) do
-            local entry = normalizeAbilityEntry(abilityConfig and (abilityConfig.Type or abilityConfig.Ability), abilityConfig)
-            if entry then
-                table.insert(normalized, entry)
-            end
+            appendAbilityEntry(normalized, abilityConfig and (abilityConfig.Type or abilityConfig.Ability), abilityConfig)
         end
     else
         for key, abilityConfig in pairs(rawAbilities) do
-            local entry = normalizeAbilityEntry(key, abilityConfig)
-            if entry then
-                table.insert(normalized, entry)
-            end
+            appendAbilityEntry(normalized, key, abilityConfig)
         end
     end
 

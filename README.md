@@ -272,7 +272,7 @@ EnemyConfigs.FrostWarden = {
 
 ##### Health-based abilities
 
-Hook mid-fight behaviour to an enemy by adding an `Abilities` table. Each entry fires once when the enemy’s remaining HP falls below the configured threshold. The table accepts either an array of ability descriptors (each with a `Type` field) or a dictionary keyed by ability name:
+Hook mid-fight behaviour to an enemy by adding an `Abilities` table. Each entry fires once when the enemy’s remaining HP falls below the configured threshold. The table accepts either an array of ability descriptors (each with a `Type` field) or a dictionary keyed by ability name. When using the dictionary style, supply either a single table (for one trigger) or an array of tables to fire the same ability multiple times at different health values:
 
 * `SkipWaypoints` &mdash; warps the enemy ahead on the path.
   * Use `TriggerPercent`, `TriggerHealth`, or their aliases (`Trigger`, `Percent`, `Threshold`, etc.) to choose when the warp happens. Percent values above `1` are treated as percentages (for example `50` becomes `0.5`).
@@ -282,7 +282,7 @@ Hook mid-fight behaviour to an enemy by adding an `Abilities` table. Each entry 
 * `StunPulse` &mdash; emits a tower-stunning shockwave while the enemy is still alive.
   * Accepts the same fields as `TowerStunOnDeath` (`Radius`, `Duration`, `PulseSound`, `Sound`, `EffectColor`, etc.) plus the trigger fields listed above. Towers caught inside the pulse freeze exactly like the Frost Warden’s death blast.
 
-The new Riftbreaker boss demonstrates both abilities:
+The new Riftbreaker boss demonstrates both abilities, including multiple warp and stun triggers:
 
 ```lua
 EnemyConfigs.Riftbreaker = {
@@ -294,44 +294,69 @@ EnemyConfigs.Riftbreaker = {
     DebuffImmunities = { Slow = true },
     Abilities = {
         SkipWaypoints = {
-            TriggerPercent = 50, -- 50% health
-            SkipCount = 2,
-            Pathfind = true,
-            Sound = {
-                SoundId = "rbxassetid://1234567901",
-                Volume = 1.1,
-                StartTime = 0.2,
+            {
+                TriggerPercent = 65, -- 65% health
+                SkipCount = 1,
+                Pathfind = true,
+                Sound = {
+                    SoundId = "rbxassetid://1234567901",
+                    Volume = 1.1,
+                    StartTime = 0.2,
+                },
+            },
+            {
+                TriggerPercent = 35, -- 35% health
+                SkipCount = 2,
+                Pathfind = true,
+                Sound = {
+                    SoundId = "rbxassetid://1234567905",
+                    Volume = 1.05,
+                },
+                SoundName = "RiftbreakerWarp",
             },
         },
         StunPulse = {
-            TriggerPercent = 25,
-            Radius = 18,
-            Duration = 4.5,
-            EffectColor = { 170, 80, 255 },
-            PulseSound = {
-                SoundId = "rbxassetid://1234567903",
-                Volume = 1.15,
+            {
+                TriggerPercent = 25,
+                Radius = 18,
+                Duration = 4.5,
+                EffectColor = { 170, 80, 255 },
+                PulseSound = {
+                    SoundId = "rbxassetid://1234567903",
+                    Volume = 1.15,
+                },
+                PulseSoundName = "RiftbreakerStunPulse",
+                Sound = {
+                    SoundId = "rbxassetid://1234567902",
+                    Volume = 1.15,
+                    StartTime = 0.35,
+                },
+                SoundName = "RiftbreakerStun",
             },
-            PulseSoundName = "RiftbreakerStunPulse",
-            Sound = {
-                SoundId = "rbxassetid://1234567902",
-                Volume = 1.15,
-                StartTime = 0.35,
+            {
+                TriggerPercent = 10,
+                Radius = 22,
+                Duration = 6,
+                EffectColor = { 255, 120, 220 },
+                PulseSoundName = "RiftbreakerFinalPulse",
+                Sound = "rbxassetid://1234567904",
             },
-            SoundName = "RiftbreakerStun",
         },
     },
 }
 ```
 
-Because abilities live entirely in the config table, you can mix and match them on any enemy without writing new code. For example, to let the classic Boss1 leap forward once at 60% HP you only need:
+Because abilities live entirely in the config table, you can mix and match them on any enemy without writing new code. For example, to let the classic Boss1 leap forward twice and unleash a pair of pulses you only need:
 
 ```lua
 EnemyConfigs.Boss1.Abilities = {
     SkipWaypoints = {
-        TriggerPercent = 60,
-        SkipCount = 1,
-        Pathfind = false,
+        { TriggerPercent = 60, SkipCount = 1, Pathfind = false },
+        { TriggerPercent = 30, SkipCount = 1, Pathfind = false },
+    },
+    StunPulse = {
+        { TriggerPercent = 45, Radius = 10, Duration = 3 },
+        { TriggerPercent = 15, Radius = 14, Duration = 4 },
     },
 }
 ```
@@ -345,7 +370,7 @@ EnemyConfigs.Boss1.Abilities = {
 }
 ```
 
-Every ability in the table triggers independently, so bosses can warp multiple times, add new resistances, or unleash support effects at different health thresholds.
+Every ability in the table triggers independently, so bosses can warp multiple times, add new resistances, or unleash support effects at different health thresholds. Mixing single entries and arrays lets you stack as many triggers as you need without writing additional code.
 
 ### Creating or editing waves
 

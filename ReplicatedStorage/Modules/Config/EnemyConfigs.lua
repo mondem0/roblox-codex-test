@@ -81,32 +81,53 @@ local EnemyConfigs = {
         },
         Abilities = {
             SkipWaypoints = {
-                TriggerPercent = 50,
-                SkipCount = 2,
-                Pathfind = true,
-                Sound = {
-                    SoundId = "rbxassetid://1234567901",
-                    Volume = 1.1,
-                    StartTime = 0.2,
+                {
+                    TriggerPercent = 65,
+                    SkipCount = 1,
+                    Pathfind = true,
+                    Sound = {
+                        SoundId = "rbxassetid://1234567901",
+                        Volume = 1.1,
+                        StartTime = 0.2,
+                    },
                 },
-                SoundName = "RiftbreakerWarp",
+                {
+                    TriggerPercent = 35,
+                    SkipCount = 2,
+                    Pathfind = true,
+                    Sound = {
+                        SoundId = "rbxassetid://1234567905",
+                        Volume = 1.05,
+                    },
+                    SoundName = "RiftbreakerWarp",
+                },
             },
             StunPulse = {
-                TriggerPercent = 25,
-                Radius = 18,
-                Duration = 4.5,
-                EffectColor = { 170, 80, 255 },
-                PulseSound = {
-                    SoundId = "rbxassetid://1234567903",
-                    Volume = 1.15,
+                {
+                    TriggerPercent = 25,
+                    Radius = 18,
+                    Duration = 4.5,
+                    EffectColor = { 170, 80, 255 },
+                    PulseSound = {
+                        SoundId = "rbxassetid://1234567903",
+                        Volume = 1.15,
+                    },
+                    PulseSoundName = "RiftbreakerStunPulse",
+                    Sound = {
+                        SoundId = "rbxassetid://1234567902",
+                        Volume = 1.15,
+                        StartTime = 0.35,
+                    },
+                    SoundName = "RiftbreakerStun",
                 },
-                PulseSoundName = "RiftbreakerStunPulse",
-                Sound = {
-                    SoundId = "rbxassetid://1234567902",
-                    Volume = 1.15,
-                    StartTime = 0.35,
+                {
+                    TriggerPercent = 10,
+                    Radius = 22,
+                    Duration = 6,
+                    EffectColor = { 255, 120, 220 },
+                    PulseSoundName = "RiftbreakerFinalPulse",
+                    Sound = "rbxassetid://1234567904",
                 },
-                SoundName = "RiftbreakerStun",
             },
         },
     },
