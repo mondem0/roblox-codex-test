@@ -150,6 +150,7 @@ function WaveService.new(mapModel, remotes)
     self.PlayerStats = {}
     self.LastTick = tick()
     self.GameEnded = false
+    self.TowerService = nil
 
     local towersFolder = Instance.new("Folder")
     towersFolder.Name = "Towers"
@@ -172,6 +173,10 @@ function WaveService.new(mapModel, remotes)
     end)
 
     return self
+end
+
+function WaveService:SetTowerService(towerService)
+    self.TowerService = towerService
 end
 
 function WaveService:SetupPlayer(player)
@@ -297,6 +302,7 @@ function WaveService:KillEnemy(enemyModel, enemyData)
             self:AdjustMoney(player, reward)
         end
 
+        self:ApplyTowerStunOnDeath(enemyConfig, enemyModel)
         self:SpawnSplitChildren(enemyConfig, enemyData, enemyModel)
 
         enemyModel:Destroy()
@@ -483,6 +489,54 @@ function WaveService:GetPathCFrame(progress)
     local alpha = clampedProgress - index
     local position = startPos:Lerp(endPos, alpha)
     return CFrame.new(position, endPos)
+end
+
+function WaveService:ApplyTowerStunOnDeath(enemyConfig, enemyModel)
+    if not self.TowerService or not enemyConfig then
+        return
+    end
+
+    local stunConfig = enemyConfig.TowerStunOnDeath or enemyConfig.StunTowersOnDeath or enemyConfig.StunOnDeath
+    if type(stunConfig) ~= "table" then
+        return
+    end
+
+    local radius = tonumber(stunConfig.Radius or stunConfig.Range or stunConfig[1])
+    local duration = tonumber(stunConfig.Duration or stunConfig.Time or stunConfig.Length or stunConfig[2])
+    if not radius or radius <= 0 or not duration or duration <= 0 then
+        return
+    end
+
+    local position
+    if enemyModel and enemyModel.PrimaryPart then
+        position = enemyModel.PrimaryPart.Position
+    elseif enemyModel then
+        local pivot = enemyModel:GetPivot()
+        if pivot then
+            position = pivot.Position
+        end
+    end
+
+    if not position then
+        return
+    end
+
+    local options = {
+        Freeze = stunConfig.Freeze,
+        Loop = stunConfig.Loop,
+    }
+
+    local soundConfig = stunConfig.Sound or stunConfig.StunSound
+    if soundConfig then
+        options.Sound = soundConfig
+    end
+
+    local soundName = stunConfig.SoundName or stunConfig.SoundLabel
+    if soundName and soundName ~= "" then
+        options.SoundName = soundName
+    end
+
+    self.TowerService:ApplyTowerStun(position, radius, duration, options)
 end
 
 function WaveService:SpawnSplitChildren(enemyConfig, enemyData, enemyModel)

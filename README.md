@@ -188,6 +188,40 @@ EnemyConfigs.Broodmother = {
 
 The sample waves now include a late-game Broodmother pack so you can see the split behavior in action.
 
+##### Stunning towers on death
+
+Add `TowerStunOnDeath` (alias `StunTowersOnDeath`) to give an enemy a disabling shockwave when it dies. Towers caught inside the configured radius immediately stop firing, keep their current rotation, and gain a `Stunned` attribute until the timer expires. The wave service also plays a looping sound from each stunned tower so players know the defense is disabled.
+
+Supported fields inside the stun table:
+
+* `Radius` &mdash; distance (in studs) around the dying enemy that should be affected (required).
+* `Duration` &mdash; how long the stun lasts in seconds (required).
+* `Sound` or `StunSound` &mdash; optional sound descriptor to loop from every stunned tower. Use the same format as other sound fields (`rbxassetid://...`, a table of `Sound` properties, or a `Sound` instance).
+* `SoundName` &mdash; optional custom name applied to the looping sound instance.
+* `Loop` &mdash; set to `false` if you prefer a one-shot cue; the default automatically loops while the tower is stunned.
+* `Freeze` &mdash; set to `false` to let towers keep rotating while stunned. By default towers are frozen in place and cannot turn until the effect ends.
+
+```lua
+EnemyConfigs.FrostWarden = {
+    Name = "Frost Warden",
+    ModelName = "FrostWarden",
+    Health = 380,
+    Speed = 10,
+    Reward = 140,
+    TowerStunOnDeath = {
+        Radius = 14,
+        Duration = 4.5,
+        Sound = {
+            SoundId = "rbxassetid://1234567896",
+            Volume = 0.95,
+        },
+        SoundName = "FrostWardenStun",
+    },
+}
+```
+
+> Towers resume firing once the stun timer expires, and any looping sounds are automatically stopped and destroyed when the effect ends or the tower is sold.
+
 ### Creating or editing waves
 
 1. Open **`WaveConfigs`**. The module now exposes a small helper named `AddWave` that registers each wave, assigns it both a numeric index, and stores optional metadata such as rewards or descriptions.
@@ -247,6 +281,10 @@ EnemyConfigs.Shielder = {
 }
 ```
 
+### Tower stun loops
+
+Assign `Sound` (or `StunSound`) inside an enemy’s `TowerStunOnDeath` table to play a looping cue from every stunned tower while the effect is active. Sounds use the same descriptor format shown above and default to looping; include `Loop = false` inside the stun table if you only want a single playback.
+
 ### Tower fire sounds
 
 Set `FireSound` on a tower inside [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) to trigger audio each time the tower attacks. Upgrades can override the base sound by defining their own `FireSound` entry—otherwise the tower keeps using the previous value.
@@ -281,8 +319,8 @@ Leave any of these fields `nil` to disable the corresponding cue. The helper aut
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
 * **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
-* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
-* **Waves**: Seven sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the new late-game wave showcases Broodmothers splitting into fresh attackers.
+* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), Frost Wardens (collapse into tower-stunning pulses), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
+* **Waves**: Eight sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the final sample wave highlights Frost Wardens stunning nearby towers when they fall.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 * **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.

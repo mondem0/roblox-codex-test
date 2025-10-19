@@ -62,6 +62,22 @@ local EnemyConfigs = {
             Volume = 1.3,
         },
     },
+    FrostWarden = {
+        Name = "Frost Warden",
+        ModelName = "FrostWarden",
+        Health = 380,
+        Speed = 10,
+        Reward = 140,
+        TowerStunOnDeath = {
+            Radius = 14,
+            Duration = 4.5,
+            Sound = {
+                SoundId = "rbxassetid://1234567896",
+                Volume = 0.95,
+            },
+            SoundName = "FrostWardenStun",
+        },
+    },
     Broodling = {
         Name = "Broodling",
         ModelName = "Runner",

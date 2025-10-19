@@ -169,6 +169,30 @@ addWave({
     },
 })
 
+addWave({
+    Name = "wave8",
+    Description = "Frost Warden shockwaves disable towers that collapse too close.",
+    Reward = 280,
+    Groups = {
+        { Type = "FrostWarden", Count = 3, Delay = 3 },
+        {
+            Streams = {
+                { Type = "Runner", Count = 14, Interval = 0.55 },
+                { Type = "FrostWarden", Count = 3, Interval = 3.25, StartDelay = 1.4 },
+            },
+            Delay = 2.2,
+        },
+        {
+            Type = "LightningBoss",
+            Count = 1,
+            Delay = 2.8,
+        },
+    },
+    Metadata = {
+        Notes = "Frost Wardens freeze nearby towers on death—spread your defenses to avoid chain stuns.",
+    },
+})
+
 waves.Definitions = waveDefinitions
 waves.AddWave = addWave
 waves.DefaultNamePattern = defaultNamePattern
