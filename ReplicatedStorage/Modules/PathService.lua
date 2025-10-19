@@ -41,17 +41,43 @@ function PathService:GetWaypoints(pathFolder)
     return waypoints
 end
 
+local function findPathFolder(mapModel)
+    local direct = mapModel:FindFirstChild("Path")
+    if direct and direct:IsA("Folder") then
+        return direct
+    end
+
+    local descendant = mapModel:FindFirstChild("Path", true)
+    if descendant and descendant:IsA("Folder") then
+        return descendant
+    end
+
+    return nil
+end
+
+local function hasMeaningfulChildren(mapModel)
+    for _, child in ipairs(mapModel:GetChildren()) do
+        -- Ignore temporary folders we create for housekeeping when nothing else exists
+        if child:IsA("BasePart") or child:IsA("Model") or child:IsA("Folder") then
+            return true
+        end
+    end
+    return false
+end
+
 function PathService:CreatePathCache(mapModel)
     local cache = {}
     if not mapModel then
         return cache
     end
 
-    local pathFolder = mapModel:FindFirstChild("Path")
+    local pathFolder = findPathFolder(mapModel)
     if pathFolder then
         cache.Waypoints = self:GetWaypoints(pathFolder)
     else
-        warn("Map missing Path folder")
+        if hasMeaningfulChildren(mapModel) then
+            warn("Map missing Path folder")
+        end
         cache.Waypoints = {}
     end
 
