@@ -154,6 +154,44 @@ local EnemyConfigs = {
             EffectColor = { 130, 220, 255 },
         },
     },
+    Warcaller = {
+        Name = "Aether Warcaller",
+        ModelName = "Warcaller",
+        Health = 520,
+        Speed = 10,
+        Reward = 185,
+        SpawnSound = {
+            SoundId = "rbxassetid://1234567906",
+            Volume = 1.15,
+            StartTime = 0.2,
+        },
+        DeathSound = {
+            SoundId = "rbxassetid://1234567907",
+            Volume = 1.2,
+        },
+        Abilities = {
+            SpawnUnits = {
+                {
+                    TriggerPercent = 70,
+                    Spawns = {
+                        { Type = "Runner", Count = 3, OffsetRadius = 4, PlaySpawnSound = true },
+                        { Type = "Grunt", Count = 2, ProgressOffset = -0.03 },
+                    },
+                    ProgressSpacing = 0.025,
+                },
+                {
+                    TriggerPercent = 40,
+                    Spawns = {
+                        { Type = "Shade", Count = 2, OffsetRadius = 5, PlaySpawnSound = true },
+                        { Type = "Broodling", Count = 3, ProgressSpacing = 0.035 },
+                    },
+                    Interval = 0.3,
+                    StartDelay = 0.6,
+                    ProgressOffset = 0.02,
+                },
+            },
+        },
+    },
     Shade = {
         Name = "Umbral Shade",
         ModelName = "Shade",

@@ -1,4 +1,8 @@
 local TowerConfigs = {
+    OverallPlacementLimit = {
+        PerPlayer = 40,
+        Global = 120,
+    },
     Archer = {
         Name = "Archer",
         ModelName = "Archer",

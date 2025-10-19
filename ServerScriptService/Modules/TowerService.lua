@@ -10,6 +10,7 @@ local TOWER_BASE_HALF_SIZE = 2
 local DEFAULT_BASE_SIZE = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
 local TowerFootprints = {}
 local TowerLimits = {}
+local OverallPlacementLimitCache
 
 local function sanitizeLimitValue(value)
     local numeric = tonumber(value)
@@ -78,6 +79,78 @@ end
 
 local function getPlacementLimit(towerType)
     local limit = resolvePlacementLimit(towerType)
+    if not limit then
+        return nil
+    end
+
+    return limit
+end
+
+local function resolveOverallPlacementLimit()
+    if OverallPlacementLimitCache ~= nil then
+        if OverallPlacementLimitCache == false then
+            return nil
+        end
+        return OverallPlacementLimitCache
+    end
+
+    local settings =
+        TowerConfigs.OverallPlacementLimit
+        or (TowerConfigs.Placement and TowerConfigs.Placement.OverallLimit)
+        or (TowerConfigs.Settings and (
+            TowerConfigs.Settings.OverallPlacementLimit
+            or TowerConfigs.Settings.OverallLimit
+        ))
+
+    local limit
+
+    if typeof(settings) == "number" then
+        local perPlayer = sanitizeLimitValue(settings)
+        if perPlayer then
+            limit = {
+                PerPlayer = perPlayer,
+            }
+        end
+    elseif typeof(settings) == "table" then
+        local perPlayer = settings.PerPlayer
+            or settings.perPlayer
+            or settings.Player
+            or settings.PlayerLimit
+            or settings.MaxPerPlayer
+            or settings.MaxOwned
+
+        local globalLimit = settings.Global
+            or settings.global
+            or settings.Total
+            or settings.total
+            or settings.GlobalLimit
+            or settings.MaxGlobal
+            or settings.MaxTotal
+
+        perPlayer = sanitizeLimitValue(perPlayer)
+        globalLimit = sanitizeLimitValue(globalLimit)
+
+        local normalized = {}
+
+        if perPlayer then
+            normalized.PerPlayer = perPlayer
+        end
+
+        if globalLimit then
+            normalized.Global = globalLimit
+        end
+
+        if next(normalized) then
+            limit = normalized
+        end
+    end
+
+    OverallPlacementLimitCache = limit or false
+    return limit
+end
+
+local function getOverallPlacementLimit()
+    local limit = resolveOverallPlacementLimit()
     if not limit then
         return nil
     end
@@ -244,6 +317,7 @@ function TowerService.new(mapModel, waveService, remotes)
     self.Towers = {}
 
     TowerLimits = {}
+    OverallPlacementLimitCache = nil
 
     if waveService and typeof(waveService) == "table" and waveService.SetTowerService then
         waveService:SetTowerService(self)
@@ -450,7 +524,38 @@ function TowerService:GetTowerCount(towerType, player)
     return count
 end
 
+function TowerService:GetOverallTowerCount(player)
+    local count = 0
+
+    for _, towerData in pairs(self.Towers) do
+        if towerData then
+            if not player or towerData.Player == player then
+                count += 1
+            end
+        end
+    end
+
+    return count
+end
+
 function TowerService:HasReachedTowerLimit(player, towerType)
+    local overallLimit = getOverallPlacementLimit()
+    if overallLimit then
+        if overallLimit.PerPlayer and player then
+            local ownedTotal = self:GetOverallTowerCount(player)
+            if ownedTotal >= overallLimit.PerPlayer then
+                return true
+            end
+        end
+
+        if overallLimit.Global then
+            local totalPlaced = self:GetOverallTowerCount()
+            if totalPlaced >= overallLimit.Global then
+                return true
+            end
+        end
+    end
+
     local limit = getPlacementLimit(towerType)
     if not limit then
         return false
@@ -1111,6 +1216,7 @@ function TowerService:Reset()
     self.Towers = {}
 
     TowerLimits = {}
+    OverallPlacementLimitCache = nil
 end
 
 return TowerService

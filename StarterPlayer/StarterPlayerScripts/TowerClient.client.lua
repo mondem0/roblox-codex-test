@@ -641,62 +641,66 @@ local function applyLoadoutToShop()
 end
 
 local function populateTowerSelectionButtons()
-	if not selectionTowerList then
-		return
-	end
+        if not selectionTowerList then
+                return
+        end
 
-	for _, child in ipairs(selectionTowerList:GetChildren()) do
-		if child:GetAttribute("TowerClientGenerated") then
-			child:Destroy()
-		end
-	end
+        for _, child in ipairs(selectionTowerList:GetChildren()) do
+                if child:GetAttribute("TowerClientGenerated") then
+                        child:Destroy()
+                end
+        end
 
-	local keys = {}
-	for towerType in pairs(towerConfigs) do
-		table.insert(keys, towerType)
-	end
+        local keys = {}
+        for towerType, config in pairs(towerConfigs) do
+                if typeof(config) == "table" and config.Cost then
+                        table.insert(keys, towerType)
+                end
+        end
 
-	table.sort(keys, function(a, b)
-		local configA = towerConfigs[a]
-		local configB = towerConfigs[b]
-		local orderA = configA and configA.SelectionOrder or math.huge
-		local orderB = configB and configB.SelectionOrder or math.huge
-		if orderA ~= orderB then
-			return orderA < orderB
-		end
-		local nameA = configA and configA.Name or a
-		local nameB = configB and configB.Name or b
-		return tostring(nameA) < tostring(nameB)
-	end)
+        table.sort(keys, function(a, b)
+                local configA = towerConfigs[a]
+                local configB = towerConfigs[b]
+                local orderA = configA and configA.SelectionOrder or math.huge
+                local orderB = configB and configB.SelectionOrder or math.huge
+                if orderA ~= orderB then
+                        return orderA < orderB
+                end
+                local nameA = configA and configA.Name or a
+                local nameB = configB and configB.Name or b
+                return tostring(nameA) < tostring(nameB)
+        end)
 
-	for _, towerType in ipairs(keys) do
-		local config = towerConfigs[towerType]
-local button = Instance.new("TextButton")
-button.Name = string.format("%sSelectButton", towerType)
-button.Size = UDim2.fromOffset(500, 56)
-		button.Position = UDim2.new(0, 5, 0, 0)
-		button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
-		button.BorderSizePixel = 0
-		button.TextColor3 = Color3.new(1, 1, 1)
-		button.Font = Enum.Font.Gotham
-button.TextSize = 20
-		button.AutoButtonColor = true
-		button.LayoutOrder = typeof(config.SelectionOrder) == "number" and config.SelectionOrder or 0
-		button.Parent = selectionTowerList
-		button:SetAttribute("TowerType", towerType)
-		button:SetAttribute("TowerClientGenerated", true)
-		button.Text = config.Name or towerType
+        for _, towerType in ipairs(keys) do
+                local config = towerConfigs[towerType]
+                if typeof(config) == "table" and config.Cost then
+                        local button = Instance.new("TextButton")
+                        button.Name = string.format("%sSelectButton", towerType)
+                        button.Size = UDim2.fromOffset(500, 56)
+                        button.Position = UDim2.new(0, 5, 0, 0)
+                        button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+                        button.BorderSizePixel = 0
+                        button.TextColor3 = Color3.new(1, 1, 1)
+                        button.Font = Enum.Font.Gotham
+                        button.TextSize = 20
+                        button.AutoButtonColor = true
+                        button.LayoutOrder = typeof(config.SelectionOrder) == "number" and config.SelectionOrder or 0
+                        button.Parent = selectionTowerList
+                        button:SetAttribute("TowerType", towerType)
+                        button:SetAttribute("TowerClientGenerated", true)
+                        button.Text = config.Name or towerType
 
-		button.MouseButton1Click:Connect(function()
-			local slotIndex = selectionActiveSlot or findFirstEmptySlot() or 1
-			assignTowerToSlot(slotIndex, towerType)
-		end)
-	end
+                        button.MouseButton1Click:Connect(function()
+                                local slotIndex = selectionActiveSlot or findFirstEmptySlot() or 1
+                                assignTowerToSlot(slotIndex, towerType)
+                        end)
+                end
+        end
 
-	local layout = selectionTowerList:FindFirstChildWhichIsA("UIListLayout")
-	if selectionTowerList:IsA("ScrollingFrame") and layout then
-		selectionTowerList.CanvasSize = UDim2.fromOffset(0, layout.AbsoluteContentSize.Y + 10)
-	end
+        local layout = selectionTowerList:FindFirstChildWhichIsA("UIListLayout")
+        if selectionTowerList:IsA("ScrollingFrame") and layout then
+                selectionTowerList.CanvasSize = UDim2.fromOffset(0, layout.AbsoluteContentSize.Y + 10)
+        end
 end
 
 local function createSelectionGui()
@@ -968,11 +972,11 @@ local function resolveTowerType(towerModel)
 		return towerType
 	end
 
-	for key, config in pairs(towerConfigs) do
-		if config.Name == towerModel.Name then
-			return key
-		end
-	end
+        for key, config in pairs(towerConfigs) do
+                if typeof(config) == "table" and config.Cost and config.Name == towerModel.Name then
+                        return key
+                end
+        end
 
 	return nil
 end

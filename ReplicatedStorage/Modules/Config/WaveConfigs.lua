@@ -249,6 +249,37 @@ addWave({
     },
 })
 
+addWave({
+    Name = "wave11",
+    Description = "Warcallers rally reinforcements while other elites close in.",
+    Reward = 480,
+    Groups = {
+        {
+            Streams = {
+                { Type = "Warcaller", Count = 2, Interval = 2.6 },
+                { Type = "Runner", Count = 12, Interval = 0.55, StartDelay = 0.9 },
+            },
+            Delay = 2.1,
+        },
+        {
+            Type = "Warcaller",
+            Count = 1,
+            Delay = 3.1,
+        },
+        {
+            Streams = {
+                { Type = "Shade", Count = 8, Interval = 0.85 },
+                { Type = "Warcaller", Count = 1, Interval = 2.4, StartDelay = 1.3 },
+                { Type = "Broodmother", Count = 2, Interval = 3.4, StartDelay = 2 },
+            },
+            Delay = 3.2,
+        },
+    },
+    Metadata = {
+        Notes = "Each Warcaller spawns waves of support at 70% and 40% health—burst them down before the reinforcements overwhelm you.",
+    },
+})
+
 waves.Definitions = waveDefinitions
 waves.AddWave = addWave
 waves.DefaultNamePattern = defaultNamePattern

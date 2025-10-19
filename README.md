@@ -281,6 +281,10 @@ Hook mid-fight behaviour to an enemy by adding an `Abilities` table. Each entry 
   * Supply `SpeedMultiplier` / `SpeedBoost` to accelerate (or slow) the dash, and `Sound` / `SoundId` to play an effect as the warp begins.
 * `StunPulse` &mdash; emits a tower-stunning shockwave while the enemy is still alive.
   * Accepts the same fields as `TowerStunOnDeath` (`Radius`, `Duration`, `PulseSound`, `Sound`, `EffectColor`, etc.) plus the trigger fields listed above. Towers caught inside the pulse freeze exactly like the Frost Warden’s death blast.
+* `SpawnUnits` &mdash; summons additional enemies the moment the trigger fires.
+  * Provide a `Spawns` table (or use the ability table directly) that mirrors the `SplitChildren` structure: list each child’s `Type`, optional `Count`, `ProgressOffset`, `ProgressSpacing`, `OffsetRadius`, and `PlaySpawnSound` flags.
+  * Ability-level fields such as `ProgressOffset`, `ProgressSpacing`, `Offset`, `OffsetRadius`, `Interval`, and `StartDelay` act as defaults for every spawn entry. Per-entry values override the defaults when you need a specific burst to behave differently.
+  * Set `Interval`/`SpawnInterval` to drip units out over time or `StartDelay`/`InitialDelay` to pause before the first reinforcement appears. Leave both at `0` to summon the entire pack instantly.
 
 The new Riftbreaker boss demonstrates both abilities, including multiple warp and stun triggers:
 
@@ -357,6 +361,40 @@ EnemyConfigs.Boss1.Abilities = {
     StunPulse = {
         { TriggerPercent = 45, Radius = 10, Duration = 3 },
         { TriggerPercent = 15, Radius = 14, Duration = 4 },
+    },
+}
+```
+
+The Aether Warcaller demonstrates the new summon ability—each health threshold pulls in a different reinforcement pack while sharing defaults for spawn spacing and delays:
+
+```lua
+EnemyConfigs.Warcaller = {
+    Name = "Aether Warcaller",
+    ModelName = "Warcaller",
+    Health = 520,
+    Speed = 10,
+    Reward = 185,
+    Abilities = {
+        SpawnUnits = {
+            {
+                TriggerPercent = 70,
+                ProgressSpacing = 0.025,
+                Spawns = {
+                    { Type = "Runner", Count = 3, OffsetRadius = 4, PlaySpawnSound = true },
+                    { Type = "Grunt", Count = 2, ProgressOffset = -0.03 },
+                },
+            },
+            {
+                TriggerPercent = 40,
+                StartDelay = 0.6,
+                Interval = 0.3,
+                ProgressOffset = 0.02,
+                Spawns = {
+                    { Type = "Shade", Count = 2, OffsetRadius = 5, PlaySpawnSound = true },
+                    { Type = "Broodling", Count = 3, ProgressSpacing = 0.035 },
+                },
+            },
+        },
     },
 }
 ```
@@ -496,6 +534,17 @@ TowerConfigs.Cannon = {
 
 Omit the field or set it to `nil` when you want unlimited copies of a tower type.
 
+To apply a hard cap across *all* towers regardless of type, set `TowerConfigs.OverallPlacementLimit` at the top of [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua). The server checks these values before every placement so the combined total can never exceed your configured ceiling:
+
+```lua
+TowerConfigs.OverallPlacementLimit = {
+    PerPlayer = 40, -- each player may place up to forty towers in total
+    Global = 120,   -- no more than one hundred twenty towers across the entire match
+}
+```
+
+Leave either key out (or `nil`) to disable that specific restriction—for example, set only `Global` to enforce a shared limit while allowing players to claim as many slots as the lobby permits.
+
 ### Tower upgrade model swaps
 
 Swapping tower visuals no longer requires scripting. Add any of the following fields to an upgrade table inside [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) and the server will rebuild the tower with the new geometry as soon as the purchase completes:
@@ -537,8 +586,8 @@ Make sure those upgrade models exist under `ReplicatedStorage/Assets/Towers` (or
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
 * **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
-* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), Frost Wardens (collapse into tower-stunning pulses), Shades (stealthed units that only hidden-detection towers can hit), and three boss variants (Boss1, LightningBoss, and the new Riftbreaker that warps ahead mid-fight and stuns towers at low health). These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
-* **Waves**: Ten sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the finale showcases Riftbreaker’s mid-fight waypoint skip alongside hidden Shades and tower-stunning support units.
+* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), Frost Wardens (collapse into tower-stunning pulses), Shades (stealthed units that only hidden-detection towers can hit), Warcallers (summon reinforcements with `SpawnUnits` abilities), and three boss variants (Boss1, LightningBoss, and the Riftbreaker that warps ahead mid-fight and stuns towers at low health). These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
+* **Waves**: Eleven sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the later encounters showcase Riftbreaker’s mid-fight waypoint skip alongside hidden Shades, tower-stunning support units, and Warcallers that spawn extra attackers while under fire.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 * **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.

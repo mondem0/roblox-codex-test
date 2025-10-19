@@ -128,6 +128,74 @@ local function shallowCopyTable(source)
     return copy
 end
 
+local function normalizeSpawnEntries(raw)
+    if type(raw) ~= "table" then
+        return nil
+    end
+
+    local collected = {}
+
+    if #raw > 0 then
+        for _, entry in ipairs(raw) do
+            if type(entry) == "string" then
+                table.insert(collected, { Type = entry })
+            elseif type(entry) == "table" then
+                local copy = shallowCopyTable(entry)
+                copy.Type = copy.Type or copy.Enemy or copy[1]
+                if type(copy.Type) == "string" then
+                    table.insert(collected, copy)
+                end
+            end
+        end
+    else
+        for key, entry in pairs(raw) do
+            if type(key) == "string" then
+                if type(entry) == "number" then
+                    table.insert(collected, { Type = key, Count = entry })
+                elseif type(entry) == "table" then
+                    local copy = shallowCopyTable(entry)
+                    copy.Type = copy.Type or copy.Enemy or key
+                    if type(copy.Type) == "string" then
+                        table.insert(collected, copy)
+                    end
+                elseif entry == true then
+                    table.insert(collected, { Type = key, Count = 1 })
+                end
+            end
+        end
+    end
+
+    if #collected == 0 then
+        return nil
+    end
+
+    local normalized = {}
+    for _, entry in ipairs(collected) do
+        local enemyType = entry.Type or entry.Enemy or entry[1]
+        if type(enemyType) == "string" then
+            local copy = shallowCopyTable(entry)
+            copy.Type = enemyType
+
+            local countValue = copy.Count or copy.Quantity or copy.Amount or entry[2]
+            countValue = tonumber(countValue)
+            if not countValue or countValue < 1 then
+                countValue = 1
+            else
+                countValue = math.floor(countValue)
+            end
+            copy.Count = math.max(1, countValue)
+
+            table.insert(normalized, copy)
+        end
+    end
+
+    if #normalized == 0 then
+        return nil
+    end
+
+    return normalized
+end
+
 local function setModelPrimaryCFrame(enemyModel, primary, cframe, partOffsets)
     if not (enemyModel and primary and cframe) then
         return
@@ -191,6 +259,8 @@ local function normalizeAbilityType(rawType)
         return "SkipWaypoints"
     elseif lowered == "stunpulse" or lowered == "stun" or lowered == "towerstun" or lowered == "stunability" then
         return "StunPulse"
+    elseif lowered == "spawnunits" or lowered == "spawn" or lowered == "summon" or lowered == "summonunits" or lowered == "callreinforcements" then
+        return "SpawnUnits"
     end
 
     return nil
@@ -233,8 +303,23 @@ local function normalizeAbilityEntry(typeHint, abilityConfig)
             triggerPercent = 0.5
         elseif abilityType == "StunPulse" then
             triggerPercent = 0.25
+        elseif abilityType == "SpawnUnits" then
+            triggerPercent = 0.75
         end
     end
+
+    configCopy.TriggerHealthPercent = nil
+    configCopy.TriggerPercent = nil
+    configCopy.HealthPercent = nil
+    configCopy.Percent = nil
+    configCopy.TriggerAtPercent = nil
+    configCopy.Trigger = nil
+    configCopy.ThresholdPercent = nil
+    configCopy.TriggerHealth = nil
+    configCopy.Health = nil
+    configCopy.TriggerValue = nil
+    configCopy.TriggerAtHealth = nil
+    configCopy.Threshold = nil
 
     return {
         Type = abilityType,
@@ -389,6 +474,161 @@ function AbilityHandlers.StunPulse(self, enemyModel, enemyData, abilityEntry)
     return self:TriggerStunPulse(config, enemyModel)
 end
 
+function AbilityHandlers.SpawnUnits(self, enemyModel, enemyData, abilityEntry)
+    local config = abilityEntry.Config or {}
+
+    local spawnConfig =
+        config.Spawns
+        or config.Units
+        or config.Enemies
+        or config.Children
+        or config.Summons
+        or config.Spawn
+
+    if not spawnConfig then
+        spawnConfig = config
+    end
+
+    local entries = normalizeSpawnEntries(spawnConfig)
+    if not entries then
+        return false
+    end
+
+    local baseProgress = self:ClampProgress(enemyData and enemyData.Progress or 1)
+    local baseCFrame
+    if enemyModel and enemyModel.PrimaryPart then
+        baseCFrame = enemyModel.PrimaryPart.CFrame
+    end
+    local hasPathWaypoints = self.PathCache and self.PathCache.Waypoints and #self.PathCache.Waypoints > 1
+
+    local defaultProgressOffset = tonumber(config.ProgressOffset or config.OffsetProgress) or 0
+    local defaultSpacing = config.ProgressSpacing or config.Spacing
+    local defaultInterval = tonumber(config.Interval or config.SpawnInterval or config.DelayBetween) or 0
+    if defaultInterval < 0 then
+        defaultInterval = 0
+    end
+    local defaultStartDelay = tonumber(config.StartDelay or config.Delay or config.InitialDelay) or 0
+    if defaultStartDelay < 0 then
+        defaultStartDelay = 0
+    end
+    local defaultOffset = toVector3(config.PositionOffset or config.Offset)
+    local defaultRadius = tonumber(config.OffsetRadius or config.Radius) or 0
+    if defaultRadius < 0 then
+        defaultRadius = 0
+    end
+
+    local defaultPlaySpawnSound
+    if config.PlaySpawnSound ~= nil then
+        defaultPlaySpawnSound = config.PlaySpawnSound == true
+    elseif config.SkipSpawnSound ~= nil then
+        defaultPlaySpawnSound = config.SkipSpawnSound == false
+    end
+
+    for _, entry in ipairs(entries) do
+        local childType = entry.Type
+        local childConfig = childType and EnemyConfigs[childType]
+        if childConfig then
+            local count = math.max(1, tonumber(entry.Count) or 1)
+
+            local progressOffset = entry.ProgressOffset or entry.OffsetProgress
+            if progressOffset == nil then
+                progressOffset = defaultProgressOffset
+            end
+            progressOffset = tonumber(progressOffset) or 0
+
+            local spacing = entry.ProgressSpacing or entry.Spacing
+            if spacing == nil then
+                spacing = defaultSpacing
+            end
+            if spacing == nil and count > 1 then
+                spacing = 0.04
+            end
+            spacing = tonumber(spacing) or 0
+
+            local offsetVector
+            if entry.PositionOffset or entry.Offset then
+                offsetVector = toVector3(entry.PositionOffset or entry.Offset)
+            else
+                offsetVector = defaultOffset
+            end
+
+            local offsetRadius = entry.OffsetRadius or entry.Radius
+            if offsetRadius == nil then
+                offsetRadius = defaultRadius
+            end
+            offsetRadius = tonumber(offsetRadius) or 0
+            if offsetRadius < 0 then
+                offsetRadius = 0
+            end
+
+            local playSpawnSound = entry.PlaySpawnSound
+            if playSpawnSound == nil then
+                if entry.UseSpawnSound ~= nil then
+                    playSpawnSound = entry.UseSpawnSound
+                elseif defaultPlaySpawnSound ~= nil then
+                    playSpawnSound = defaultPlaySpawnSound
+                end
+            end
+            local useSpawnSound = playSpawnSound == true
+
+            local interval = entry.Interval or entry.SpawnInterval or entry.DelayBetween
+            if interval == nil then
+                interval = defaultInterval
+            end
+            interval = tonumber(interval) or 0
+            if interval < 0 then
+                interval = 0
+            end
+
+            local startDelay = entry.StartDelay or entry.Delay or entry.InitialDelay
+            if startDelay == nil then
+                startDelay = defaultStartDelay
+            end
+            startDelay = tonumber(startDelay) or 0
+            if startDelay < 0 then
+                startDelay = 0
+            end
+
+            task.spawn(function()
+                if startDelay > 0 then
+                    task.wait(startDelay)
+                end
+
+                for index = 1, count do
+                    if self.GameEnded then
+                        break
+                    end
+
+                    local spawnProgress = self:ClampProgress(baseProgress + progressOffset + spacing * (index - 1))
+                    local spawnOptions = {
+                        Progress = spawnProgress,
+                        SkipSpawnSound = not useSpawnSound,
+                    }
+
+                    if baseCFrame and not hasPathWaypoints then
+                        spawnOptions.CFrame = baseCFrame
+                    end
+
+                    if offsetVector then
+                        spawnOptions.PositionOffset = offsetVector
+                    elseif offsetRadius > 0 then
+                        local angle = (index - 1) / count * math.pi * 2
+                        spawnOptions.PositionOffset = Vector3.new(math.cos(angle) * offsetRadius, 0, math.sin(angle) * offsetRadius)
+                    end
+
+                    self:SpawnEnemy(childType, childConfig, spawnOptions)
+
+                    if index < count and interval > 0 then
+                        task.wait(interval)
+                    end
+                end
+            end)
+        end
+    end
+
+    return true
+end
+
 function WaveService:NormalizeEnemyAbilities(rawAbilities)
     return normalizeAbilities(rawAbilities)
 end
@@ -471,6 +711,7 @@ local function normalizeImmunityMap(raw)
 
     return nil
 end
+
 
 local function enemyImmuneTo(enemyData, debuffType)
     if not enemyData or not debuffType then
@@ -1074,25 +1315,8 @@ function WaveService:SpawnSplitChildren(enemyConfig, enemyData, enemyModel)
         return
     end
 
-    local entries
-    if #splitConfig > 0 then
-        entries = splitConfig
-    else
-        entries = {}
-        for childType, entry in pairs(splitConfig) do
-            if typeof(childType) == "string" then
-                if type(entry) == "number" then
-                    table.insert(entries, { Type = childType, Count = entry })
-                elseif type(entry) == "table" then
-                    local copy = shallowCopyTable(entry)
-                    copy.Type = copy.Type or childType
-                    table.insert(entries, copy)
-                end
-            end
-        end
-    end
-
-    if not entries or #entries == 0 then
+    local entries = normalizeSpawnEntries(splitConfig)
+    if not entries then
         return
     end
 
@@ -1105,19 +1329,25 @@ function WaveService:SpawnSplitChildren(enemyConfig, enemyData, enemyModel)
     local hasPathWaypoints = self.PathCache and self.PathCache.Waypoints and #self.PathCache.Waypoints > 1
 
     for _, entry in ipairs(entries) do
-        local childType = entry.Type or entry.Enemy or entry[1]
+        local childType = entry.Type
         local childConfig = childType and EnemyConfigs[childType]
         if childConfig then
-            local count = math.max(1, entry.Count or entry.Quantity or 1)
-            local progressOffset = tonumber(entry.ProgressOffset) or 0
+            local count = math.max(1, tonumber(entry.Count) or 1)
+            local progressOffset = tonumber(entry.ProgressOffset or entry.OffsetProgress) or 0
             local spacing = entry.ProgressSpacing
+            if spacing == nil then
+                spacing = entry.Spacing
+            end
             if spacing == nil and count > 1 then
                 spacing = 0.04
             end
-            spacing = spacing or 0
+            spacing = tonumber(spacing) or 0
 
             local positionOffset = toVector3(entry.Offset or entry.PositionOffset)
-            local offsetRadius = tonumber(entry.OffsetRadius)
+            local offsetRadius = tonumber(entry.OffsetRadius or entry.Radius)
+            if offsetRadius and offsetRadius < 0 then
+                offsetRadius = 0
+            end
             local playSpawnSound = entry.PlaySpawnSound == true or entry.UseSpawnSound == true
 
             for index = 1, count do
