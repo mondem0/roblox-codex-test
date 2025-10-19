@@ -30,6 +30,7 @@ local EnemyConfigs = {
         SpawnSound = {
             SoundId = "rbxassetid://1234567890",
             Volume = 0.8,
+            StartTime = 0.15,
         },
         DeathSound = {
             SoundId = "rbxassetid://1234567891",
@@ -74,8 +75,10 @@ local EnemyConfigs = {
             Sound = {
                 SoundId = "rbxassetid://1234567896",
                 Volume = 0.95,
+                StartTime = 0.35,
             },
             SoundName = "FrostWardenStun",
+            EffectColor = { 130, 220, 255 },
         },
     },
     Broodling = {

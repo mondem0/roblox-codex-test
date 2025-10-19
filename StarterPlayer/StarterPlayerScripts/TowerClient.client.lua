@@ -1908,9 +1908,15 @@ remotes.TowerUpgraded.OnClientEvent:Connect(function(towerModel)
 end)
 
 if remotes:FindFirstChild("SplashFired") then
-	remotes.SplashFired.OnClientEvent:Connect(function(position, radius, color)
-		showExplosion(position, radius, color)
-	end)
+        remotes.SplashFired.OnClientEvent:Connect(function(position, radius, color)
+                showExplosion(position, radius, color)
+        end)
+end
+
+if remotes:FindFirstChild("TowerStunPulse") then
+        remotes.TowerStunPulse.OnClientEvent:Connect(function(position, radius, color)
+                showExplosion(position, radius, color or Color3.fromRGB(140, 225, 255))
+        end)
 end
 
 RunService.RenderStepped:Connect(function()

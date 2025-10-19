@@ -609,6 +609,19 @@ function TowerService:ApplyTowerStun(origin, radius, duration, config)
         return
     end
 
+    local effectColor
+    if type(config) == "table" then
+        effectColor = config.EffectColor or config.Color or config.StunColor
+    end
+
+    if not effectColor then
+        effectColor = Color3.fromRGB(140, 225, 255)
+    end
+
+    if self.Remotes and self.Remotes.TowerStunPulse then
+        self.Remotes.TowerStunPulse:FireAllClients(origin, radius, effectColor)
+    end
+
     local now = tick()
     for towerModel, towerData in pairs(self.Towers) do
         local primary = getTowerPrimaryPart(towerModel)

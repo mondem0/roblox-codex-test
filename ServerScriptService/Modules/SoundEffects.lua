@@ -19,6 +19,13 @@ local SOUND_ID_KEYS = {
     "asset",
 }
 
+local START_TIME_KEYS = {
+    "TimePosition",
+    "StartTime",
+    "StartPosition",
+    "StartAt",
+}
+
 local function extractSoundId(config)
     if type(config) ~= "table" then
         return nil
@@ -51,6 +58,24 @@ local function applyProperties(sound, properties)
     end
 end
 
+local function extractStartTime(source)
+    if type(source) ~= "table" then
+        return nil
+    end
+
+    for _, key in ipairs(START_TIME_KEYS) do
+        local value = source[key]
+        if value ~= nil then
+            local numberValue = tonumber(value)
+            if numberValue and numberValue >= 0 then
+                return numberValue
+            end
+        end
+    end
+
+    return nil
+end
+
 local SoundEffects = {}
 
 function SoundEffects.CreateSound(config)
@@ -73,6 +98,12 @@ function SoundEffects.CreateSound(config)
         local sound = Instance.new("Sound")
         sound.SoundId = soundId
         applyProperties(sound, config)
+
+        local startTime = extractStartTime(config)
+        if startTime then
+            sound.TimePosition = startTime
+        end
+
         return sound
     end
 
@@ -115,6 +146,19 @@ function SoundEffects.Play(parent, config, options)
     end
 
     sound.Parent = targetParent
+
+    local startTime
+    if options then
+        startTime = extractStartTime(options)
+    end
+
+    if not startTime then
+        startTime = extractStartTime(config)
+    end
+
+    if startTime then
+        sound.TimePosition = startTime
+    end
 
     if not sound.Looped then
         sound.Ended:Connect(function()

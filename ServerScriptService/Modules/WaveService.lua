@@ -40,6 +40,42 @@ local function toVector3(value)
     return nil
 end
 
+local function toColor3(value)
+    if typeof(value) == "Color3" then
+        return value
+    elseif type(value) == "table" then
+        local r = value.R or value.r or value.Red or value.red or value[1]
+        local g = value.G or value.g or value.Green or value.green or value[2]
+        local b = value.B or value.b or value.Blue or value.blue or value[3]
+
+        if r and g and b then
+            r = tonumber(r)
+            g = tonumber(g)
+            b = tonumber(b)
+
+            if r and g and b then
+                if r <= 1 and g <= 1 and b <= 1 then
+                    return Color3.new(r, g, b)
+                else
+                    return Color3.fromRGB(r, g, b)
+                end
+            end
+        end
+    elseif type(value) == "string" then
+        local hex = value:match("^#?(%x%x%x%x%x%x)$")
+        if hex then
+            local r = tonumber(hex:sub(1, 2), 16)
+            local g = tonumber(hex:sub(3, 4), 16)
+            local b = tonumber(hex:sub(5, 6), 16)
+            if r and g and b then
+                return Color3.fromRGB(r, g, b)
+            end
+        end
+    end
+
+    return nil
+end
+
 local function normalizeImmunityMap(raw)
     if type(raw) == "string" then
         local map = {}
@@ -525,6 +561,14 @@ function WaveService:ApplyTowerStunOnDeath(enemyConfig, enemyModel)
         Freeze = stunConfig.Freeze,
         Loop = stunConfig.Loop,
     }
+
+    local effectColor =
+        toColor3(stunConfig.EffectColor)
+        or toColor3(stunConfig.Color)
+        or toColor3(stunConfig.StunColor)
+        or toColor3(stunConfig.PulseColor)
+        or Color3.fromRGB(140, 225, 255)
+    options.EffectColor = effectColor
 
     local soundConfig = stunConfig.Sound or stunConfig.StunSound
     if soundConfig then

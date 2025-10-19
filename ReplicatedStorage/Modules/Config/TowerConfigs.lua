@@ -40,6 +40,7 @@ local TowerConfigs = {
         FireSound = {
             SoundId = "rbxassetid://2234567891",
             Volume = 1.2,
+            StartTime = 0.1,
         },
         Upgrades = {
             {
@@ -74,6 +75,7 @@ local TowerConfigs = {
         FireSound = {
             SoundId = "rbxassetid://2234567892",
             Volume = 0.9,
+            TimePosition = 0.2,
         },
         Upgrades = {
             {

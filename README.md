@@ -190,16 +190,17 @@ The sample waves now include a late-game Broodmother pack so you can see the spl
 
 ##### Stunning towers on death
 
-Add `TowerStunOnDeath` (alias `StunTowersOnDeath`) to give an enemy a disabling shockwave when it dies. Towers caught inside the configured radius immediately stop firing, keep their current rotation, and gain a `Stunned` attribute until the timer expires. The wave service also plays a looping sound from each stunned tower so players know the defense is disabled.
+Add `TowerStunOnDeath` (alias `StunTowersOnDeath`) to give an enemy a disabling shockwave when it dies. Towers caught inside the configured radius immediately stop firing, keep their current rotation, and gain a `Stunned` attribute until the timer expires. The wave service now triggers a visible energy burst scaled to the configured radius and plays a looping sound from each stunned tower so players know the defense is disabled.
 
 Supported fields inside the stun table:
 
 * `Radius` &mdash; distance (in studs) around the dying enemy that should be affected (required).
 * `Duration` &mdash; how long the stun lasts in seconds (required).
-* `Sound` or `StunSound` &mdash; optional sound descriptor to loop from every stunned tower. Use the same format as other sound fields (`rbxassetid://...`, a table of `Sound` properties, or a `Sound` instance).
+* `Sound` or `StunSound` &mdash; optional sound descriptor to loop from every stunned tower. Use the same format as other sound fields (`rbxassetid://...`, a table of `Sound` properties, or a `Sound` instance). Include `StartTime` / `TimePosition` if you want the loop to begin mid-track.
 * `SoundName` &mdash; optional custom name applied to the looping sound instance.
 * `Loop` &mdash; set to `false` if you prefer a one-shot cue; the default automatically loops while the tower is stunned.
 * `Freeze` &mdash; set to `false` to let towers keep rotating while stunned. By default towers are frozen in place and cannot turn until the effect ends.
+* `EffectColor` (aliases `Color`, `StunColor`, or `PulseColor`) &mdash; optional RGB/hex/`Color3` value that tints the stun explosion. When omitted the pulse defaults to a frosty blue.
 
 ```lua
 EnemyConfigs.FrostWarden = {
@@ -214,8 +215,10 @@ EnemyConfigs.FrostWarden = {
         Sound = {
             SoundId = "rbxassetid://1234567896",
             Volume = 0.95,
+            StartTime = 0.35,
         },
         SoundName = "FrostWardenStun",
+        EffectColor = { 130, 220, 255 },
     },
 }
 ```
@@ -258,6 +261,8 @@ The shared [`SoundEffects` module](ServerScriptService/Modules/SoundEffects.lua)
 * A table with `SoundId` plus any extra `Sound` properties (for example `Volume`, `PlaybackSpeed`, or `RollOffMaxDistance`).
 * A pre-built `Sound` instance, which will be cloned before playback.
 
+Add `StartTime`/`TimePosition` to any descriptor to begin playback from a specific timestamp. The helper also accepts `StartAt` and `StartPosition` as aliases if you prefer those names.
+
 ### Enemy spawn & death hooks
 
 Add `SpawnSound` and/or `DeathSound` to an entry in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua). The wave service plays the spawn clip from the enemy’s root part and moves death audio to an invisible anchor so it can finish even after the model is destroyed.
@@ -273,6 +278,7 @@ EnemyConfigs.Shielder = {
     SpawnSound = {
         SoundId = "rbxassetid://1234567890",
         Volume = 0.8,
+        StartTime = 0.15,
     },
     DeathSound = {
         SoundId = "rbxassetid://1234567891",
@@ -283,7 +289,7 @@ EnemyConfigs.Shielder = {
 
 ### Tower stun loops
 
-Assign `Sound` (or `StunSound`) inside an enemy’s `TowerStunOnDeath` table to play a looping cue from every stunned tower while the effect is active. Sounds use the same descriptor format shown above and default to looping; include `Loop = false` inside the stun table if you only want a single playback.
+Assign `Sound` (or `StunSound`) inside an enemy’s `TowerStunOnDeath` table to play a looping cue from every stunned tower while the effect is active. Sounds use the same descriptor format shown above and default to looping; include `Loop = false` inside the stun table if you only want a single playback. Combine this with `EffectColor` to tint the visible pulse so players can instantly tell which enemy triggered it.
 
 ### Tower fire sounds
 
@@ -302,6 +308,7 @@ TowerConfigs.Cannon = {
         SoundId = "rbxassetid://2234567891",
         Volume = 1.2,
         PlaybackSpeed = 0.9,
+        StartTime = 0.1,
     },
     Upgrades = {
         {
