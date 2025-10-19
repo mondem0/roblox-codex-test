@@ -63,6 +63,20 @@ local sellButtonOriginalAutoButtonColor
 local priceLabelsCanShow = false
 local GREY_COLOR = Color3.new(0.5, 0.5, 0.5)
 
+local LOADOUT_SLOT_COUNT = 5
+local SLOT_KEY_CODES = {
+        [Enum.KeyCode.One] = 1,
+        [Enum.KeyCode.Two] = 2,
+        [Enum.KeyCode.Three] = 3,
+        [Enum.KeyCode.Four] = 4,
+        [Enum.KeyCode.Five] = 5,
+        [Enum.KeyCode.KeypadOne] = 1,
+        [Enum.KeyCode.KeypadTwo] = 2,
+        [Enum.KeyCode.KeypadThree] = 3,
+        [Enum.KeyCode.KeypadFour] = 4,
+        [Enum.KeyCode.KeypadFive] = 5,
+}
+
 local selectionScreenGui
 local selectionFrame
 local selectionTowerList
@@ -479,18 +493,22 @@ local function resolveSlotIndex(button)
 	return nil
 end
 
-local function updateConfirmButtonState()
-	if not selectionConfirmButton then
-		return
-	end
+local function hasAnySelectedTowers()
+        for i = 1, LOADOUT_SLOT_COUNT do
+                if loadoutSelection[i] then
+                        return true
+                end
+        end
 
-	local ready = true
-	for i = 1, 3 do
-		if not loadoutSelection[i] then
-			ready = false
-			break
-		end
-	end
+        return false
+end
+
+local function updateConfirmButtonState()
+        if not selectionConfirmButton then
+                return
+        end
+
+        local ready = hasAnySelectedTowers()
 
 	if selectionConfirmButtonOriginalAutoButtonColor == nil then
 		selectionConfirmButtonOriginalAutoButtonColor = selectionConfirmButton.AutoButtonColor
@@ -539,27 +557,27 @@ local function setActiveSelectionSlot(slotIndex)
 end
 
 local function findFirstEmptySlot()
-	for i = 1, 3 do
-		if not loadoutSelection[i] then
-			return i
-		end
-	end
-	return nil
+        for i = 1, LOADOUT_SLOT_COUNT do
+                if not loadoutSelection[i] then
+                        return i
+                end
+        end
+        return nil
 end
 
 local function assignTowerToSlot(slotIndex, towerType)
-	if not (slotIndex and towerType and towerConfigs[towerType]) then
+        if not (slotIndex and towerType and towerConfigs[towerType]) then
 		return
 	end
 
 	-- Prevent duplicate towers in the loadout by clearing any other slot that already
 	-- contains the requested tower before assigning it to the active slot.
-	for i = 1, 3 do
-		if i ~= slotIndex and loadoutSelection[i] == towerType then
-			loadoutSelection[i] = nil
-			updateSelectionSlotDisplay(i)
-		end
-	end
+        for i = 1, LOADOUT_SLOT_COUNT do
+                if i ~= slotIndex and loadoutSelection[i] == towerType then
+                        loadoutSelection[i] = nil
+                        updateSelectionSlotDisplay(i)
+                end
+        end
 
 	loadoutSelection[slotIndex] = towerType
 	updateSelectionSlotDisplay(slotIndex)
@@ -584,12 +602,13 @@ local function clearSlot(slotIndex)
 end
 
 local function applyLoadoutToShop()
-	for slotIndex, button in pairs(shopSlotButtons) do
-		if button and button:IsA("GuiButton") then
-			local towerType = loadoutSelection[slotIndex]
-			local priceLabel = shopSlotPriceLabels[slotIndex]
-			if towerType and towerConfigs[towerType] then
-				disconnectShopButton(button)
+        for slotIndex = 1, LOADOUT_SLOT_COUNT do
+                local button = shopSlotButtons[slotIndex]
+                if button and button:IsA("GuiButton") then
+                        local towerType = loadoutSelection[slotIndex]
+                        local priceLabel = shopSlotPriceLabels[slotIndex]
+                        if towerType and towerConfigs[towerType] then
+                                disconnectShopButton(button)
 				button:SetAttribute("TowerType", towerType)
 				local config = towerConfigs[towerType]
 				if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
@@ -695,7 +714,7 @@ local function createSelectionGui()
 
 	selectionFrame = Instance.new("Frame")
 	selectionFrame.Name = "SelectionFrame"
-	selectionFrame.Size = UDim2.fromOffset(520, 420)
+        selectionFrame.Size = UDim2.fromOffset(620, 420)
 	selectionFrame.Position = UDim2.fromOffset(0, 0)
 	selectionFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 	selectionFrame.BorderSizePixel = 0
@@ -718,7 +737,7 @@ local function createSelectionGui()
 
 	selectionTowerList = Instance.new("ScrollingFrame")
 	selectionTowerList.Name = "TowerList"
-	selectionTowerList.Size = UDim2.fromOffset(500, 230)
+        selectionTowerList.Size = UDim2.fromOffset(600, 230)
 	selectionTowerList.Position = UDim2.new(0, 10, 0, 60)
 	selectionTowerList.CanvasSize = UDim2.fromOffset(0, 0)
 	selectionTowerList.ScrollBarThickness = 6
@@ -737,19 +756,19 @@ local function createSelectionGui()
 
 	local slotsLabel = Instance.new("TextLabel")
 	slotsLabel.Name = "SlotsLabel"
-	slotsLabel.Size = UDim2.fromOffset(500, 24)
+        slotsLabel.Size = UDim2.fromOffset(600, 24)
 	slotsLabel.Position = UDim2.new(0, 10, 0, 290)
 	slotsLabel.BackgroundTransparency = 1
 	slotsLabel.Font = Enum.Font.Gotham
 	slotsLabel.TextSize = 18
 	slotsLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
-	slotsLabel.Text = "Assign three towers to your loadout:"
+        slotsLabel.Text = string.format("Assign up to %d towers to your loadout (minimum one):", LOADOUT_SLOT_COUNT)
 	slotsLabel.TextXAlignment = Enum.TextXAlignment.Left
 	slotsLabel.Parent = selectionFrame
 
 	local slotsFrame = Instance.new("Frame")
 	slotsFrame.Name = "SlotsContainer"
-	slotsFrame.Size = UDim2.fromOffset(500, 48)
+        slotsFrame.Size = UDim2.fromOffset(600, 48)
 	slotsFrame.Position = UDim2.new(0, 10, 0, 315)
 	slotsFrame.BackgroundTransparency = 1
 	slotsFrame.Parent = selectionFrame
@@ -762,21 +781,22 @@ local function createSelectionGui()
 
 	selectionSlotButtons = {}
 	selectionSlotOriginalText = {}
-	for i = 1, 3 do
-		local button = Instance.new("TextButton")
-		button.Name = string.format("Slot%d", i)
-		button.Size = UDim2.fromOffset(120, 48)
-		button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
-		button.BorderSizePixel = 0
-		button.Font = Enum.Font.Gotham
-		button.TextSize = 18
-		button.TextColor3 = Color3.new(1, 1, 1)
-		button.AutoButtonColor = true
-		button.Text = string.format("Slot %d", i)
-		button.Parent = slotsFrame
-		button:SetAttribute("SlotIndex", i)
-		selectionSlotButtons[i] = button
-		selectionSlotOriginalText[i] = button.Text
+        for i = 1, LOADOUT_SLOT_COUNT do
+                local button = Instance.new("TextButton")
+                button.Name = string.format("Slot%d", i)
+                button.Size = UDim2.fromOffset(112, 48)
+                button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+                button.BorderSizePixel = 0
+                button.Font = Enum.Font.Gotham
+                button.TextSize = 18
+                button.TextColor3 = Color3.new(1, 1, 1)
+                button.AutoButtonColor = true
+                button.Text = string.format("Slot %d", i)
+                button.Parent = slotsFrame
+                button.LayoutOrder = i
+                button:SetAttribute("SlotIndex", i)
+                selectionSlotButtons[i] = button
+                selectionSlotOriginalText[i] = button.Text
 
 		button.MouseButton1Click:Connect(function()
 			setActiveSelectionSlot(i)
@@ -788,8 +808,8 @@ local function createSelectionGui()
 
 	selectionConfirmButton = Instance.new("TextButton")
 	selectionConfirmButton.Name = "ConfirmButton"
-	selectionConfirmButton.Size = UDim2.fromOffset(200, 44)
-	selectionConfirmButton.Position = UDim2.new(0, 160, 0, 370)
+        selectionConfirmButton.Size = UDim2.fromOffset(200, 44)
+        selectionConfirmButton.Position = UDim2.new(0.5, -100, 0, 370)
 	selectionConfirmButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
 	selectionConfirmButton.BorderSizePixel = 0
 	selectionConfirmButton.Font = Enum.Font.GothamBold
@@ -800,19 +820,19 @@ local function createSelectionGui()
 	selectionConfirmButton.Parent = selectionFrame
 	selectionConfirmButtonOriginalAutoButtonColor = selectionConfirmButton.AutoButtonColor
 
-	selectionConfirmButton.MouseButton1Click:Connect(function()
-		if selectionComplete or not selectionConfirmButton.Active then
-			return
-		end
+        selectionConfirmButton.MouseButton1Click:Connect(function()
+                if selectionComplete or not selectionConfirmButton.Active then
+                        return
+                end
 
-		if not loadoutSelection[1] or not loadoutSelection[2] or not loadoutSelection[3] then
-			return
-		end
+                if not hasAnySelectedTowers() then
+                        return
+                end
 
-		selectionComplete = true
-		selectionScreenGui.Enabled = false
-		applyLoadoutToShop()
-	end)
+                selectionComplete = true
+                selectionScreenGui.Enabled = false
+                applyLoadoutToShop()
+        end)
 
 	local function updateSelectionLayout()
 		if not selectionScreenGui or not selectionFrame then
@@ -1214,7 +1234,7 @@ local function createGui()
 
 	shopFrame = Instance.new("Frame")
 	shopFrame.Name = "Shop"
-	shopFrame.Size = UDim2.fromOffset(420, 140)
+        shopFrame.Size = UDim2.fromOffset(720, 140)
 	shopFrame.Position = UDim2.fromOffset(0, 0)
 	shopFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 	shopFrame.BackgroundTransparency = 0.1
@@ -1235,9 +1255,9 @@ local function createGui()
 
 	shopSlotButtons = {}
 	shopSlotOriginalText = {}
-	for i = 1, 3 do
-		local slotContainer = Instance.new("Frame")
-		slotContainer.Name = string.format("ShopSlotContainer%d", i)
+        for i = 1, LOADOUT_SLOT_COUNT do
+                local slotContainer = Instance.new("Frame")
+                slotContainer.Name = string.format("ShopSlotContainer%d", i)
 		slotContainer.Size = UDim2.fromOffset(120, 108)
 		slotContainer.BackgroundTransparency = 1
 		slotContainer.BorderSizePixel = 0
@@ -1560,18 +1580,18 @@ local function showTowerSelection()
 		return
 	end
 
-	selectionComplete = false
-	for i = 1, 3 do
-		loadoutSelection[i] = nil
-		if selectionSlotButtons[i] then
-			selectionSlotButtons[i]:SetAttribute("TowerType", nil)
-		end
-	end
+        selectionComplete = false
+        for i = 1, LOADOUT_SLOT_COUNT do
+                loadoutSelection[i] = nil
+                if selectionSlotButtons[i] then
+                        selectionSlotButtons[i]:SetAttribute("TowerType", nil)
+                end
+        end
 
-	populateTowerSelectionButtons()
-	for index = 1, 3 do
-		updateSelectionSlotDisplay(index)
-	end
+        populateTowerSelectionButtons()
+        for index = 1, LOADOUT_SLOT_COUNT do
+                updateSelectionSlotDisplay(index)
+        end
 
 	setActiveSelectionSlot(findFirstEmptySlot() or 1)
 	updateConfirmButtonState()
@@ -1862,13 +1882,29 @@ updateStartButtonVisual()
 showTowerSelection()
 
 UserInputService.InputBegan:Connect(function(input, processed)
-	if processed then
-		return
-	end
+        if processed then
+                return
+        end
 
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		if placingTowerType then
-			local unitRay = mouse.UnitRay
+        local slotIndex = SLOT_KEY_CODES[input.KeyCode]
+        if slotIndex then
+                if selectionScreenGui and selectionScreenGui.Enabled then
+                        setActiveSelectionSlot(math.clamp(slotIndex, 1, LOADOUT_SLOT_COUNT))
+                else
+                        local button = shopSlotButtons[slotIndex]
+                        if button and button.Active then
+                                local towerType = getTowerTypeForButton(button)
+                                if towerType then
+                                        beginPlacement(towerType)
+                                end
+                        end
+                end
+                return
+        end
+
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if placingTowerType then
+                        local unitRay = mouse.UnitRay
 			local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
 			if rayResult and computePlacementValidity(rayResult.Position, rayResult.Instance) then
 				remotes.TowerPlaced:FireServer(placingTowerType, rayResult.Position)
