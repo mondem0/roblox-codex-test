@@ -282,8 +282,9 @@ Hook mid-fight behaviour to an enemy by adding an `Abilities` table. Each entry 
 * `StunPulse` &mdash; emits a tower-stunning shockwave while the enemy is still alive.
   * Accepts the same fields as `TowerStunOnDeath` (`Radius`, `Duration`, `PulseSound`, `Sound`, `EffectColor`, etc.) plus the trigger fields listed above. Towers caught inside the pulse freeze exactly like the Frost Warden’s death blast.
 * `SpawnUnits` &mdash; summons additional enemies the moment the trigger fires.
-  * Provide a `Spawns` table (or use the ability table directly) that mirrors the `SplitChildren` structure: list each child’s `Type`, optional `Count`, `ProgressOffset`, `ProgressSpacing`, `OffsetRadius`, and `PlaySpawnSound` flags.
-  * Ability-level fields such as `ProgressOffset`, `ProgressSpacing`, `Offset`, `OffsetRadius`, `Interval`, and `StartDelay` act as defaults for every spawn entry. Per-entry values override the defaults when you need a specific burst to behave differently.
+  * Provide a `Spawns` table (or use the ability table directly) that mirrors the `SplitChildren` structure: list each child’s `Type`, optional `Count`, `ProgressOffset`, `ProgressSpacing`, and `PlaySpawnSound` flags.
+  * Ability-level fields such as `ProgressOffset`, `ProgressSpacing`, `Interval`, and `StartDelay` act as defaults for every spawn entry. Per-entry values override the defaults when you need a specific burst to behave differently.
+  * Spawned enemies always appear exactly where the caster currently stands while inheriting the caster’s path progress.
   * Set `Interval`/`SpawnInterval` to drip units out over time or `StartDelay`/`InitialDelay` to pause before the first reinforcement appears. Leave both at `0` to summon the entire pack instantly.
 
 The new Riftbreaker boss demonstrates both abilities, including multiple warp and stun triggers:
@@ -380,7 +381,7 @@ EnemyConfigs.Warcaller = {
                 TriggerPercent = 70,
                 ProgressSpacing = 0.025,
                 Spawns = {
-                    { Type = "Runner", Count = 3, OffsetRadius = 4, PlaySpawnSound = true },
+                    { Type = "Runner", Count = 3, PlaySpawnSound = true },
                     { Type = "Grunt", Count = 2, ProgressOffset = -0.03 },
                 },
             },
@@ -390,7 +391,7 @@ EnemyConfigs.Warcaller = {
                 Interval = 0.3,
                 ProgressOffset = 0.02,
                 Spawns = {
-                    { Type = "Shade", Count = 2, OffsetRadius = 5, PlaySpawnSound = true },
+                    { Type = "Shade", Count = 2, PlaySpawnSound = true },
                     { Type = "Broodling", Count = 3, ProgressSpacing = 0.035 },
                 },
             },

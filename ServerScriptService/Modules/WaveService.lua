@@ -507,11 +507,6 @@ function AbilityHandlers.SpawnUnits(self, enemyModel, enemyData, abilityEntry)
     end
 
     local baseProgress = self:ClampProgress(enemyData and enemyData.Progress or 1)
-    local baseCFrame
-    if enemyModel and enemyModel.PrimaryPart then
-        baseCFrame = enemyModel.PrimaryPart.CFrame
-    end
-    local hasPathWaypoints = self.PathCache and self.PathCache.Waypoints and #self.PathCache.Waypoints > 1
 
     local defaultProgressOffset = tonumber(config.ProgressOffset or config.OffsetProgress) or 0
     local defaultSpacing = config.ProgressSpacing or config.Spacing
@@ -523,12 +518,6 @@ function AbilityHandlers.SpawnUnits(self, enemyModel, enemyData, abilityEntry)
     if defaultStartDelay < 0 then
         defaultStartDelay = 0
     end
-    local defaultOffset = toVector3(config.PositionOffset or config.Offset)
-    local defaultRadius = tonumber(config.OffsetRadius or config.Radius) or 0
-    if defaultRadius < 0 then
-        defaultRadius = 0
-    end
-
     local defaultPlaySpawnSound
     if config.PlaySpawnSound ~= nil then
         defaultPlaySpawnSound = config.PlaySpawnSound == true
@@ -556,22 +545,6 @@ function AbilityHandlers.SpawnUnits(self, enemyModel, enemyData, abilityEntry)
                 spacing = 0.04
             end
             spacing = tonumber(spacing) or 0
-
-            local offsetVector
-            if entry.PositionOffset or entry.Offset then
-                offsetVector = toVector3(entry.PositionOffset or entry.Offset)
-            else
-                offsetVector = defaultOffset
-            end
-
-            local offsetRadius = entry.OffsetRadius or entry.Radius
-            if offsetRadius == nil then
-                offsetRadius = defaultRadius
-            end
-            offsetRadius = tonumber(offsetRadius) or 0
-            if offsetRadius < 0 then
-                offsetRadius = 0
-            end
 
             local playSpawnSound = entry.PlaySpawnSound
             if playSpawnSound == nil then
@@ -634,15 +607,6 @@ function AbilityHandlers.SpawnUnits(self, enemyModel, enemyData, abilityEntry)
                     local sourcePrimary = enemyModel.PrimaryPart
                     if sourcePrimary then
                         spawnOptions.CFrame = sourcePrimary.CFrame
-                    elseif baseCFrame and not hasPathWaypoints then
-                        spawnOptions.CFrame = baseCFrame
-                    end
-
-                    if offsetVector then
-                        spawnOptions.PositionOffset = offsetVector
-                    elseif offsetRadius > 0 then
-                        local angle = (index - 1) / count * math.pi * 2
-                        spawnOptions.PositionOffset = Vector3.new(math.cos(angle) * offsetRadius, 0, math.sin(angle) * offsetRadius)
                     end
 
                     self:SpawnEnemy(childType, childConfig, spawnOptions)

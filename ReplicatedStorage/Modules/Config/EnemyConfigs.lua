@@ -174,7 +174,7 @@ local EnemyConfigs = {
                 {
                     TriggerPercent = 70,
                     Spawns = {
-                        { Type = "Runner", Count = 3, OffsetRadius = 4, PlaySpawnSound = true },
+                        { Type = "Runner", Count = 3, PlaySpawnSound = true },
                         { Type = "Grunt", Count = 2, ProgressOffset = -0.03 },
                     },
                     ProgressSpacing = 0.025,
@@ -182,7 +182,7 @@ local EnemyConfigs = {
                 {
                     TriggerPercent = 40,
                     Spawns = {
-                        { Type = "Shade", Count = 2, OffsetRadius = 5, PlaySpawnSound = true },
+                        { Type = "Shade", Count = 2, PlaySpawnSound = true },
                         { Type = "Broodling", Count = 3, ProgressSpacing = 0.035 },
                     },
                     Interval = 0.3,
