@@ -3,6 +3,7 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local towerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
+local PathService = require(ReplicatedStorage.Modules.PathService)
 
 local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes") or Instance.new("Folder")
 remotesFolder.Name = "Remotes"
@@ -268,7 +269,17 @@ local function beginRound(groupInfo)
     end
 
     activeMap = cloneMap(groupInfo.SelectedOption)
-    waveService:SetMapModel(activeMap)
+    if type(WaveService.SetMapModel) == "function" then
+        WaveService.SetMapModel(waveService, activeMap)
+    elseif type(waveService.SetMapModel) == "function" then
+        -- Some versions of the wave service expose SetMapModel on the instance itself.
+        waveService:SetMapModel(activeMap)
+    else
+        waveService.MapModel = activeMap
+        if PathService and type(PathService.CreatePathCache) == "function" then
+            waveService.PathCache = PathService:CreatePathCache(activeMap)
+        end
+    end
     towerService.MapModel = activeMap
 
     setActivePlayers(participants)
