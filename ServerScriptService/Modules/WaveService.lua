@@ -541,9 +541,6 @@ function AbilityHandlers.SpawnUnits(self, enemyModel, enemyData, abilityEntry)
             if spacing == nil then
                 spacing = defaultSpacing
             end
-            if spacing == nil and count > 1 then
-                spacing = 0.04
-            end
             spacing = tonumber(spacing) or 0
 
             local playSpawnSound = entry.PlaySpawnSound
