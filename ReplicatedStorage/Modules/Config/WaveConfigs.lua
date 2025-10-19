@@ -219,6 +219,36 @@ addWave({
     },
 })
 
+addWave({
+    Name = "wave10",
+    Description = "Riftbreaker warps ahead mid-fight and unleashes a stunning collapse.",
+    Reward = 420,
+    Groups = {
+        {
+            Streams = {
+                { Type = "Shade", Count = 10, Interval = 0.75 },
+                { Type = "Runner", Count = 10, Interval = 0.6, StartDelay = 1 },
+            },
+            Delay = 1.8,
+        },
+        {
+            Type = "Riftbreaker",
+            Count = 1,
+            Delay = 3.2,
+        },
+        {
+            Streams = {
+                { Type = "Tank", Count = 6, Interval = 1.2 },
+                { Type = "Shielder", Count = 4, Interval = 1.35, StartDelay = 1.1 },
+            },
+            Delay = 2.4,
+        },
+    },
+    Metadata = {
+        Notes = "Riftbreaker skips two waypoints at half health before stunning nearby towers at 25%.",
+    },
+})
+
 waves.Definitions = waveDefinitions
 waves.AddWave = addWave
 waves.DefaultNamePattern = defaultNamePattern

@@ -63,6 +63,48 @@ local EnemyConfigs = {
             Volume = 1.3,
         },
     },
+    Riftbreaker = {
+        Name = "Riftbreaker Aethron",
+        ModelName = "VoidReaver",
+        Health = 1400,
+        Speed = 11,
+        Reward = 420,
+        DebuffImmunities = { Slow = true },
+        SpawnSound = {
+            SoundId = "rbxassetid://1234567899",
+            Volume = 1.25,
+            StartTime = 0.1,
+        },
+        DeathSound = {
+            SoundId = "rbxassetid://1234567900",
+            Volume = 1.35,
+        },
+        Abilities = {
+            SkipWaypoints = {
+                TriggerPercent = 50,
+                SkipCount = 2,
+                Pathfind = true,
+                Sound = {
+                    SoundId = "rbxassetid://1234567901",
+                    Volume = 1.1,
+                    StartTime = 0.2,
+                },
+                SoundName = "RiftbreakerWarp",
+            },
+            StunPulse = {
+                TriggerPercent = 25,
+                Radius = 18,
+                Duration = 4.5,
+                EffectColor = { 170, 80, 255 },
+                Sound = {
+                    SoundId = "rbxassetid://1234567902",
+                    Volume = 1.15,
+                    StartTime = 0.35,
+                },
+                SoundName = "RiftbreakerStun",
+            },
+        },
+    },
     FrostWarden = {
         Name = "Frost Warden",
         ModelName = "FrostWarden",

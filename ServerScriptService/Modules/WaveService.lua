@@ -5,9 +5,109 @@ local WaveConfigs = require(ReplicatedStorage.Modules.Config.WaveConfigs)
 local PathService = require(ReplicatedStorage.Modules.PathService)
 local SoundEffects = require(script.Parent.SoundEffects)
 local RunService = game:GetService("RunService")
+local PathfindingService = game:GetService("PathfindingService")
 
 local WaveService = {}
 WaveService.__index = WaveService
+
+function WaveService:BuildOverridePath(enemyModel, enemyData, targetProgress, abilityConfig)
+    if not (enemyModel and enemyData) then
+        return nil
+    end
+
+    local primary = enemyModel.PrimaryPart
+    if not primary then
+        return nil
+    end
+
+    local targetCFrame = self:GetPathCFrame(targetProgress)
+    if not targetCFrame then
+        return nil
+    end
+
+    local startPosition = primary.Position
+    local targetPosition = targetCFrame.Position
+
+    if (startPosition - targetPosition).Magnitude < 0.1 then
+        return nil
+    end
+
+    local usePathfinding = true
+    if abilityConfig and abilityConfig.Pathfind ~= nil then
+        usePathfinding = abilityConfig.Pathfind ~= false
+    end
+
+    local points
+
+    if usePathfinding then
+        local success, computed = pcall(function()
+            local pathParams = {}
+
+            if abilityConfig then
+                if abilityConfig.AgentRadius then
+                    pathParams.AgentRadius = tonumber(abilityConfig.AgentRadius)
+                end
+                if abilityConfig.AgentHeight then
+                    pathParams.AgentHeight = tonumber(abilityConfig.AgentHeight)
+                end
+                if abilityConfig.AgentCanJump ~= nil then
+                    pathParams.AgentCanJump = abilityConfig.AgentCanJump ~= false
+                end
+                if abilityConfig.AgentCanClimb ~= nil then
+                    pathParams.AgentCanClimb = abilityConfig.AgentCanClimb ~= false
+                end
+                if abilityConfig.Costs or abilityConfig.AgentCosts then
+                    pathParams.Costs = abilityConfig.Costs or abilityConfig.AgentCosts
+                end
+            end
+
+            local path = PathfindingService:CreatePath(pathParams)
+            path:ComputeAsync(startPosition, targetPosition)
+            if path.Status == Enum.PathStatus.Success then
+                local waypoints = path:GetWaypoints()
+                local positions = {}
+                for _, waypoint in ipairs(waypoints) do
+                    table.insert(positions, waypoint.Position)
+                end
+                return positions
+            end
+
+            return nil
+        end)
+
+        if success and computed and #computed >= 2 then
+            points = computed
+        end
+    end
+
+    if not points or #points < 2 then
+        points = { startPosition, targetPosition }
+    else
+        if (points[1] - startPosition).Magnitude > 1 then
+            table.insert(points, 1, startPosition)
+        else
+            points[1] = startPosition
+        end
+        points[#points] = targetPosition
+    end
+
+    local speedMultiplier
+    if abilityConfig then
+        speedMultiplier = tonumber(
+            abilityConfig.SpeedMultiplier
+            or abilityConfig.SpeedBoost
+            or abilityConfig.SpeedScale
+        )
+    end
+
+    return {
+        Points = points,
+        Progress = 1,
+        TargetProgress = targetProgress,
+        TargetCFrame = targetCFrame,
+        SpeedMultiplier = speedMultiplier,
+    }
+end
 
 local Players = game:GetService("Players")
 
@@ -26,6 +126,259 @@ local function shallowCopyTable(source)
         copy[key] = value
     end
     return copy
+end
+
+local function setModelPrimaryCFrame(enemyModel, primary, cframe, partOffsets)
+    if not (enemyModel and primary and cframe) then
+        return
+    end
+
+    primary.CFrame = cframe
+
+    if not partOffsets then
+        return
+    end
+
+    for part, offset in pairs(partOffsets) do
+        if part and part.Parent and part:IsDescendantOf(enemyModel) then
+            part.CFrame = cframe * offset
+        end
+    end
+end
+
+local function parseTriggerPercent(value)
+    local number = tonumber(value)
+    if not number then
+        return nil
+    end
+
+    if number > 1 then
+        number /= 100
+    end
+
+    if number <= 0 then
+        return nil
+    end
+
+    if number > 1 then
+        number = 1
+    end
+
+    return number
+end
+
+local function parseTriggerHealth(value)
+    local number = tonumber(value)
+    if not number then
+        return nil
+    end
+
+    if number <= 0 then
+        return nil
+    end
+
+    return number
+end
+
+local function normalizeAbilityType(rawType)
+    if type(rawType) ~= "string" then
+        return nil
+    end
+
+    local lowered = string.lower(rawType)
+
+    if lowered == "skip" or lowered == "skipwaypoints" or lowered == "waypointskip" or lowered == "skipwaypoint" then
+        return "SkipWaypoints"
+    elseif lowered == "stunpulse" or lowered == "stun" or lowered == "towerstun" or lowered == "stunability" then
+        return "StunPulse"
+    end
+
+    return nil
+end
+
+local AbilityHandlers = {}
+
+local function normalizeAbilityEntry(typeHint, abilityConfig)
+    if type(abilityConfig) ~= "table" then
+        return nil
+    end
+
+    local abilityType = normalizeAbilityType(typeHint or abilityConfig.Type or abilityConfig.Ability)
+    if not abilityType then
+        return nil
+    end
+
+    local configCopy = shallowCopyTable(abilityConfig)
+    configCopy.Type = nil
+    configCopy.Ability = nil
+
+    local triggerPercent =
+        parseTriggerPercent(configCopy.TriggerHealthPercent)
+        or parseTriggerPercent(configCopy.TriggerPercent)
+        or parseTriggerPercent(configCopy.HealthPercent)
+        or parseTriggerPercent(configCopy.Percent)
+        or parseTriggerPercent(configCopy.TriggerAtPercent)
+        or parseTriggerPercent(configCopy.Trigger)
+        or parseTriggerPercent(configCopy.ThresholdPercent)
+
+    local triggerHealth =
+        parseTriggerHealth(configCopy.TriggerHealth)
+        or parseTriggerHealth(configCopy.Health)
+        or parseTriggerHealth(configCopy.TriggerValue)
+        or parseTriggerHealth(configCopy.TriggerAtHealth)
+        or parseTriggerHealth(configCopy.Threshold)
+
+    if not triggerPercent and not triggerHealth then
+        if abilityType == "SkipWaypoints" then
+            triggerPercent = 0.5
+        elseif abilityType == "StunPulse" then
+            triggerPercent = 0.25
+        end
+    end
+
+    return {
+        Type = abilityType,
+        Config = configCopy,
+        TriggerPercent = triggerPercent,
+        TriggerHealth = triggerHealth,
+        Triggered = false,
+    }
+end
+
+local function getEnemySpeed(enemyData)
+    if not enemyData then
+        return 0
+    end
+
+    local speed = enemyData.Speed or 0
+
+    if enemyData.Slow then
+        if enemyImmuneTo(enemyData, "Slow") then
+            enemyData.Slow = nil
+        elseif enemyData.Slow.EndsAt > tick() then
+            speed = speed * (1 - enemyData.Slow.Percent)
+        else
+            enemyData.Slow = nil
+        end
+    end
+
+    return speed
+end
+
+local function normalizeAbilities(rawAbilities)
+    if type(rawAbilities) ~= "table" then
+        return nil
+    end
+
+    local normalized = {}
+
+    if #rawAbilities > 0 then
+        for _, abilityConfig in ipairs(rawAbilities) do
+            local entry = normalizeAbilityEntry(abilityConfig and (abilityConfig.Type or abilityConfig.Ability), abilityConfig)
+            if entry then
+                table.insert(normalized, entry)
+            end
+        end
+    else
+        for key, abilityConfig in pairs(rawAbilities) do
+            local entry = normalizeAbilityEntry(key, abilityConfig)
+            if entry then
+                table.insert(normalized, entry)
+            end
+        end
+    end
+
+    if #normalized == 0 then
+        return nil
+    end
+
+    table.sort(normalized, function(a, b)
+        local aValue = a.TriggerHealth or ((a.TriggerPercent or 0) * 10000)
+        local bValue = b.TriggerHealth or ((b.TriggerPercent or 0) * 10000)
+        return aValue > bValue
+    end)
+
+    return normalized
+end
+
+function AbilityHandlers.SkipWaypoints(self, enemyModel, enemyData, abilityEntry)
+    if not (enemyModel and enemyData) then
+        return false
+    end
+
+    local config = abilityEntry.Config or {}
+    local currentProgress = enemyData.Progress or 1
+
+    local targetProgress
+    if config.TargetProgress or config.Progress or config.ProgressIndex then
+        targetProgress = tonumber(config.TargetProgress or config.Progress or config.ProgressIndex)
+    elseif config.Waypoint or config.WaypointIndex then
+        targetProgress = tonumber(config.Waypoint or config.WaypointIndex)
+    end
+
+    local skipAmount = tonumber(
+        config.SkipWaypoints
+        or config.SkipCount
+        or config.Skip
+        or config.Waypoints
+        or config.Count
+    )
+
+    if not targetProgress then
+        skipAmount = skipAmount or 1
+        targetProgress = currentProgress + skipAmount
+    elseif skipAmount then
+        targetProgress += skipAmount
+    end
+
+    local offset = tonumber(config.ProgressOffset or config.Offset or config.AdditionalSkip)
+    if offset then
+        targetProgress = (targetProgress or currentProgress) + offset
+    end
+
+    targetProgress = self:ClampProgress(targetProgress or currentProgress)
+    if targetProgress <= currentProgress then
+        return true
+    end
+
+    if config.Teleport == true or config.Instant == true then
+        enemyData.Progress = targetProgress
+        local finalCFrame = self:GetPathCFrame(targetProgress)
+        if finalCFrame then
+            local primary = enemyModel.PrimaryPart
+            setModelPrimaryCFrame(enemyModel, primary, finalCFrame, enemyData.PartOffsets)
+        end
+    else
+        local override = self:BuildOverridePath(enemyModel, enemyData, targetProgress, config)
+        if override then
+            enemyData.OverridePath = override
+        else
+            enemyData.Progress = targetProgress
+            local finalCFrame = self:GetPathCFrame(targetProgress)
+            if finalCFrame then
+                setModelPrimaryCFrame(enemyModel, enemyModel.PrimaryPart, finalCFrame, enemyData.PartOffsets)
+            end
+        end
+    end
+
+    local soundDescriptor = config.Sound or config.SoundId or config.SoundEffect
+    if soundDescriptor then
+        local soundName = config.SoundName or string.format("%sSkip", enemyData.Type or "Enemy")
+        SoundEffects.Play(enemyModel.PrimaryPart, soundDescriptor, {
+            Name = soundName,
+        })
+    end
+
+    return true
+end
+
+function AbilityHandlers.StunPulse(self, enemyModel, enemyData, abilityEntry)
+    local config = abilityEntry.Config or {}
+    return self:TriggerStunPulse(config, enemyModel)
+end
+
+function WaveService:NormalizeEnemyAbilities(rawAbilities)
+    return normalizeAbilities(rawAbilities)
 end
 
 local function toVector3(value)
@@ -284,6 +637,59 @@ function WaveService:WinGame()
     self.Remotes.GameEnded:FireAllClients(true)
 end
 
+function WaveService:ActivateEnemyAbility(enemyModel, enemyData, abilityEntry)
+    if not (abilityEntry and abilityEntry.Type) then
+        return false
+    end
+
+    local handler = AbilityHandlers[abilityEntry.Type]
+    if not handler then
+        return false
+    end
+
+    local success = handler(self, enemyModel, enemyData, abilityEntry)
+    if success == nil then
+        success = true
+    end
+
+    return success
+end
+
+function WaveService:ProcessEnemyAbilities(enemyModel, enemyData)
+    if not enemyData or not enemyData.Abilities or enemyData.Health <= 0 then
+        return
+    end
+
+    for _, abilityEntry in ipairs(enemyData.Abilities) do
+        if abilityEntry.Triggered then
+            continue
+        end
+
+        local threshold = abilityEntry.CalculatedHealth
+        if not threshold then
+            if abilityEntry.TriggerHealth then
+                threshold = abilityEntry.TriggerHealth
+            elseif abilityEntry.TriggerPercent then
+                local maxHealth = enemyData.MaxHealth or abilityEntry.MaxHealth
+                if not maxHealth and enemyData.HealthValue then
+                    maxHealth = enemyData.HealthValue.Value
+                end
+                maxHealth = maxHealth or enemyData.Health
+                if maxHealth then
+                    threshold = maxHealth * abilityEntry.TriggerPercent
+                end
+            end
+            abilityEntry.CalculatedHealth = threshold
+        end
+
+        if threshold and enemyData.Health <= threshold then
+            local activated = self:ActivateEnemyAbility(enemyModel, enemyData, abilityEntry)
+            abilityEntry.Triggered = true
+            abilityEntry.WasSuccessful = activated
+        end
+    end
+end
+
 function WaveService:DamageEnemy(enemyModel, towerData)
     local enemyData = self.Enemies[enemyModel]
     if not enemyData then
@@ -309,6 +715,7 @@ function WaveService:DamageEnemy(enemyModel, towerData)
         for player in pairs(self.PlayerStats) do
             self:AdjustMoney(player, appliedDamage)
         end
+        self:ProcessEnemyAbilities(enemyModel, enemyData)
     end
 
     if towerData.Config.SlowPercent and not enemyImmuneTo(enemyData, "Slow") then
@@ -551,20 +958,15 @@ function WaveService:GetPathCFrame(progress)
     return CFrame.new(position, endPos)
 end
 
-function WaveService:ApplyTowerStunOnDeath(enemyConfig, enemyModel)
-    if not self.TowerService or not enemyConfig then
-        return
-    end
-
-    local stunConfig = enemyConfig.TowerStunOnDeath or enemyConfig.StunTowersOnDeath or enemyConfig.StunOnDeath
-    if type(stunConfig) ~= "table" then
-        return
+function WaveService:TriggerStunPulse(stunConfig, enemyModel)
+    if not self.TowerService or type(stunConfig) ~= "table" then
+        return false
     end
 
     local radius = tonumber(stunConfig.Radius or stunConfig.Range or stunConfig[1])
     local duration = tonumber(stunConfig.Duration or stunConfig.Time or stunConfig.Length or stunConfig[2])
     if not radius or radius <= 0 or not duration or duration <= 0 then
-        return
+        return false
     end
 
     local position
@@ -578,7 +980,7 @@ function WaveService:ApplyTowerStunOnDeath(enemyConfig, enemyModel)
     end
 
     if not position then
-        return
+        return false
     end
 
     local options = {
@@ -595,6 +997,10 @@ function WaveService:ApplyTowerStunOnDeath(enemyConfig, enemyModel)
     options.EffectColor = effectColor
 
     local soundConfig = stunConfig.Sound or stunConfig.StunSound
+    if not soundConfig then
+        soundConfig = stunConfig.SoundId or stunConfig.StunSoundId
+    end
+
     if soundConfig then
         options.Sound = soundConfig
     end
@@ -604,7 +1010,25 @@ function WaveService:ApplyTowerStunOnDeath(enemyConfig, enemyModel)
         options.SoundName = soundName
     end
 
+    if stunConfig.ForceLoop ~= nil then
+        options.Loop = stunConfig.ForceLoop
+    end
+
+    if stunConfig.StunFreeze ~= nil then
+        options.Freeze = stunConfig.StunFreeze
+    end
+
     self.TowerService:ApplyTowerStun(position, radius, duration, options)
+    return true
+end
+
+function WaveService:ApplyTowerStunOnDeath(enemyConfig, enemyModel)
+    if not enemyConfig then
+        return
+    end
+
+    local stunConfig = enemyConfig.TowerStunOnDeath or enemyConfig.StunTowersOnDeath or enemyConfig.StunOnDeath
+    self:TriggerStunPulse(stunConfig, enemyModel)
 end
 
 function WaveService:SpawnSplitChildren(enemyConfig, enemyData, enemyModel)
@@ -762,6 +1186,7 @@ function WaveService:SpawnEnemy(enemyType, config, options)
     self.Enemies[enemyModel] = {
         Type = enemyType,
         Health = config.Health,
+        MaxHealth = config.Health,
         Speed = config.Speed,
         Progress = spawnProgress or 1,
         Slow = nil,
@@ -769,6 +1194,7 @@ function WaveService:SpawnEnemy(enemyType, config, options)
         PartOffsets = partOffsets,
         DebuffImmunities = normalizeImmunityMap(config.DebuffImmunities),
         Hidden = hidden,
+        Abilities = self:NormalizeEnemyAbilities(config.Abilities),
     }
 
     local appliedCFrame
@@ -833,14 +1259,79 @@ function WaveService:MoveEnemy(enemyModel)
         return
     end
 
-    local waypoints = self.PathCache.Waypoints
     local primary = enemyModel.PrimaryPart
+    if not primary then
+        return
+    end
+
+    local waypoints = self.PathCache.Waypoints or {}
+    if #waypoints < 2 then
+        return
+    end
     local partOffsets = enemyData.PartOffsets
 
     while enemyModel.Parent and enemyData.Health > 0 do
         if self.GameEnded then
             return
         end
+
+        local override = enemyData.OverridePath
+        if override and override.Points and #override.Points >= 2 then
+            local points = override.Points
+            local progress = override.Progress or 1
+            local index = math.floor(progress)
+            local nextIndex = math.min(index + 1, #points)
+            local startPos = points[index]
+            local endPos = points[nextIndex]
+
+            if not startPos or not endPos then
+                enemyData.OverridePath = nil
+            else
+                local alpha = progress - index
+                local currentPos = startPos:Lerp(endPos, alpha)
+                local delta = endPos - startPos
+                local lookVector
+                if delta.Magnitude < 0.001 then
+                    lookVector = Vector3.new(0, 0, -1)
+                else
+                    lookVector = delta.Unit
+                end
+
+                setModelPrimaryCFrame(enemyModel, primary, CFrame.new(currentPos, currentPos + lookVector), partOffsets)
+
+                local step = RunService.Heartbeat:Wait()
+                local speed = getEnemySpeed(enemyData)
+                if override.SpeedMultiplier and override.SpeedMultiplier > 0 then
+                    speed *= override.SpeedMultiplier
+                end
+
+                local segmentLength = (startPos - endPos).Magnitude
+                if segmentLength < 0.1 then
+                    progress = nextIndex
+                else
+                    progress += (speed * step) / math.max(segmentLength, 0.001)
+                end
+
+                if progress >= #points then
+                    enemyData.OverridePath = nil
+                    enemyData.Progress = self:ClampProgress(override.TargetProgress or enemyData.Progress)
+                    local finalCFrame = override.TargetCFrame or self:GetPathCFrame(enemyData.Progress)
+                    if finalCFrame then
+                        setModelPrimaryCFrame(enemyModel, primary, finalCFrame, partOffsets)
+                    end
+                else
+                    override.Progress = progress
+                end
+
+                if enemyData.Progress >= #waypoints then
+                    self:EnemyReachedGoal(enemyModel)
+                    return
+                end
+
+                continue
+            end
+        end
+
         local index = math.floor(enemyData.Progress)
         local nextIndex = index + 1
         local startPos = waypoints[index]
@@ -851,32 +1342,15 @@ function WaveService:MoveEnemy(enemyModel)
 
         local alpha = enemyData.Progress - index
         local currentPos = startPos:Lerp(endPos, alpha)
-        primary.CFrame = CFrame.new(currentPos, endPos)
-        if partOffsets then
-            for part, offset in pairs(partOffsets) do
-                if part and part.Parent and part:IsDescendantOf(enemyModel) then
-                    part.CFrame = primary.CFrame * offset
-                end
-            end
-        end
-
-        local speed = enemyData.Speed
-        if enemyData.Slow then
-            if enemyImmuneTo(enemyData, "Slow") then
-                enemyData.Slow = nil
-            elseif enemyData.Slow.EndsAt > tick() then
-                speed = speed * (1 - enemyData.Slow.Percent)
-            else
-                enemyData.Slow = nil
-            end
-        end
+        setModelPrimaryCFrame(enemyModel, primary, CFrame.new(currentPos, endPos), partOffsets)
 
         local step = RunService.Heartbeat:Wait()
+        local speed = getEnemySpeed(enemyData)
         local segmentLength = (startPos - endPos).Magnitude
         if segmentLength < 0.1 then
             enemyData.Progress = nextIndex
         else
-            enemyData.Progress += (speed * step) / segmentLength
+            enemyData.Progress += (speed * step) / math.max(segmentLength, 0.001)
         end
 
         if enemyData.Progress >= #waypoints then

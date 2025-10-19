@@ -263,6 +263,74 @@ EnemyConfigs.FrostWarden = {
 
 > Towers resume firing once the stun timer expires, and any looping sounds are automatically stopped and destroyed when the effect ends or the tower is sold.
 
+##### Health-based abilities
+
+Hook mid-fight behaviour to an enemy by adding an `Abilities` table. Each entry fires once when the enemy’s remaining HP falls below the configured threshold. The table accepts either an array of ability descriptors (each with a `Type` field) or a dictionary keyed by ability name:
+
+* `SkipWaypoints` &mdash; warps the enemy ahead on the path.
+  * Use `TriggerPercent`, `TriggerHealth`, or their aliases (`Trigger`, `Percent`, `Threshold`, etc.) to choose when the warp happens. Percent values above `1` are treated as percentages (for example `50` becomes `0.5`).
+  * `SkipCount`/`SkipWaypoints`/`Skip` advances that many waypoints beyond the current progress. Combine with `ProgressOffset` to fine-tune the landing point, or set `TargetProgress` / `WaypointIndex` to jump to an exact path index.
+  * `Pathfind` is `true` by default. The wave service computes a `PathfindingService` route from the enemy’s current position to the target waypoint and temporarily follows that path. Set `Pathfind = false` to travel in a straight line or `Teleport = true`/`Instant = true` to snap directly to the destination. Optional `AgentRadius`, `AgentHeight`, `AgentCanJump`, and `AgentCanClimb` values forward to the path query.
+  * Supply `SpeedMultiplier` / `SpeedBoost` to accelerate (or slow) the dash, and `Sound` / `SoundId` to play an effect as the warp begins.
+* `StunPulse` &mdash; emits a tower-stunning shockwave while the enemy is still alive.
+  * Accepts the same fields as `TowerStunOnDeath` (`Radius`, `Duration`, `Sound`, `EffectColor`, etc.) plus the trigger fields listed above. Towers caught inside the pulse freeze exactly like the Frost Warden’s death blast.
+
+The new Riftbreaker boss demonstrates both abilities:
+
+```lua
+EnemyConfigs.Riftbreaker = {
+    Name = "Riftbreaker Aethron",
+    ModelName = "VoidReaver",
+    Health = 1400,
+    Speed = 11,
+    Reward = 420,
+    DebuffImmunities = { Slow = true },
+    Abilities = {
+        SkipWaypoints = {
+            TriggerPercent = 50, -- 50% health
+            SkipCount = 2,
+            Pathfind = true,
+            Sound = {
+                SoundId = "rbxassetid://1234567901",
+                Volume = 1.1,
+                StartTime = 0.2,
+            },
+        },
+        StunPulse = {
+            TriggerPercent = 25,
+            Radius = 18,
+            Duration = 4.5,
+            EffectColor = { 170, 80, 255 },
+            Sound = "rbxassetid://1234567902",
+            SoundName = "RiftbreakerStun",
+        },
+    },
+}
+```
+
+Because abilities live entirely in the config table, you can mix and match them on any enemy without writing new code. For example, to let the classic Boss1 leap forward once at 60% HP you only need:
+
+```lua
+EnemyConfigs.Boss1.Abilities = {
+    SkipWaypoints = {
+        TriggerPercent = 60,
+        SkipCount = 1,
+        Pathfind = false,
+    },
+}
+```
+
+Use either dictionary keys (as above) or an array if you prefer:
+
+```lua
+EnemyConfigs.Boss1.Abilities = {
+    { Type = "SkipWaypoints", TriggerPercent = 60, SkipCount = 1 },
+    { Type = "StunPulse", TriggerPercent = 20, Radius = 12, Duration = 3 },
+}
+```
+
+Every ability in the table triggers independently, so bosses can warp multiple times, add new resistances, or unleash support effects at different health thresholds.
+
 ### Creating or editing waves
 
 1. Open **`WaveConfigs`**. The module now exposes a small helper named `AddWave` that registers each wave, assigns it both a numeric index, and stores optional metadata such as rewards or descriptions.
@@ -401,8 +469,8 @@ Make sure those upgrade models exist under `ReplicatedStorage/Assets/Towers` (or
 
 * **Towers**: Archer (rapid single-target), Cannon (area splash), Frost Mage (slow + damage). Each tower includes two upgrade tiers with distinct stat boosts.
 * **Loadouts**: Players pick three towers from the selection screen at the start (and after restarts). The shop only enables those three slots, so add new entries to `TowerConfigs` to expand the picker. Each tower can only occupy one slot—picking a tower that’s already assigned will move it to the active slot and free the previous one. The Start button remains hidden until you confirm the full three-tower loadout.
-* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), Frost Wardens (collapse into tower-stunning pulses), Shades (stealthed units that only hidden-detection towers can hit), plus two boss variants (Boss1 and LightningBoss) that ignore slow debuffs. These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
-* **Waves**: Nine sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the final sample wave highlights hidden Shades sneaking in alongside Frost Wardens that stun nearby towers when they fall.
+* **Enemies**: Grunts (balanced), Runners (fast, low HP), Tanks (slow, high HP), Shielders (soak direct hits and ignore untargeted splash damage), Broodmothers (split into Broodlings and Runners when slain), Broodlings (nimble hatchlings spawned by Broodmothers), Frost Wardens (collapse into tower-stunning pulses), Shades (stealthed units that only hidden-detection towers can hit), and three boss variants (Boss1, LightningBoss, and the new Riftbreaker that warps ahead mid-fight and stuns towers at low health). These samples live in [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua); add more entries there to introduce new archetypes. Defeating enemies awards cash for all players.
+* **Waves**: Ten sample waves live in [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua). Add or edit entries there to change pacing—the system automatically starts the next wave when the current one clears, and players can press `Start` before wave 1. Groups that define `Streams` will emit multiple enemy types simultaneously with independent spawn cadences, and the finale showcases Riftbreaker’s mid-fight waypoint skip alongside hidden Shades and tower-stunning support units.
 * **Economy & Lives**: Players begin with $350 and 30 lives. Lives decrease when enemies reach the exit. Losing all lives ends the game for everyone; clearing every wave triggers victory.
 * **Tower management**: Press **`X`** while placing to cancel without spending money. Select one of your towers and press **`E`** to buy the next upgrade or **`X`** to sell it for **50%** of the total amount invested (base cost + upgrades).
 * **Enemy info**: Hovering over an enemy shows a floating card beside the cursor with that enemy’s name and HP. No extra billboard setup is required while testing.
