@@ -960,18 +960,24 @@ local function createSelectionGui()
         lobbyCountdownLabel.Text = ""
         lobbyCountdownLabel.Parent = roundPanel
 
-        lobbyRoundList = Instance.new("Frame")
+        lobbyRoundList = Instance.new("ScrollingFrame")
         lobbyRoundList.Name = "RoundList"
-        lobbyRoundList.Size = UDim2.new(1, -24, 0, 120)
+        lobbyRoundList.Size = UDim2.new(1, -24, 0, 148)
         lobbyRoundList.Position = UDim2.new(0, 12, 0, 76)
         lobbyRoundList.BackgroundTransparency = 1
+        lobbyRoundList.BorderSizePixel = 0
+        lobbyRoundList.CanvasSize = UDim2.new(0, 0, 0, 0)
+        lobbyRoundList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        lobbyRoundList.ScrollBarThickness = 6
+        lobbyRoundList.ScrollingDirection = Enum.ScrollingDirection.Y
         lobbyRoundList.Parent = roundPanel
 
         local roundLayout = Instance.new("UIListLayout")
-        roundLayout.FillDirection = Enum.FillDirection.Horizontal
-        roundLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        roundLayout.FillDirection = Enum.FillDirection.Vertical
+        roundLayout.HorizontalAlignment = Enum.HorizontalAlignment.Stretch
         roundLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-        roundLayout.Padding = UDim.new(0, 12)
+        roundLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        roundLayout.Padding = UDim.new(0, 8)
         roundLayout.Parent = lobbyRoundList
 
         local loadoutPanel = Instance.new("Frame")
@@ -1032,7 +1038,11 @@ local function createSelectionGui()
                 selectionSlotOriginalText[i] = button.Text
 
                 button.MouseButton1Click:Connect(function()
-                        setActiveSelectionSlot(i)
+                        if loadoutSelection[i] then
+                                clearSlot(i)
+                        else
+                                setActiveSelectionSlot(i)
+                        end
                 end)
                 button.MouseButton2Click:Connect(function()
                         clearSlot(i)
@@ -1091,7 +1101,7 @@ end
 
 local function updateInterfaceVisibility()
         if selectionScreenGui then
-                selectionScreenGui.Enabled = lobbyPhase == "lobby"
+                selectionScreenGui.Enabled = lobbyPhase ~= "inRound"
         end
 
         if mapSelectionGui then
@@ -1121,7 +1131,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 if not button then
                         button = Instance.new("TextButton")
                         button.Name = string.format("Round%sButton", roundKey)
-                        button.Size = UDim2.fromOffset(150, 120)
+                        button.Size = UDim2.new(1, -4, 0, 96)
                         button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
                         button.BorderSizePixel = 0
                         button.Font = Enum.Font.Gotham
@@ -1140,6 +1150,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         roundButtons[roundKey] = button
                 end
 
+                button.Size = UDim2.new(1, -4, 0, 96)
                 button.LayoutOrder = round.RequiredPlayers or index
                 button:SetAttribute("RoundKey", roundKey)
                 button.Active = hasLoadout
@@ -1822,12 +1833,13 @@ local function createGui()
 
         shopFrame = Instance.new("Frame")
         shopFrame.Name = "Shop"
-        shopFrame.Size = UDim2.fromOffset(720, 164)
-	shopFrame.Position = UDim2.fromOffset(0, 0)
-	shopFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-	shopFrame.BackgroundTransparency = 0.1
-	shopFrame.BorderSizePixel = 0
-	shopFrame.Parent = screenGui
+        shopFrame.Size = UDim2.fromOffset(900, 164)
+        shopFrame.AnchorPoint = Vector2.new(0.5, 0)
+        shopFrame.Position = UDim2.new(0.5, 0, 0, 0)
+        shopFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        shopFrame.BackgroundTransparency = 0.1
+        shopFrame.BorderSizePixel = 0
+        shopFrame.Parent = screenGui
 
 	local shopCorner = Instance.new("UICorner")
 	shopCorner.CornerRadius = UDim.new(0, 12)

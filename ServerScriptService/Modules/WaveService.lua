@@ -787,6 +787,7 @@ function WaveService.new(mapModel, remotes)
     self.GameEnded = false
     self.TowerService = nil
     self.RoundFinishedCallback = nil
+    self.ActivePlayerCount = 1
 
     local towersFolder = Instance.new("Folder")
     towersFolder.Name = "Towers"
@@ -813,6 +814,29 @@ end
 
 function WaveService:SetTowerService(towerService)
     self.TowerService = towerService
+end
+
+function WaveService:SetActivePlayerCount(count)
+    local numeric = tonumber(count) or 1
+    numeric = math.max(1, math.floor(numeric + 0.5))
+    self.ActivePlayerCount = numeric
+end
+
+function WaveService:GetActivePlayerCount()
+    return self.ActivePlayerCount or 1
+end
+
+function WaveService:GetEnemyHealthMultiplier()
+    local playerCount = self:GetActivePlayerCount()
+    if playerCount <= 1 then
+        return 1
+    elseif playerCount == 2 then
+        return 1.5
+    elseif playerCount == 3 then
+        return 2
+    else
+        return 2.5
+    end
 end
 
 function WaveService:SetMapModel(mapModel)
@@ -1391,7 +1415,13 @@ function WaveService:SpawnEnemy(enemyType, config, options)
     end
 
     local displayName = config.Name or enemyType
-    enemyModel:SetAttribute("MaxHealth", config.Health)
+    local baseHealth = tonumber(config.Health) or 0
+    local healthMultiplier = self:GetEnemyHealthMultiplier()
+    local scaledHealth = baseHealth
+    if baseHealth > 0 then
+        scaledHealth = math.max(1, math.floor(baseHealth * healthMultiplier + 0.5))
+    end
+    enemyModel:SetAttribute("MaxHealth", scaledHealth)
     if displayName then
         enemyModel:SetAttribute("DisplayName", displayName)
     end
@@ -1401,7 +1431,7 @@ function WaveService:SpawnEnemy(enemyType, config, options)
         healthValue.Name = "HealthValue"
         healthValue.Parent = enemyModel
     end
-    healthValue.Value = config.Health
+    healthValue.Value = scaledHealth
 
     if isDefault then
         if enemyType == "Runner" then
@@ -1445,8 +1475,8 @@ function WaveService:SpawnEnemy(enemyType, config, options)
 
     self.Enemies[enemyModel] = {
         Type = enemyType,
-        Health = config.Health,
-        MaxHealth = config.Health,
+        Health = scaledHealth,
+        MaxHealth = scaledHealth,
         Speed = config.Speed,
         Progress = spawnProgress or 1,
         Slow = nil,

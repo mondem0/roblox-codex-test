@@ -75,6 +75,9 @@ end
 
 local function clearActivePlayers()
     activeRoundPlayers = {}
+    if waveService and waveService.SetActivePlayerCount then
+        waveService:SetActivePlayerCount(1)
+    end
 end
 
 local function isActivePlayer(player)
@@ -259,6 +262,10 @@ local function beginRound(groupInfo)
     if #participants == 0 then
         lobbyService:RoundEnded()
         return
+    end
+
+    if waveService and waveService.SetActivePlayerCount then
+        waveService:SetActivePlayerCount(#participants)
     end
 
     towerService:Reset()
