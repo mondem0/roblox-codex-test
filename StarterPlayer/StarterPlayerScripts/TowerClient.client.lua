@@ -851,7 +851,7 @@ local function populateTowerSelectionButtons()
                 if typeof(config) == "table" and config.Cost then
                         local button = Instance.new("TextButton")
                         button.Name = string.format("%sSelectButton", towerType)
-                        button.Size = UDim2.fromOffset(210, 90)
+                        button.Size = UDim2.new(1, 0, 1, 0)
                         button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
                         button.BorderSizePixel = 0
                         button.TextColor3 = Color3.new(1, 1, 1)
@@ -875,9 +875,8 @@ local function populateTowerSelectionButtons()
         end
 
         local layout = selectionTowerList:FindFirstChildWhichIsA("UIGridLayout")
-        if selectionTowerList:IsA("ScrollingFrame") and layout then
-                local contentSize = layout.AbsoluteContentSize
-                selectionTowerList.CanvasSize = UDim2.fromOffset(contentSize.X, contentSize.Y)
+        if layout then
+                layout.CellSize = UDim2.new(0.48, 0, 0.22, 0)
         end
 
         applyLoadoutLockState()
@@ -899,7 +898,7 @@ local function createSelectionGui()
         selectionFrame = Instance.new("Frame")
         selectionFrame.Name = "LobbyFrame"
         selectionFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-        selectionFrame.Size = UDim2.fromOffset(1140, 520)
+        selectionFrame.Size = UDim2.fromScale(0.9, 0.85)
         selectionFrame.Position = UDim2.fromScale(0.5, 0.5)
         selectionFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
         selectionFrame.BackgroundTransparency = 0.15
@@ -907,26 +906,37 @@ local function createSelectionGui()
         selectionFrame.Parent = selectionScreenGui
 
         local frameCorner = Instance.new("UICorner")
-        frameCorner.CornerRadius = UDim.new(0, 16)
+        frameCorner.CornerRadius = UDim.new(0.03, 0)
         frameCorner.Parent = selectionFrame
+
+        local frameConstraint = Instance.new("UIAspectRatioConstraint")
+        frameConstraint.AspectRatio = 1140 / 520
+        frameConstraint.DominantAxis = Enum.DominantAxis.Width
+        frameConstraint.Parent = selectionFrame
+
+        local frameSizeConstraint = Instance.new("UISizeConstraint")
+        frameSizeConstraint.MinSize = Vector2.new(720, 420)
+        frameSizeConstraint.Parent = selectionFrame
 
         local shopPanel = Instance.new("Frame")
         shopPanel.Name = "TowerShopPanel"
-        shopPanel.Size = UDim2.fromOffset(700, 400)
-        shopPanel.Position = UDim2.new(0, 24, 0.5, -200)
+        shopPanel.AnchorPoint = Vector2.new(0, 0.5)
+        shopPanel.Size = UDim2.new(0.6, 0, 0.78, 0)
+        shopPanel.Position = UDim2.new(0.03, 0, 0.5, 0)
         shopPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         shopPanel.BackgroundTransparency = 0.05
         shopPanel.BorderSizePixel = 0
         shopPanel.Parent = selectionFrame
 
         local shopCorner = Instance.new("UICorner")
-        shopCorner.CornerRadius = UDim.new(0, 12)
+        shopCorner.CornerRadius = UDim.new(0.03, 0)
         shopCorner.Parent = shopPanel
 
         local shopTitle = Instance.new("TextLabel")
         shopTitle.Name = "ShopTitle"
-        shopTitle.Size = UDim2.new(1, -24, 0, 40)
-        shopTitle.Position = UDim2.new(0, 12, 0, 12)
+        shopTitle.AnchorPoint = Vector2.new(0, 0)
+        shopTitle.Size = UDim2.new(0.94, 0, 0.12, 0)
+        shopTitle.Position = UDim2.new(0.03, 0, 0.03, 0)
         shopTitle.BackgroundTransparency = 1
         shopTitle.Font = Enum.Font.GothamBold
         shopTitle.TextSize = 26
@@ -939,15 +949,16 @@ local function createSelectionGui()
         selectionTowerList.Name = "TowerList"
         selectionTowerList.BackgroundTransparency = 1
         selectionTowerList.BorderSizePixel = 0
-        selectionTowerList.Size = UDim2.new(1, -24, 1, -96)
-        selectionTowerList.Position = UDim2.new(0, 12, 0, 60)
-        selectionTowerList.CanvasSize = UDim2.fromOffset(0, 0)
+        selectionTowerList.AnchorPoint = Vector2.new(0, 0)
+        selectionTowerList.Size = UDim2.new(0.94, 0, 0.76, 0)
+        selectionTowerList.Position = UDim2.new(0.03, 0, 0.18, 0)
+        selectionTowerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
         selectionTowerList.ScrollBarThickness = 8
         selectionTowerList.Parent = shopPanel
 
         local shopGrid = Instance.new("UIGridLayout")
-        shopGrid.CellSize = UDim2.fromOffset(210, 90)
-        shopGrid.CellPadding = UDim2.fromOffset(12, 12)
+        shopGrid.CellSize = UDim2.new(0.48, 0, 0.22, 0)
+        shopGrid.CellPadding = UDim2.new(0.04, 0, 0.04, 0)
         shopGrid.FillDirection = Enum.FillDirection.Horizontal
         shopGrid.SortOrder = Enum.SortOrder.LayoutOrder
         shopGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
@@ -955,8 +966,9 @@ local function createSelectionGui()
 
         lobbyStatusLabel = Instance.new("TextLabel")
         lobbyStatusLabel.Name = "LobbyStatus"
-        lobbyStatusLabel.Size = UDim2.new(1, -24, 0, 24)
-        lobbyStatusLabel.Position = UDim2.new(0, 12, 1, -32)
+        lobbyStatusLabel.AnchorPoint = Vector2.new(0, 1)
+        lobbyStatusLabel.Size = UDim2.new(0.94, 0, 0.1, 0)
+        lobbyStatusLabel.Position = UDim2.new(0.03, 0, 0.97, 0)
         lobbyStatusLabel.BackgroundTransparency = 1
         lobbyStatusLabel.Font = Enum.Font.Gotham
         lobbyStatusLabel.TextSize = 18
@@ -967,21 +979,23 @@ local function createSelectionGui()
 
         local roundPanel = Instance.new("Frame")
         roundPanel.Name = "RoundPanel"
-        roundPanel.Size = UDim2.fromOffset(360, 220)
-        roundPanel.Position = UDim2.new(1, -380, 0, 24)
+        roundPanel.AnchorPoint = Vector2.new(1, 0)
+        roundPanel.Size = UDim2.new(0.32, 0, 0.42, 0)
+        roundPanel.Position = UDim2.new(0.97, 0, 0.07, 0)
         roundPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         roundPanel.BackgroundTransparency = 0.05
         roundPanel.BorderSizePixel = 0
         roundPanel.Parent = selectionFrame
 
         local roundCorner = Instance.new("UICorner")
-        roundCorner.CornerRadius = UDim.new(0, 12)
+        roundCorner.CornerRadius = UDim.new(0.04, 0)
         roundCorner.Parent = roundPanel
 
         local roundTitle = Instance.new("TextLabel")
         roundTitle.Name = "RoundTitle"
-        roundTitle.Size = UDim2.new(1, -24, 0, 32)
-        roundTitle.Position = UDim2.new(0, 12, 0, 12)
+        roundTitle.AnchorPoint = Vector2.new(0, 0)
+        roundTitle.Size = UDim2.new(0.94, 0, 0.16, 0)
+        roundTitle.Position = UDim2.new(0.03, 0, 0.05, 0)
         roundTitle.BackgroundTransparency = 1
         roundTitle.Font = Enum.Font.GothamBold
         roundTitle.TextSize = 22
@@ -992,8 +1006,9 @@ local function createSelectionGui()
 
         lobbyCountdownLabel = Instance.new("TextLabel")
         lobbyCountdownLabel.Name = "CountdownLabel"
-        lobbyCountdownLabel.Size = UDim2.new(1, -24, 0, 24)
-        lobbyCountdownLabel.Position = UDim2.new(0, 12, 0, 48)
+        lobbyCountdownLabel.AnchorPoint = Vector2.new(0, 0)
+        lobbyCountdownLabel.Size = UDim2.new(0.94, 0, 0.12, 0)
+        lobbyCountdownLabel.Position = UDim2.new(0.03, 0, 0.24, 0)
         lobbyCountdownLabel.BackgroundTransparency = 1
         lobbyCountdownLabel.Font = Enum.Font.Gotham
         lobbyCountdownLabel.TextSize = 18
@@ -1004,13 +1019,13 @@ local function createSelectionGui()
 
         lobbyRoundList = Instance.new("ScrollingFrame")
         lobbyRoundList.Name = "RoundList"
-        lobbyRoundList.Size = UDim2.new(1, -24, 0, 148)
-        lobbyRoundList.Position = UDim2.new(0, 12, 0, 76)
+        lobbyRoundList.AnchorPoint = Vector2.new(0, 0)
+        lobbyRoundList.Size = UDim2.new(0.94, 0, 0.62, 0)
+        lobbyRoundList.Position = UDim2.new(0.03, 0, 0.42, 0)
         lobbyRoundList.BackgroundTransparency = 1
         lobbyRoundList.BorderSizePixel = 0
-        lobbyRoundList.CanvasSize = UDim2.new(0, 0, 0, 0)
         lobbyRoundList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        lobbyRoundList.ScrollBarThickness = 6
+        lobbyRoundList.ScrollBarThickness = 8
         lobbyRoundList.ScrollingDirection = Enum.ScrollingDirection.Y
         lobbyRoundList.Parent = roundPanel
 
@@ -1019,26 +1034,28 @@ local function createSelectionGui()
         roundLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
         roundLayout.VerticalAlignment = Enum.VerticalAlignment.Top
         roundLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        roundLayout.Padding = UDim.new(0, 8)
+        roundLayout.Padding = UDim.new(0.02, 0)
         roundLayout.Parent = lobbyRoundList
 
         local loadoutPanel = Instance.new("Frame")
         loadoutPanel.Name = "LoadoutPanel"
-        loadoutPanel.Size = UDim2.fromOffset(360, 160)
-        loadoutPanel.Position = UDim2.new(1, -380, 0, 260)
+        loadoutPanel.AnchorPoint = Vector2.new(1, 0.5)
+        loadoutPanel.Size = UDim2.new(0.32, 0, 0.3, 0)
+        loadoutPanel.Position = UDim2.new(0.97, 0, 0.7, 0)
         loadoutPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         loadoutPanel.BackgroundTransparency = 0.05
         loadoutPanel.BorderSizePixel = 0
         loadoutPanel.Parent = selectionFrame
 
         local loadoutCorner = Instance.new("UICorner")
-        loadoutCorner.CornerRadius = UDim.new(0, 12)
+        loadoutCorner.CornerRadius = UDim.new(0.04, 0)
         loadoutCorner.Parent = loadoutPanel
 
         local loadoutTitle = Instance.new("TextLabel")
         loadoutTitle.Name = "LoadoutTitle"
-        loadoutTitle.Size = UDim2.new(1, -24, 0, 28)
-        loadoutTitle.Position = UDim2.new(0, 12, 0, 12)
+        loadoutTitle.AnchorPoint = Vector2.new(0, 0)
+        loadoutTitle.Size = UDim2.new(0.94, 0, 0.22, 0)
+        loadoutTitle.Position = UDim2.new(0.03, 0, 0.05, 0)
         loadoutTitle.BackgroundTransparency = 1
         loadoutTitle.Font = Enum.Font.GothamBold
         loadoutTitle.TextSize = 20
@@ -1049,15 +1066,16 @@ local function createSelectionGui()
 
         local slotsFrame = Instance.new("Frame")
         slotsFrame.Name = "SlotsFrame"
-        slotsFrame.Size = UDim2.new(1, -24, 0, 64)
-        slotsFrame.Position = UDim2.new(0, 12, 0, 48)
+        slotsFrame.AnchorPoint = Vector2.new(0, 0)
+        slotsFrame.Size = UDim2.new(0.94, 0, 0.36, 0)
+        slotsFrame.Position = UDim2.new(0.03, 0, 0.32, 0)
         slotsFrame.BackgroundTransparency = 1
         slotsFrame.Parent = loadoutPanel
 
         local slotsLayout = Instance.new("UIListLayout")
         slotsLayout.FillDirection = Enum.FillDirection.Horizontal
-        slotsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        slotsLayout.Padding = UDim.new(0, 8)
+        slotsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        slotsLayout.Padding = UDim.new(0.02, 0)
         slotsLayout.Parent = slotsFrame
 
         selectionSlotButtons = {}
@@ -1065,7 +1083,7 @@ local function createSelectionGui()
         for i = 1, LOADOUT_SLOT_COUNT do
                 local button = Instance.new("TextButton")
                 button.Name = string.format("Slot%d", i)
-                button.Size = UDim2.fromOffset(60, 60)
+                button.Size = UDim2.new(0.16, 0, 1, 0)
                 button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
                 button.BorderSizePixel = 0
                 button.AutoButtonColor = true
@@ -1097,8 +1115,9 @@ local function createSelectionGui()
 
         readyButton = Instance.new("TextButton")
         readyButton.Name = "ReadyButton"
-        readyButton.Size = UDim2.new(0.5, -18, 0, 40)
-        readyButton.Position = UDim2.new(0, 12, 0, 118)
+        readyButton.AnchorPoint = Vector2.new(0, 1)
+        readyButton.Size = UDim2.new(0.47, 0, 0.26, 0)
+        readyButton.Position = UDim2.new(0.03, 0, 0.97, 0)
         readyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
         readyButton.BorderSizePixel = 0
         readyButton.Font = Enum.Font.GothamBold
@@ -1117,8 +1136,9 @@ local function createSelectionGui()
 
         leaveButton = Instance.new("TextButton")
         leaveButton.Name = "LeaveButton"
-        leaveButton.Size = UDim2.new(0.5, -18, 0, 40)
-        leaveButton.Position = UDim2.new(0.5, 6, 0, 118)
+        leaveButton.AnchorPoint = Vector2.new(1, 1)
+        leaveButton.Size = UDim2.new(0.47, 0, 0.26, 0)
+        leaveButton.Position = UDim2.new(0.97, 0, 0.97, 0)
         leaveButton.BackgroundColor3 = Color3.fromRGB(150, 80, 80)
         leaveButton.BorderSizePixel = 0
         leaveButton.Font = Enum.Font.GothamBold
@@ -1178,7 +1198,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 if not button then
                         button = Instance.new("TextButton")
                         button.Name = string.format("Round%sButton", roundKey)
-                        button.Size = UDim2.new(1, -4, 0, 96)
+                        button.Size = UDim2.new(1, 0, 0.24, 0)
                         button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
                         button.BorderSizePixel = 0
                         button.Font = Enum.Font.Gotham
@@ -1197,7 +1217,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         roundButtons[roundKey] = button
                 end
 
-                button.Size = UDim2.new(1, -4, 0, 96)
+                button.Size = UDim2.new(1, 0, 0.24, 0)
                 button.LayoutOrder = round.RequiredPlayers or index
                 button:SetAttribute("RoundKey", roundKey)
                 button.Active = hasLoadout
@@ -1349,7 +1369,7 @@ local function createMapSelectionGui()
         mapSelectionFrame = Instance.new("Frame")
         mapSelectionFrame.Name = "MapSelectionFrame"
         mapSelectionFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-        mapSelectionFrame.Size = UDim2.fromOffset(720, 420)
+        mapSelectionFrame.Size = UDim2.fromScale(0.8, 0.7)
         mapSelectionFrame.Position = UDim2.fromScale(0.5, 0.5)
         mapSelectionFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
         mapSelectionFrame.BackgroundTransparency = 0.1
@@ -1357,13 +1377,23 @@ local function createMapSelectionGui()
         mapSelectionFrame.Parent = mapSelectionGui
 
         local frameCorner = Instance.new("UICorner")
-        frameCorner.CornerRadius = UDim.new(0, 16)
+        frameCorner.CornerRadius = UDim.new(0.03, 0)
         frameCorner.Parent = mapSelectionFrame
+
+        local mapFrameConstraint = Instance.new("UIAspectRatioConstraint")
+        mapFrameConstraint.AspectRatio = 720 / 420
+        mapFrameConstraint.DominantAxis = Enum.DominantAxis.Width
+        mapFrameConstraint.Parent = mapSelectionFrame
+
+        local mapSizeConstraint = Instance.new("UISizeConstraint")
+        mapSizeConstraint.MinSize = Vector2.new(600, 360)
+        mapSizeConstraint.Parent = mapSelectionFrame
 
         local title = Instance.new("TextLabel")
         title.Name = "MapSelectionTitle"
-        title.Size = UDim2.new(1, -32, 0, 48)
-        title.Position = UDim2.new(0, 16, 0, 16)
+        title.AnchorPoint = Vector2.new(0, 0)
+        title.Size = UDim2.new(0.94, 0, 0.14, 0)
+        title.Position = UDim2.new(0.03, 0, 0.05, 0)
         title.BackgroundTransparency = 1
         title.Font = Enum.Font.GothamBold
         title.TextSize = 28
@@ -1374,8 +1404,9 @@ local function createMapSelectionGui()
 
         mapSelectionStatusLabel = Instance.new("TextLabel")
         mapSelectionStatusLabel.Name = "StatusLabel"
-        mapSelectionStatusLabel.Size = UDim2.new(1, -32, 0, 24)
-        mapSelectionStatusLabel.Position = UDim2.new(0, 16, 0, 64)
+        mapSelectionStatusLabel.AnchorPoint = Vector2.new(0, 0)
+        mapSelectionStatusLabel.Size = UDim2.new(0.94, 0, 0.1, 0)
+        mapSelectionStatusLabel.Position = UDim2.new(0.03, 0, 0.22, 0)
         mapSelectionStatusLabel.BackgroundTransparency = 1
         mapSelectionStatusLabel.Font = Enum.Font.Gotham
         mapSelectionStatusLabel.TextSize = 18
@@ -1386,15 +1417,16 @@ local function createMapSelectionGui()
 
         mapOptionsContainer = Instance.new("Frame")
         mapOptionsContainer.Name = "OptionsContainer"
-        mapOptionsContainer.Size = UDim2.new(1, -32, 1, -120)
-        mapOptionsContainer.Position = UDim2.new(0, 16, 0, 96)
+        mapOptionsContainer.AnchorPoint = Vector2.new(0, 0)
+        mapOptionsContainer.Size = UDim2.new(0.94, 0, 0.68, 0)
+        mapOptionsContainer.Position = UDim2.new(0.03, 0, 0.32, 0)
         mapOptionsContainer.BackgroundTransparency = 1
         mapOptionsContainer.Parent = mapSelectionFrame
 
         local layout = Instance.new("UIListLayout")
         layout.FillDirection = Enum.FillDirection.Horizontal
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        layout.Padding = UDim.new(0, 16)
+        layout.Padding = UDim.new(0.04, 0)
         layout.Parent = mapOptionsContainer
 
         return mapSelectionGui
@@ -1417,20 +1449,21 @@ local function showMapSelection(options, totalPlayers)
         for index, option in ipairs(options or {}) do
                 local container = Instance.new("Frame")
                 container.Name = string.format("Option%d", index)
-                container.Size = UDim2.fromOffset(200, 220)
+                container.Size = UDim2.new(0.3, 0, 1, 0)
                 container.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
                 container.BackgroundTransparency = 0.05
                 container.BorderSizePixel = 0
                 container.Parent = mapOptionsContainer
 
                 local corner = Instance.new("UICorner")
-                corner.CornerRadius = UDim.new(0, 12)
+                corner.CornerRadius = UDim.new(0.05, 0)
                 corner.Parent = container
 
                 local nameLabel = Instance.new("TextLabel")
                 nameLabel.Name = "NameLabel"
-                nameLabel.Size = UDim2.new(1, -24, 0, 60)
-                nameLabel.Position = UDim2.new(0, 12, 0, 12)
+                nameLabel.AnchorPoint = Vector2.new(0, 0)
+                nameLabel.Size = UDim2.new(0.9, 0, 0.24, 0)
+                nameLabel.Position = UDim2.new(0.05, 0, 0.05, 0)
                 nameLabel.BackgroundTransparency = 1
                 nameLabel.Font = Enum.Font.GothamBold
                 nameLabel.TextSize = 20
@@ -1441,8 +1474,9 @@ local function showMapSelection(options, totalPlayers)
 
                 local descriptionLabel = Instance.new("TextLabel")
                 descriptionLabel.Name = "DescriptionLabel"
-                descriptionLabel.Size = UDim2.new(1, -24, 0, 60)
-                descriptionLabel.Position = UDim2.new(0, 12, 0, 80)
+                descriptionLabel.AnchorPoint = Vector2.new(0, 0)
+                descriptionLabel.Size = UDim2.new(0.9, 0, 0.24, 0)
+                descriptionLabel.Position = UDim2.new(0.05, 0, 0.35, 0)
                 descriptionLabel.BackgroundTransparency = 1
                 descriptionLabel.Font = Enum.Font.Gotham
                 descriptionLabel.TextSize = 16
@@ -1453,8 +1487,9 @@ local function showMapSelection(options, totalPlayers)
 
                 local voteButton = Instance.new("TextButton")
                 voteButton.Name = "VoteButton"
-                voteButton.Size = UDim2.new(1, -24, 0, 44)
-                voteButton.Position = UDim2.new(0, 12, 0, 150)
+                voteButton.AnchorPoint = Vector2.new(0, 0)
+                voteButton.Size = UDim2.new(0.9, 0, 0.18, 0)
+                voteButton.Position = UDim2.new(0.05, 0, 0.62, 0)
                 voteButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
                 voteButton.BorderSizePixel = 0
                 voteButton.Font = Enum.Font.GothamBold
@@ -1466,8 +1501,9 @@ local function showMapSelection(options, totalPlayers)
 
                 local voteLabel = Instance.new("TextLabel")
                 voteLabel.Name = "VoteLabel"
-                voteLabel.Size = UDim2.new(1, -24, 0, 24)
-                voteLabel.Position = UDim2.new(0, 12, 0, 198)
+                voteLabel.AnchorPoint = Vector2.new(0, 0)
+                voteLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
+                voteLabel.Position = UDim2.new(0.05, 0, 0.84, 0)
                 voteLabel.BackgroundTransparency = 1
                 voteLabel.Font = Enum.Font.Gotham
                 voteLabel.TextSize = 16
@@ -1545,37 +1581,39 @@ local function ensureHoverGui()
 	hoverGuiContainer.Enabled = true
 	hoverGuiContainer.Parent = playerGui
 
-	hoverGui = Instance.new("Frame")
-	hoverGui.Name = "EnemyHoverFrame"
-	hoverGui.AnchorPoint = Vector2.new(0, 1)
-	hoverGui.Size = UDim2.fromOffset(220, 48)
-	hoverGui.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-	hoverGui.BackgroundTransparency = 0.2
-	hoverGui.BorderSizePixel = 0
-	hoverGui.Visible = false
-	hoverGui.Parent = hoverGuiContainer
+        hoverGui = Instance.new("Frame")
+        hoverGui.Name = "EnemyHoverFrame"
+        hoverGui.AnchorPoint = Vector2.new(0, 1)
+        hoverGui.Size = UDim2.new(0.18, 0, 0.08, 0)
+        hoverGui.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        hoverGui.BackgroundTransparency = 0.2
+        hoverGui.BorderSizePixel = 0
+        hoverGui.Visible = false
+        hoverGui.Parent = hoverGuiContainer
 
-	local hoverCorner = Instance.new("UICorner")
-	hoverCorner.CornerRadius = UDim.new(0, 8)
-	hoverCorner.Parent = hoverGui
+        local hoverCorner = Instance.new("UICorner")
+        hoverCorner.CornerRadius = UDim.new(0.25, 0)
+        hoverCorner.Parent = hoverGui
 
-	hoverNameLabel = Instance.new("TextLabel")
-	hoverNameLabel.Name = "NameLabel"
-	hoverNameLabel.BackgroundTransparency = 1
-	hoverNameLabel.Position = UDim2.new(0, 8, 0, 4)
-	hoverNameLabel.Size = UDim2.fromOffset(204, 22)
-	hoverNameLabel.Font = Enum.Font.GothamBold
-	hoverNameLabel.TextColor3 = Color3.new(1, 1, 1)
-	hoverNameLabel.TextSize = 18
-	hoverNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	hoverNameLabel.Text = "Enemy"
-	hoverNameLabel.Parent = hoverGui
+        hoverNameLabel = Instance.new("TextLabel")
+        hoverNameLabel.Name = "NameLabel"
+        hoverNameLabel.BackgroundTransparency = 1
+        hoverNameLabel.AnchorPoint = Vector2.new(0, 0)
+        hoverNameLabel.Position = UDim2.new(0.04, 0, 0.12, 0)
+        hoverNameLabel.Size = UDim2.new(0.92, 0, 0.46, 0)
+        hoverNameLabel.Font = Enum.Font.GothamBold
+        hoverNameLabel.TextColor3 = Color3.new(1, 1, 1)
+        hoverNameLabel.TextSize = 18
+        hoverNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        hoverNameLabel.Text = "Enemy"
+        hoverNameLabel.Parent = hoverGui
 
-	hoverHealthLabel = Instance.new("TextLabel")
-	hoverHealthLabel.Name = "HealthLabel"
-	hoverHealthLabel.BackgroundTransparency = 1
-	hoverHealthLabel.Position = UDim2.new(0, 8, 0, 24)
-	hoverHealthLabel.Size = UDim2.fromOffset(204, 20)
+        hoverHealthLabel = Instance.new("TextLabel")
+        hoverHealthLabel.Name = "HealthLabel"
+        hoverHealthLabel.BackgroundTransparency = 1
+        hoverHealthLabel.AnchorPoint = Vector2.new(0, 0)
+        hoverHealthLabel.Position = UDim2.new(0.04, 0, 0.58, 0)
+        hoverHealthLabel.Size = UDim2.new(0.92, 0, 0.32, 0)
 	hoverHealthLabel.Font = Enum.Font.Gotham
 	hoverHealthLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	hoverHealthLabel.TextSize = 16
@@ -1905,25 +1943,25 @@ local function createGui()
 
         shopFrame = Instance.new("Frame")
         shopFrame.Name = "Shop"
-        shopFrame.Size = UDim2.fromOffset(900, 164)
-        shopFrame.AnchorPoint = Vector2.new(0, 1)
-        shopFrame.Position = UDim2.fromOffset(0, 164)
+        shopFrame.Size = UDim2.new(0.7, 0, 0.22, 0)
+        shopFrame.AnchorPoint = Vector2.new(0.5, 1)
+        shopFrame.Position = UDim2.new(0.5, 0, 0.98, 0)
         shopFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
         shopFrame.BackgroundTransparency = 0.1
         shopFrame.BorderSizePixel = 0
         shopFrame.Parent = screenGui
 
-	local shopCorner = Instance.new("UICorner")
-	shopCorner.CornerRadius = UDim.new(0, 12)
-	shopCorner.Parent = shopFrame
+        local shopCorner = Instance.new("UICorner")
+        shopCorner.CornerRadius = UDim.new(0.05, 0)
+        shopCorner.Parent = shopFrame
 
-	local slotLayout = Instance.new("UIListLayout")
-	slotLayout.FillDirection = Enum.FillDirection.Horizontal
-	slotLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	slotLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-	slotLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	slotLayout.Padding = UDim.new(0, 12)
-	slotLayout.Parent = shopFrame
+        local slotLayout = Instance.new("UIListLayout")
+        slotLayout.FillDirection = Enum.FillDirection.Horizontal
+        slotLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        slotLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        slotLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        slotLayout.Padding = UDim.new(0.02, 0)
+        slotLayout.Parent = shopFrame
 
         shopSlotButtons = {}
         shopSlotOriginalText = {}
@@ -1931,22 +1969,23 @@ local function createGui()
         for i = 1, LOADOUT_SLOT_COUNT do
                 local slotContainer = Instance.new("Frame")
                 slotContainer.Name = string.format("ShopSlotContainer%d", i)
-                slotContainer.Size = UDim2.fromOffset(120, 140)
+                slotContainer.Size = UDim2.new(0.18, 0, 1, 0)
                 slotContainer.BackgroundTransparency = 1
                 slotContainer.BorderSizePixel = 0
                 slotContainer.LayoutOrder = i
                 slotContainer.Parent = shopFrame
 
-		local priceLabel = Instance.new("TextLabel")
-		priceLabel.Name = "PriceLabel"
-		priceLabel.BackgroundTransparency = 1
-		priceLabel.Size = UDim2.fromOffset(120, 22)
-		priceLabel.Position = UDim2.fromOffset(0, 0)
-		priceLabel.Font = Enum.Font.Gotham
-		priceLabel.TextSize = 18
-		priceLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
-		priceLabel.Text = ""
-		priceLabel.TextXAlignment = Enum.TextXAlignment.Center
+                local priceLabel = Instance.new("TextLabel")
+                priceLabel.Name = "PriceLabel"
+                priceLabel.BackgroundTransparency = 1
+                priceLabel.AnchorPoint = Vector2.new(0.5, 0)
+                priceLabel.Size = UDim2.new(0.9, 0, 0.18, 0)
+                priceLabel.Position = UDim2.new(0.5, 0, 0.02, 0)
+                priceLabel.Font = Enum.Font.Gotham
+                priceLabel.TextSize = 18
+                priceLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
+                priceLabel.Text = ""
+                priceLabel.TextXAlignment = Enum.TextXAlignment.Center
 		priceLabel.TextYAlignment = Enum.TextYAlignment.Center
 		priceLabel.TextWrapped = true
 		priceLabel.TextScaled = false
@@ -1956,8 +1995,9 @@ local function createGui()
 
                 local button = Instance.new("TextButton")
                 button.Name = string.format("ShopSlot%d", i)
-                button.Size = UDim2.fromOffset(120, 82)
-                button.Position = UDim2.fromOffset(0, 24)
+                button.AnchorPoint = Vector2.new(0.5, 0)
+                button.Size = UDim2.new(0.9, 0, 0.52, 0)
+                button.Position = UDim2.new(0.5, 0, 0.24, 0)
                 button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
                 button.BorderSizePixel = 0
                 button.Font = Enum.Font.Gotham
@@ -1973,8 +2013,9 @@ local function createGui()
                 local countLabel = Instance.new("TextLabel")
                 countLabel.Name = "CountLabel"
                 countLabel.BackgroundTransparency = 1
-                countLabel.Size = UDim2.fromOffset(120, 32)
-                countLabel.Position = UDim2.fromOffset(0, 108)
+                countLabel.AnchorPoint = Vector2.new(0.5, 1)
+                countLabel.Size = UDim2.new(0.9, 0, 0.22, 0)
+                countLabel.Position = UDim2.new(0.5, 0, 0.98, 0)
                 countLabel.Font = Enum.Font.Gotham
                 countLabel.TextSize = 14
                 countLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -1989,22 +2030,28 @@ local function createGui()
 
         statusFrame = Instance.new("Frame")
         statusFrame.Name = "Status"
-        statusFrame.Size = UDim2.fromOffset(320, 236)
-	statusFrame.Position = UDim2.fromOffset(0, 0)
-	statusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-	statusFrame.BackgroundTransparency = 0.1
-	statusFrame.BorderSizePixel = 0
-	statusFrame.Parent = screenGui
+        statusFrame.AnchorPoint = Vector2.new(0, 0)
+        statusFrame.Size = UDim2.new(0.22, 0, 0.34, 0)
+        statusFrame.Position = UDim2.new(0.02, 0, 0.05, 0)
+        statusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        statusFrame.BackgroundTransparency = 0.1
+        statusFrame.BorderSizePixel = 0
+        statusFrame.Parent = screenGui
 
-	local statusCorner = Instance.new("UICorner")
-	statusCorner.CornerRadius = UDim.new(0, 12)
-	statusCorner.Parent = statusFrame
+        local statusCorner = Instance.new("UICorner")
+        statusCorner.CornerRadius = UDim.new(0.05, 0)
+        statusCorner.Parent = statusFrame
 
-	moneyLabel = Instance.new("TextLabel")
-	moneyLabel.Name = "MoneyLabel"
-	moneyLabel.BackgroundTransparency = 1
-	moneyLabel.Position = UDim2.new(0, 12, 0, 12)
-	moneyLabel.Size = UDim2.fromOffset(296, 24)
+        local statusConstraint = Instance.new("UISizeConstraint")
+        statusConstraint.MinSize = Vector2.new(280, 200)
+        statusConstraint.Parent = statusFrame
+
+        moneyLabel = Instance.new("TextLabel")
+        moneyLabel.Name = "MoneyLabel"
+        moneyLabel.BackgroundTransparency = 1
+        moneyLabel.AnchorPoint = Vector2.new(0, 0)
+        moneyLabel.Position = UDim2.new(0.04, 0, 0.05, 0)
+        moneyLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
 	moneyLabel.Font = Enum.Font.GothamBold
 	moneyLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
 	moneyLabel.TextSize = 20
@@ -2012,11 +2059,12 @@ local function createGui()
 	moneyLabel.Text = "$0"
 	moneyLabel.Parent = statusFrame
 
-	livesLabel = Instance.new("TextLabel")
-	livesLabel.Name = "LivesLabel"
-	livesLabel.BackgroundTransparency = 1
-	livesLabel.Position = UDim2.new(0, 12, 0, 44)
-	livesLabel.Size = UDim2.fromOffset(296, 24)
+        livesLabel = Instance.new("TextLabel")
+        livesLabel.Name = "LivesLabel"
+        livesLabel.BackgroundTransparency = 1
+        livesLabel.AnchorPoint = Vector2.new(0, 0)
+        livesLabel.Position = UDim2.new(0.04, 0, 0.24, 0)
+        livesLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
 	livesLabel.Font = Enum.Font.Gotham
 	livesLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
 	livesLabel.TextSize = 18
@@ -2024,11 +2072,12 @@ local function createGui()
 	livesLabel.Text = "Lives: 0"
 	livesLabel.Parent = statusFrame
 
-	waveLabel = Instance.new("TextLabel")
-	waveLabel.Name = "WaveLabel"
-	waveLabel.BackgroundTransparency = 1
-	waveLabel.Position = UDim2.new(0, 12, 0, 76)
-	waveLabel.Size = UDim2.fromOffset(296, 24)
+        waveLabel = Instance.new("TextLabel")
+        waveLabel.Name = "WaveLabel"
+        waveLabel.BackgroundTransparency = 1
+        waveLabel.AnchorPoint = Vector2.new(0, 0)
+        waveLabel.Position = UDim2.new(0.04, 0, 0.43, 0)
+        waveLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
 	waveLabel.Font = Enum.Font.Gotham
 	waveLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
 	waveLabel.TextSize = 18
@@ -2039,8 +2088,9 @@ local function createGui()
         playerTowerTotalLabel = Instance.new("TextLabel")
         playerTowerTotalLabel.Name = "PlayerTowerTotal"
         playerTowerTotalLabel.BackgroundTransparency = 1
-        playerTowerTotalLabel.Position = UDim2.new(0, 12, 0, 108)
-        playerTowerTotalLabel.Size = UDim2.fromOffset(296, 20)
+        playerTowerTotalLabel.AnchorPoint = Vector2.new(0, 0)
+        playerTowerTotalLabel.Position = UDim2.new(0.04, 0, 0.62, 0)
+        playerTowerTotalLabel.Size = UDim2.new(0.92, 0, 0.1, 0)
         playerTowerTotalLabel.Font = Enum.Font.Gotham
         playerTowerTotalLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
         playerTowerTotalLabel.TextSize = 18
@@ -2051,8 +2101,9 @@ local function createGui()
         teamTowerTotalLabel = Instance.new("TextLabel")
         teamTowerTotalLabel.Name = "TeamTowerTotal"
         teamTowerTotalLabel.BackgroundTransparency = 1
-        teamTowerTotalLabel.Position = UDim2.new(0, 12, 0, 132)
-        teamTowerTotalLabel.Size = UDim2.fromOffset(296, 20)
+        teamTowerTotalLabel.AnchorPoint = Vector2.new(0, 0)
+        teamTowerTotalLabel.Position = UDim2.new(0.04, 0, 0.76, 0)
+        teamTowerTotalLabel.Size = UDim2.new(0.92, 0, 0.1, 0)
         teamTowerTotalLabel.Font = Enum.Font.Gotham
         teamTowerTotalLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
         teamTowerTotalLabel.TextSize = 18
@@ -2063,8 +2114,9 @@ local function createGui()
         preRoundCountdownLabel = Instance.new("TextLabel")
         preRoundCountdownLabel.Name = "CountdownLabel"
         preRoundCountdownLabel.BackgroundTransparency = 1
-        preRoundCountdownLabel.Position = UDim2.new(0, 12, 0, 168)
-        preRoundCountdownLabel.Size = UDim2.fromOffset(296, 24)
+        preRoundCountdownLabel.AnchorPoint = Vector2.new(0, 0)
+        preRoundCountdownLabel.Position = UDim2.new(0.04, 0, 0.9, 0)
+        preRoundCountdownLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
         preRoundCountdownLabel.Font = Enum.Font.GothamBold
         preRoundCountdownLabel.TextSize = 18
         preRoundCountdownLabel.TextColor3 = Color3.fromRGB(255, 220, 120)
@@ -2073,25 +2125,27 @@ local function createGui()
         preRoundCountdownLabel.Visible = false
         preRoundCountdownLabel.Parent = statusFrame
 
-	towerDetailsFrame = Instance.new("Frame")
-	towerDetailsFrame.Name = "TowerDetails"
-	towerDetailsFrame.Size = UDim2.fromOffset(380, 240)
-	towerDetailsFrame.Position = UDim2.fromOffset(0, 0)
+        towerDetailsFrame = Instance.new("Frame")
+        towerDetailsFrame.Name = "TowerDetails"
+        towerDetailsFrame.AnchorPoint = Vector2.new(1, 0.5)
+        towerDetailsFrame.Size = UDim2.new(0.26, 0, 0.36, 0)
+        towerDetailsFrame.Position = UDim2.new(0.98, 0, 0.5, 0)
 	towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 	towerDetailsFrame.BackgroundTransparency = 0.1
 	towerDetailsFrame.BorderSizePixel = 0
 	towerDetailsFrame.Visible = false
 	towerDetailsFrame.Parent = screenGui
 
-	local detailsCorner = Instance.new("UICorner")
-	detailsCorner.CornerRadius = UDim.new(0, 12)
+        local detailsCorner = Instance.new("UICorner")
+        detailsCorner.CornerRadius = UDim.new(0.05, 0)
 	detailsCorner.Parent = towerDetailsFrame
 
 	towerNameLabel = Instance.new("TextLabel")
 	towerNameLabel.Name = "TowerNameLabel"
 	towerNameLabel.BackgroundTransparency = 1
-	towerNameLabel.Position = UDim2.new(0, 16, 0, 16)
-	towerNameLabel.Size = UDim2.fromOffset(348, 26)
+        towerNameLabel.AnchorPoint = Vector2.new(0, 0)
+        towerNameLabel.Position = UDim2.new(0.05, 0, 0.07, 0)
+        towerNameLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
 	towerNameLabel.Font = Enum.Font.GothamBold
 	towerNameLabel.TextColor3 = Color3.new(1, 1, 1)
 	towerNameLabel.TextSize = 20
@@ -2102,8 +2156,9 @@ local function createGui()
 	towerLevelLabel = Instance.new("TextLabel")
 	towerLevelLabel.Name = "TowerLevelLabel"
 	towerLevelLabel.BackgroundTransparency = 1
-	towerLevelLabel.Position = UDim2.new(0, 16, 0, 48)
-	towerLevelLabel.Size = UDim2.fromOffset(348, 20)
+        towerLevelLabel.AnchorPoint = Vector2.new(0, 0)
+        towerLevelLabel.Position = UDim2.new(0.05, 0, 0.24, 0)
+        towerLevelLabel.Size = UDim2.new(0.9, 0, 0.1, 0)
 	towerLevelLabel.Font = Enum.Font.Gotham
 	towerLevelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	towerLevelLabel.TextSize = 16
@@ -2114,8 +2169,9 @@ local function createGui()
 	towerStatsLabel = Instance.new("TextLabel")
 	towerStatsLabel.Name = "TowerStatsLabel"
 	towerStatsLabel.BackgroundTransparency = 1
-	towerStatsLabel.Position = UDim2.new(0, 16, 0, 72)
-	towerStatsLabel.Size = UDim2.fromOffset(348, 72)
+        towerStatsLabel.AnchorPoint = Vector2.new(0, 0)
+        towerStatsLabel.Position = UDim2.new(0.05, 0, 0.36, 0)
+        towerStatsLabel.Size = UDim2.new(0.9, 0, 0.28, 0)
 	towerStatsLabel.Font = Enum.Font.Gotham
 	towerStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	towerStatsLabel.TextSize = 16
@@ -2128,8 +2184,9 @@ local function createGui()
 	ownershipLabel = Instance.new("TextLabel")
 	ownershipLabel.Name = "OwnershipLabel"
 	ownershipLabel.BackgroundTransparency = 1
-	ownershipLabel.Position = UDim2.new(0, 16, 0, 140)
-	ownershipLabel.Size = UDim2.fromOffset(348, 20)
+        ownershipLabel.AnchorPoint = Vector2.new(0, 0)
+        ownershipLabel.Position = UDim2.new(0.05, 0, 0.66, 0)
+        ownershipLabel.Size = UDim2.new(0.9, 0, 0.1, 0)
 	ownershipLabel.Font = Enum.Font.Gotham
 	ownershipLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	ownershipLabel.TextSize = 16
@@ -2140,8 +2197,9 @@ local function createGui()
 	upgradeDescriptionLabel = Instance.new("TextLabel")
 	upgradeDescriptionLabel.Name = "UpgradeDescriptionLabel"
 	upgradeDescriptionLabel.BackgroundTransparency = 1
-	upgradeDescriptionLabel.Position = UDim2.new(0, 16, 0, 164)
-	upgradeDescriptionLabel.Size = UDim2.fromOffset(348, 28)
+        upgradeDescriptionLabel.AnchorPoint = Vector2.new(0, 0)
+        upgradeDescriptionLabel.Position = UDim2.new(0.05, 0, 0.78, 0)
+        upgradeDescriptionLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
 	upgradeDescriptionLabel.Font = Enum.Font.Gotham
 	upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	upgradeDescriptionLabel.TextSize = 14
@@ -2151,10 +2209,11 @@ local function createGui()
 	upgradeDescriptionLabel.Text = ""
 	upgradeDescriptionLabel.Parent = towerDetailsFrame
 
-	upgradeButton = Instance.new("TextButton")
-	upgradeButton.Name = "UpgradeButton"
-	upgradeButton.Size = UDim2.fromOffset(170, 34)
-	upgradeButton.Position = UDim2.new(0, 16, 0, 198)
+        upgradeButton = Instance.new("TextButton")
+        upgradeButton.Name = "UpgradeButton"
+        upgradeButton.Size = UDim2.new(0.44, 0, 0.14, 0)
+        upgradeButton.AnchorPoint = Vector2.new(0, 1)
+        upgradeButton.Position = UDim2.new(0.05, 0, 0.98, 0)
 	upgradeButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
 	upgradeButton.BorderSizePixel = 0
 	upgradeButton.Font = Enum.Font.GothamBold
@@ -2177,10 +2236,11 @@ local function createGui()
 		end
 	end)
 
-	sellButton = Instance.new("TextButton")
-	sellButton.Name = "SellButton"
-	sellButton.Size = UDim2.fromOffset(170, 34)
-	sellButton.Position = UDim2.new(0, 194, 0, 198)
+        sellButton = Instance.new("TextButton")
+        sellButton.Name = "SellButton"
+        sellButton.Size = UDim2.new(0.44, 0, 0.14, 0)
+        sellButton.AnchorPoint = Vector2.new(1, 1)
+        sellButton.Position = UDim2.new(0.95, 0, 0.98, 0)
 	sellButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
 	sellButton.BorderSizePixel = 0
 	sellButton.Font = Enum.Font.GothamBold
@@ -2199,26 +2259,27 @@ local function createGui()
 		end
 	end)
 
-	priceLabelContainer = Instance.new("Frame")
-	priceLabelContainer.Name = "PlayerTowerPriceLabels"
-	priceLabelContainer.Size = UDim2.fromOffset(240, 52)
-	priceLabelContainer.Position = UDim2.new(0, 190, 0, -72)
-	priceLabelContainer.AnchorPoint = Vector2.new(0.5, 1)
-	priceLabelContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	priceLabelContainer.BackgroundTransparency = 0.2
-	priceLabelContainer.BorderSizePixel = 0
-	priceLabelContainer.Visible = false
-	priceLabelContainer.Parent = towerDetailsFrame
+        priceLabelContainer = Instance.new("Frame")
+        priceLabelContainer.Name = "PlayerTowerPriceLabels"
+        priceLabelContainer.AnchorPoint = Vector2.new(0.5, 1)
+        priceLabelContainer.Size = UDim2.new(0.7, 0, 0.2, 0)
+        priceLabelContainer.Position = UDim2.new(0.5, 0, 0.84, 0)
+        priceLabelContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        priceLabelContainer.BackgroundTransparency = 0.2
+        priceLabelContainer.BorderSizePixel = 0
+        priceLabelContainer.Visible = false
+        priceLabelContainer.Parent = towerDetailsFrame
 
-	local priceCorner = Instance.new("UICorner")
-	priceCorner.CornerRadius = UDim.new(0, 10)
-	priceCorner.Parent = priceLabelContainer
+        local priceCorner = Instance.new("UICorner")
+        priceCorner.CornerRadius = UDim.new(0.4, 0)
+        priceCorner.Parent = priceLabelContainer
 
-	upgradePriceLabel = Instance.new("TextLabel")
-	upgradePriceLabel.Name = "UpgradePriceLabel"
-	upgradePriceLabel.BackgroundTransparency = 1
-	upgradePriceLabel.Position = UDim2.new(0, 10, 0, 6)
-	upgradePriceLabel.Size = UDim2.fromOffset(200, 18)
+        upgradePriceLabel = Instance.new("TextLabel")
+        upgradePriceLabel.Name = "UpgradePriceLabel"
+        upgradePriceLabel.BackgroundTransparency = 1
+        upgradePriceLabel.AnchorPoint = Vector2.new(0, 0)
+        upgradePriceLabel.Position = UDim2.new(0.05, 0, 0.2, 0)
+        upgradePriceLabel.Size = UDim2.new(0.9, 0, 0.3, 0)
 	upgradePriceLabel.Font = Enum.Font.Gotham
 	upgradePriceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	upgradePriceLabel.TextSize = 16
@@ -2226,11 +2287,12 @@ local function createGui()
 	upgradePriceLabel.Text = "Upgrade: $0"
 	upgradePriceLabel.Parent = priceLabelContainer
 
-	sellPriceLabel = Instance.new("TextLabel")
-	sellPriceLabel.Name = "SellPriceLabel"
-	sellPriceLabel.BackgroundTransparency = 1
-	sellPriceLabel.Position = UDim2.new(0, 10, 0, 26)
-	sellPriceLabel.Size = UDim2.fromOffset(200, 18)
+        sellPriceLabel = Instance.new("TextLabel")
+        sellPriceLabel.Name = "SellPriceLabel"
+        sellPriceLabel.BackgroundTransparency = 1
+        sellPriceLabel.AnchorPoint = Vector2.new(0, 0)
+        sellPriceLabel.Position = UDim2.new(0.05, 0, 0.56, 0)
+        sellPriceLabel.Size = UDim2.new(0.9, 0, 0.3, 0)
 	sellPriceLabel.Font = Enum.Font.Gotham
 	sellPriceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	sellPriceLabel.TextSize = 16
@@ -2238,38 +2300,47 @@ local function createGui()
 	sellPriceLabel.Text = "Sell: $0"
 	sellPriceLabel.Parent = priceLabelContainer
 
-	local function updateHudLayout()
-		if not screenGui then
-			return
-		end
+        local function applyHudConstraints()
+                if not screenGui then
+                        return
+                end
 
-		local absoluteSize = screenGui.AbsoluteSize
+                if shopFrame then
+                        if not shopFrame:FindFirstChild("AspectConstraint") then
+                                local aspect = Instance.new("UIAspectRatioConstraint")
+                                aspect.Name = "AspectConstraint"
+                                aspect.AspectRatio = 900 / 164
+                                aspect.Parent = shopFrame
+                        end
 
-		if shopFrame then
-			local shopSize = shopFrame.AbsoluteSize
-			local shopX = math.max(math.floor((absoluteSize.X - shopSize.X) * 0.5), 0)
-			local shopY = math.max(absoluteSize.Y - 10, shopSize.Y)
-			shopFrame.Position = UDim2.fromOffset(shopX, shopY)
-		end
-
-		if statusFrame then
-			local statusSize = statusFrame.AbsoluteSize
-			local statusX = math.max(absoluteSize.X - statusSize.X - 20, 0)
-			local statusY = math.max(absoluteSize.Y - statusSize.Y - 20, 0)
-			statusFrame.Position = UDim2.fromOffset(statusX, statusY)
-		end
+                        if not shopFrame:FindFirstChild("SizeConstraint") then
+                                local sizeConstraint = Instance.new("UISizeConstraint")
+                                sizeConstraint.Name = "SizeConstraint"
+                                sizeConstraint.MinSize = Vector2.new(600, 140)
+                                sizeConstraint.Parent = shopFrame
+                        end
+                end
 
                 if towerDetailsFrame then
-                        local detailsSize = towerDetailsFrame.AbsoluteSize
-                        local detailsX = math.max(absoluteSize.X - detailsSize.X - 20, 0)
-                        local detailsY = math.max(math.floor((absoluteSize.Y - detailsSize.Y) * 0.5), 0)
-                        towerDetailsFrame.Position = UDim2.fromOffset(detailsX, detailsY)
+                        if not towerDetailsFrame:FindFirstChild("AspectConstraint") then
+                                local aspect = Instance.new("UIAspectRatioConstraint")
+                                aspect.Name = "AspectConstraint"
+                                aspect.AspectRatio = 380 / 240
+                                aspect.Parent = towerDetailsFrame
+                        end
+
+                        if not towerDetailsFrame:FindFirstChild("SizeConstraint") then
+                                local sizeConstraint = Instance.new("UISizeConstraint")
+                                sizeConstraint.Name = "SizeConstraint"
+                                sizeConstraint.MinSize = Vector2.new(320, 220)
+                                sizeConstraint.Parent = towerDetailsFrame
+                        end
                 end
         end
 
-	updateHudLayout()
-	task.defer(updateHudLayout)
-	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateHudLayout)
+        applyHudConstraints()
+        task.defer(applyHudConstraints)
+        screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(applyHudConstraints)
 
 	for _, button in pairs(shopSlotButtons) do
 		connectShopButton(button)
@@ -2522,11 +2593,19 @@ local function updateEnemyHover()
 			end
 		end
 
-		local mousePosition = Vector2.new(mouse.X, mouse.Y)
-		local offsetX = guiObject:GetAttribute("OffsetX") or 16
-		local offsetY = guiObject:GetAttribute("OffsetY") or 16
-		guiObject.Position = UDim2.fromOffset(mousePosition.X + offsetX, mousePosition.Y + offsetY)
-		guiObject.Visible = true
+                local mousePosition = Vector2.new(mouse.X, mouse.Y)
+                local offsetX = guiObject:GetAttribute("OffsetX") or 16
+                local offsetY = guiObject:GetAttribute("OffsetY") or 16
+                local camera = workspace.CurrentCamera
+                local viewport = camera and camera.ViewportSize or playerGui.AbsoluteSize
+                local relativeX = 0
+                local relativeY = 0
+                if viewport.X > 0 and viewport.Y > 0 then
+                        relativeX = math.clamp((mousePosition.X + offsetX) / viewport.X, 0, 1)
+                        relativeY = math.clamp((mousePosition.Y + offsetY) / viewport.Y, 0, 1)
+                end
+                guiObject.Position = UDim2.new(relativeX, 0, relativeY, 0)
+                guiObject.Visible = true
 	else
 		if hoverGui and hoverGui:IsA("GuiObject") then
 			hoverGui.Visible = false
