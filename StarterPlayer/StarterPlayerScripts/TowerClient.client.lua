@@ -99,6 +99,7 @@ local lobbyPhase = "lobby"
 local lobbyStateSnapshot
 local lobbyReadyState = false
 local lobbyRoundList
+local loadoutLocked = false
 
 local mapSelectionGui
 local mapSelectionFrame
@@ -586,6 +587,35 @@ local function hasAnySelectedTowers()
         return false
 end
 
+local function applyLoadoutLockState()
+        for _, button in pairs(selectionSlotButtons) do
+                if button and button:IsA("GuiButton") then
+                        button.AutoButtonColor = not loadoutLocked
+                end
+        end
+
+        if selectionTowerList then
+                if selectionTowerList:IsA("ScrollingFrame") then
+                        selectionTowerList.Active = not loadoutLocked
+                        selectionTowerList.ScrollingEnabled = not loadoutLocked
+                end
+
+                for _, child in ipairs(selectionTowerList:GetChildren()) do
+                        if child:IsA("GuiButton") then
+                                child.Active = not loadoutLocked
+                                child.AutoButtonColor = not loadoutLocked
+                        end
+                end
+        end
+end
+
+local function setLoadoutLocked(locked)
+        locked = locked and true or false
+
+        loadoutLocked = locked
+        applyLoadoutLockState()
+end
+
 local function updateConfirmButtonState()
         syncLoadoutWithServer()
 
@@ -598,7 +628,9 @@ local function updateConfirmButtonState()
         end
 
         if lobbyStatusLabel then
-                if ready then
+                if loadoutLocked then
+                        lobbyStatusLabel.Text = "Loadout locked while the countdown is active."
+                elseif ready then
                         lobbyStatusLabel.Text = ""
                 else
                         lobbyStatusLabel.Text = "Select at least one tower to join a round."
@@ -694,24 +726,28 @@ syncLoadoutWithServer = function()
 end
 
 local function assignTowerToSlot(slotIndex, towerType)
+    if loadoutLocked then
+        return
+    end
+
     if not (slotIndex and towerType and towerConfigs[towerType]) then
         return
     end
 
-	-- Prevent duplicate towers in the loadout by clearing any other slot that already
-	-- contains the requested tower before assigning it to the active slot.
-        for i = 1, LOADOUT_SLOT_COUNT do
-                if i ~= slotIndex and loadoutSelection[i] == towerType then
-                        loadoutSelection[i] = nil
-                        updateSelectionSlotDisplay(i)
-                end
+    -- Prevent duplicate towers in the loadout by clearing any other slot that already
+    -- contains the requested tower before assigning it to the active slot.
+    for i = 1, LOADOUT_SLOT_COUNT do
+        if i ~= slotIndex and loadoutSelection[i] == towerType then
+            loadoutSelection[i] = nil
+            updateSelectionSlotDisplay(i)
         end
+    end
 
-	loadoutSelection[slotIndex] = towerType
-	updateSelectionSlotDisplay(slotIndex)
+    loadoutSelection[slotIndex] = towerType
+    updateSelectionSlotDisplay(slotIndex)
 
-	local nextEmpty = findFirstEmptySlot()
-	if nextEmpty then
+    local nextEmpty = findFirstEmptySlot()
+    if nextEmpty then
         setActiveSelectionSlot(nextEmpty)
     end
 
@@ -719,6 +755,10 @@ local function assignTowerToSlot(slotIndex, towerType)
 end
 
 local function clearSlot(slotIndex)
+    if loadoutLocked then
+        return
+    end
+
     if not slotIndex then
         return
     end
@@ -839,6 +879,8 @@ local function populateTowerSelectionButtons()
                 local contentSize = layout.AbsoluteContentSize
                 selectionTowerList.CanvasSize = UDim2.fromOffset(contentSize.X, contentSize.Y)
         end
+
+        applyLoadoutLockState()
 end
 
 local function createSelectionGui()
@@ -1039,7 +1081,11 @@ local function createSelectionGui()
 
                 button.MouseButton1Click:Connect(function()
                         if loadoutSelection[i] then
-                                clearSlot(i)
+                                if loadoutLocked then
+                                        setActiveSelectionSlot(i)
+                                else
+                                        clearSlot(i)
+                                end
                         else
                                 setActiveSelectionSlot(i)
                         end
@@ -1095,6 +1141,7 @@ local function createSelectionGui()
         end
         setActiveSelectionSlot(findFirstEmptySlot() or 1)
         updateConfirmButtonState()
+        applyLoadoutLockState()
 
         return selectionScreenGui
 end
@@ -1209,6 +1256,27 @@ local function applyLobbyState(state)
         lobbyPhase = state and state.Phase or lobbyPhase
         lobbyReadyState = state and state.Player and state.Player.Ready or false
 
+        local playerInfo = state and state.Player or {}
+        local playerRound = playerInfo.CurrentRound
+        local hasLoadout = playerInfo.HasLoadout ~= false
+        local countdownActive = false
+        local countdownRemaining = 0
+
+        if playerRound then
+                for _, round in ipairs(state and state.Rounds or {}) do
+                        if round.Key == playerRound then
+                                local remaining = tonumber(round.Countdown) or 0
+                                if remaining > 0 then
+                                        countdownActive = true
+                                        countdownRemaining = remaining
+                                end
+                                break
+                        end
+                end
+        end
+
+        setLoadoutLocked(countdownActive)
+
         updateInterfaceVisibility()
 
         if lobbyPhase ~= "lobby" then
@@ -1217,18 +1285,18 @@ local function applyLobbyState(state)
 
         createSelectionGui()
 
-        local playerInfo = state and state.Player or {}
-        local playerRound = playerInfo.CurrentRound
-        local hasLoadout = playerInfo.HasLoadout ~= false
-
         updateRoundButtons(state and state.Rounds or {}, playerRound, hasLoadout)
 
         if lobbyCountdownLabel then
                 local countdownText = ""
-                for _, round in ipairs(state and state.Rounds or {}) do
-                        if round.Key == playerRound and round.Countdown and round.Countdown > 0 then
-                                countdownText = string.format("Countdown: %ds", round.Countdown)
-                                break
+                if countdownActive then
+                        countdownText = string.format("Countdown: %ds", countdownRemaining)
+                else
+                        for _, round in ipairs(state and state.Rounds or {}) do
+                                if round.Key == playerRound and round.Countdown and round.Countdown > 0 then
+                                        countdownText = string.format("Countdown: %ds", round.Countdown)
+                                        break
+                                end
                         end
                 end
                 lobbyCountdownLabel.Text = countdownText
@@ -1253,7 +1321,9 @@ local function applyLobbyState(state)
         end
 
         if lobbyStatusLabel then
-                if not hasLoadout or not hasAnySelectedTowers() then
+                if loadoutLocked then
+                        lobbyStatusLabel.Text = "Loadout locked while the countdown is active."
+                elseif not hasLoadout or not hasAnySelectedTowers() then
                         lobbyStatusLabel.Text = "Select at least one tower to join a round."
                 elseif not playerRound then
                         lobbyStatusLabel.Text = "Choose a round to enter the waiting room."
