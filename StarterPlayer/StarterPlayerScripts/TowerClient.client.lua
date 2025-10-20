@@ -1262,13 +1262,13 @@ local function ensurePlayerSlots(entry, slotCount)
                         slotLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
                         slotLayout.VerticalAlignment = Enum.VerticalAlignment.Center
                         slotLayout.SortOrder = Enum.SortOrder.LayoutOrder
-                        slotLayout.Padding = UDim.new(0.015, 0)
+                        slotLayout.Padding = UDim.new(0, 0)
                         slotLayout.Parent = slotFrame
 
                         local nameLabel = Instance.new("TextLabel")
                         nameLabel.Name = "NameLabel"
                         nameLabel.BackgroundTransparency = 1
-                        nameLabel.Size = UDim2.new(0.48, 0, 1, 0)
+                        nameLabel.Size = UDim2.new(0.66, 0, 1, 0)
                         nameLabel.Font = Enum.Font.GothamMedium
                         nameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
                         nameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1280,7 +1280,7 @@ local function ensurePlayerSlots(entry, slotCount)
                         local readyFrame = Instance.new("Frame")
                         readyFrame.Name = "ReadyFrame"
                         readyFrame.AnchorPoint = Vector2.new(0, 0)
-                        readyFrame.Size = UDim2.new(0.48, 0, 1, 0)
+                        readyFrame.Size = UDim2.new(0.34, 0, 1, 0)
                         readyFrame.BackgroundColor3 = NOT_READY_COLOR
                         readyFrame.BackgroundTransparency = 0.15
                         readyFrame.BorderSizePixel = 0
