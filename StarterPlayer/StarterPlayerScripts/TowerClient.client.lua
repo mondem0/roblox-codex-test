@@ -1210,7 +1210,7 @@ local function updateInterfaceVisibility()
         end
 end
 
-local PLAYER_SLOT_PADDING = 0.025
+local PLAYER_SLOT_PADDING = 0.02
 
 local function ensurePlayerSlots(entry, slotCount)
         slotCount = math.max(slotCount or 0, 1)
@@ -1253,8 +1253,8 @@ local function ensurePlayerSlots(entry, slotCount)
                         slotCorner.Parent = slotFrame
 
                         local slotPadding = Instance.new("UIPadding")
-                        slotPadding.PaddingLeft = UDim.new(0.03, 0)
-                        slotPadding.PaddingRight = UDim.new(0.03, 0)
+                        slotPadding.PaddingLeft = UDim.new(0.02, 0)
+                        slotPadding.PaddingRight = UDim.new(0.02, 0)
                         slotPadding.Parent = slotFrame
 
                         local slotLayout = Instance.new("UIListLayout")
@@ -1262,13 +1262,13 @@ local function ensurePlayerSlots(entry, slotCount)
                         slotLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
                         slotLayout.VerticalAlignment = Enum.VerticalAlignment.Center
                         slotLayout.SortOrder = Enum.SortOrder.LayoutOrder
-                        slotLayout.Padding = UDim.new(0.02, 0)
+                        slotLayout.Padding = UDim.new(0.015, 0)
                         slotLayout.Parent = slotFrame
 
                         local nameLabel = Instance.new("TextLabel")
                         nameLabel.Name = "NameLabel"
                         nameLabel.BackgroundTransparency = 1
-                        nameLabel.Size = UDim2.new(0.5, 0, 1, 0)
+                        nameLabel.Size = UDim2.new(0.48, 0, 1, 0)
                         nameLabel.Font = Enum.Font.GothamMedium
                         nameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
                         nameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1280,7 +1280,7 @@ local function ensurePlayerSlots(entry, slotCount)
                         local readyFrame = Instance.new("Frame")
                         readyFrame.Name = "ReadyFrame"
                         readyFrame.AnchorPoint = Vector2.new(0, 0)
-                        readyFrame.Size = UDim2.new(0.5, 0, 1, 0)
+                        readyFrame.Size = UDim2.new(0.48, 0, 1, 0)
                         readyFrame.BackgroundColor3 = NOT_READY_COLOR
                         readyFrame.BackgroundTransparency = 0.15
                         readyFrame.BorderSizePixel = 0
@@ -1409,7 +1409,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         playerContainer.Name = "PlayerContainer"
                         playerContainer.AnchorPoint = Vector2.new(0, 0)
                         playerContainer.Position = UDim2.new(0.03, 0, 0.46, 0)
-                        playerContainer.Size = UDim2.new(0.94, 0, 0.5, 0)
+                        playerContainer.Size = UDim2.new(0.94, 0, 0.46, 0)
                         playerContainer.BackgroundTransparency = 1
                         playerContainer.Parent = frame
 
@@ -1434,23 +1434,23 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
 
                 local players = round.Players or {}
                 local occupantCount = #players
-                local readyCount = 0
-                for _, occupant in ipairs(players) do
-                        if occupant.Ready then
-                                readyCount += 1
-                        end
-                end
-
                 local requiredPlayers = tonumber(round.RequiredPlayers) or 0
                 local slotCount = requiredPlayers > 0 and requiredPlayers or math.max(occupantCount, 1)
                 ensurePlayerSlots(entry, slotCount)
 
-                local slotAreaHeight = math.clamp(0.18 * slotCount + (PLAYER_SLOT_PADDING * math.max(slotCount - 1, 0)) + 0.08, 0.26, 0.62)
+                local baseSlotHeight = 0.14
+                local containerTop = 0.46
+                local containerBottomBuffer = 0.04
+                local slotAreaHeight = math.clamp(
+                        baseSlotHeight * slotCount + (PLAYER_SLOT_PADDING * math.max(slotCount - 1, 0)) + 0.06,
+                        0.26,
+                        0.68
+                )
+                slotAreaHeight = math.min(slotAreaHeight, 1 - containerTop - containerBottomBuffer)
+                entry.PlayerContainer.Position = UDim2.new(0.03, 0, containerTop, 0)
                 entry.PlayerContainer.Size = UDim2.new(0.94, 0, slotAreaHeight, 0)
-                local slotTop = math.max(0.3, math.min(0.46, 1 - slotAreaHeight - 0.05))
-                entry.PlayerContainer.Position = UDim2.new(0.03, 0, slotTop, 0)
 
-                local frameHeight = math.clamp(0.32 + slotAreaHeight, 0.52, 0.98)
+                local frameHeight = math.clamp(containerTop + slotAreaHeight + containerBottomBuffer, 0.52, 1)
                 entry.Frame.Size = UDim2.new(1, 0, frameHeight, 0)
                 entry.Frame.LayoutOrder = round.RequiredPlayers or index
                 entry.TitleLabel.Text = round.DisplayName or roundKey
@@ -1462,15 +1462,9 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 entry.JoinButton.TextTransparency = hasLoadout and 0 or 0.35
                 entry.JoinButton.Text = "Join"
 
-                entry.CountdownLabel.TextTransparency = hasLoadout and 0 or 0.35
-                local countdownText = "Waiting for players"
-                if round.Countdown and round.Countdown > 0 then
-                        countdownText = string.format("Countdown: %ds", round.Countdown)
-                elseif readyCount > 0 then
-                        countdownText = string.format("%d ready", readyCount)
-                end
                 local occupancyText = string.format("%d/%s Players", occupantCount, requiredText)
-                entry.CountdownLabel.Text = string.format("%s\n%s", occupancyText, countdownText)
+                entry.CountdownLabel.TextTransparency = hasLoadout and 0 or 0.35
+                entry.CountdownLabel.Text = occupancyText
 
                 for slotIndex = 1, slotCount do
                         local slot = entry.PlayerSlots[slotIndex]
