@@ -974,7 +974,7 @@ local function createSelectionGui()
 
         local roundLayout = Instance.new("UIListLayout")
         roundLayout.FillDirection = Enum.FillDirection.Vertical
-        roundLayout.HorizontalAlignment = Enum.HorizontalAlignment.Stretch
+        roundLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
         roundLayout.VerticalAlignment = Enum.VerticalAlignment.Top
         roundLayout.SortOrder = Enum.SortOrder.LayoutOrder
         roundLayout.Padding = UDim.new(0, 8)
