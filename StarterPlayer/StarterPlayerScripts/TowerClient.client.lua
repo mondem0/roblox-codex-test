@@ -1000,8 +1000,8 @@ local function createSelectionGui()
         local roundPanel = Instance.new("Frame")
         roundPanel.Name = "RoundPanel"
         roundPanel.AnchorPoint = Vector2.new(1, 0)
-        roundPanel.Size = UDim2.new(0.36, 0, 0.55, 0)
-        roundPanel.Position = UDim2.new(0.97, 0, 0.05, 0)
+        roundPanel.Size = UDim2.new(0.34, 0, 0.55, 0)
+        roundPanel.Position = UDim2.new(0.99, 0, 0.05, 0)
         roundPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         roundPanel.BackgroundTransparency = 0.05
         roundPanel.BorderSizePixel = 0
@@ -1064,7 +1064,7 @@ local function createSelectionGui()
         loadoutPanel.Name = "LoadoutPanel"
         loadoutPanel.AnchorPoint = Vector2.new(1, 0.5)
         loadoutPanel.Size = UDim2.new(0.32, 0, 0.3, 0)
-        loadoutPanel.Position = UDim2.new(0.97, 0, 0.7, 0)
+        loadoutPanel.Position = UDim2.new(0.99, 0, 0.82, 0)
         loadoutPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         loadoutPanel.BackgroundTransparency = 0.05
         loadoutPanel.BorderSizePixel = 0
