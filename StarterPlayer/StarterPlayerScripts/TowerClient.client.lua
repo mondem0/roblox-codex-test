@@ -1043,8 +1043,8 @@ local function createSelectionGui()
         lobbyRoundList = Instance.new("ScrollingFrame")
         lobbyRoundList.Name = "RoundList"
         lobbyRoundList.AnchorPoint = Vector2.new(0, 0)
-        lobbyRoundList.Size = UDim2.new(0.94, 0, 0.64, 0)
-        lobbyRoundList.Position = UDim2.new(0.03, 0, 0.42, 0)
+        lobbyRoundList.Size = UDim2.new(0.94, 0, 0.6, 0)
+        lobbyRoundList.Position = UDim2.new(0.03, 0, 0.36, 0)
         lobbyRoundList.BackgroundTransparency = 1
         lobbyRoundList.BorderSizePixel = 0
         lobbyRoundList.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -1063,7 +1063,7 @@ local function createSelectionGui()
         local loadoutPanel = Instance.new("Frame")
         loadoutPanel.Name = "LoadoutPanel"
         loadoutPanel.AnchorPoint = Vector2.new(1, 0.5)
-        loadoutPanel.Size = UDim2.new(0.32, 0, 0.3, 0)
+        loadoutPanel.Size = UDim2.new(0.34, 0, 0.3, 0)
         loadoutPanel.Position = UDim2.new(0.99, 0, 0.82, 0)
         loadoutPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         loadoutPanel.BackgroundTransparency = 0.05
