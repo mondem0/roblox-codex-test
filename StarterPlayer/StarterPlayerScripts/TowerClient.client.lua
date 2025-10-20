@@ -50,17 +50,12 @@ local ownershipLabel
 local upgradeDescriptionLabel
 local upgradeButton
 local sellButton
-local priceLabelContainer
-local upgradePriceLabel
-local sellPriceLabel
-
 local upgradeButtonOriginalColor
 local upgradeButtonOriginalTextColor
 local upgradeButtonOriginalBackgroundTransparency
 local upgradeButtonOriginalTextTransparency
 local upgradeButtonOriginalAutoButtonColor
 local sellButtonOriginalAutoButtonColor
-local priceLabelsCanShow = false
 local GREY_COLOR = Color3.new(0.5, 0.5, 0.5)
 
 local playerTowerTotalLabel
@@ -427,10 +422,6 @@ function beginPlacement(towerType)
 	if upgradeDescriptionLabel then
 		upgradeDescriptionLabel.Text = ""
 	end
-	priceLabelsCanShow = false
-	if priceLabelContainer then
-		priceLabelContainer.Visible = false
-	end
 end
 
 local function createRaycastParams()
@@ -629,7 +620,7 @@ local function updateConfirmButtonState()
 
         if lobbyStatusLabel then
                 if loadoutLocked then
-                        lobbyStatusLabel.Text = "Loadout locked while the countdown is active."
+                        lobbyStatusLabel.Text = "Loadout locked while you are joined to a round."
                 elseif ready then
                         lobbyStatusLabel.Text = ""
                 else
@@ -1295,7 +1286,8 @@ local function applyLobbyState(state)
                 end
         end
 
-        setLoadoutLocked(countdownActive)
+        local shouldLockLoadout = countdownActive or playerRound ~= nil
+        setLoadoutLocked(shouldLockLoadout)
 
         updateInterfaceVisibility()
 
@@ -1826,38 +1818,6 @@ local function updateSellButton(towerModel, ownerUserId)
 	sellButton.Selectable = active
 end
 
-local function updateTowerPriceLabels(towerModel, towerType, level, ownerUserId)
-	if not priceLabelContainer then
-		priceLabelsCanShow = false
-		return
-	end
-
-	local isOwner = ownerUserId == player.UserId
-	priceLabelsCanShow = isOwner
-	if not isOwner then
-		priceLabelContainer.Visible = false
-		return
-	end
-
-	local nextUpgrade = getNextUpgrade(towerType, level)
-	if upgradePriceLabel then
-		if nextUpgrade then
-			upgradePriceLabel.Text = string.format("Upgrade: $%d", nextUpgrade.Cost)
-		else
-			upgradePriceLabel.Text = "Upgrade: Max"
-		end
-	end
-
-	if sellPriceLabel then
-		local sellValue = towerModel and towerModel:GetAttribute("SellValue")
-		if typeof(sellValue) == "number" and sellValue > 0 then
-			sellPriceLabel.Text = string.format("Sell: +$%d", math.floor(sellValue + 0.5))
-		else
-			sellPriceLabel.Text = "Sell: N/A"
-		end
-	end
-end
-
 local function updateTowerDetails(towerModel)
 	if not towerDetailsFrame or not towerModel then
 		return
@@ -1926,7 +1886,6 @@ local function updateTowerDetails(towerModel)
 	showRangeIndicator(towerModel, stats and stats.Range)
 	updateUpgradeButton(towerType, level, ownerUserId)
 	updateSellButton(towerModel, ownerUserId)
-	updateTowerPriceLabels(towerModel, towerType, level, ownerUserId)
 end
 
 local function createGui()
@@ -2030,9 +1989,9 @@ local function createGui()
 
         statusFrame = Instance.new("Frame")
         statusFrame.Name = "Status"
-        statusFrame.AnchorPoint = Vector2.new(0, 0)
+        statusFrame.AnchorPoint = Vector2.new(1, 1)
         statusFrame.Size = UDim2.new(0.22, 0, 0.34, 0)
-        statusFrame.Position = UDim2.new(0.02, 0, 0.05, 0)
+        statusFrame.Position = UDim2.new(0.98, 0, 0.98, 0)
         statusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
         statusFrame.BackgroundTransparency = 0.1
         statusFrame.BorderSizePixel = 0
@@ -2128,7 +2087,7 @@ local function createGui()
         towerDetailsFrame = Instance.new("Frame")
         towerDetailsFrame.Name = "TowerDetails"
         towerDetailsFrame.AnchorPoint = Vector2.new(1, 0.5)
-        towerDetailsFrame.Size = UDim2.new(0.26, 0, 0.36, 0)
+        towerDetailsFrame.Size = UDim2.new(0.3, 0, 0.46, 0)
         towerDetailsFrame.Position = UDim2.new(0.98, 0, 0.5, 0)
 	towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 	towerDetailsFrame.BackgroundTransparency = 0.1
@@ -2170,8 +2129,8 @@ local function createGui()
 	towerStatsLabel.Name = "TowerStatsLabel"
 	towerStatsLabel.BackgroundTransparency = 1
         towerStatsLabel.AnchorPoint = Vector2.new(0, 0)
-        towerStatsLabel.Position = UDim2.new(0.05, 0, 0.36, 0)
-        towerStatsLabel.Size = UDim2.new(0.9, 0, 0.28, 0)
+        towerStatsLabel.Position = UDim2.new(0.05, 0, 0.32, 0)
+        towerStatsLabel.Size = UDim2.new(0.9, 0, 0.36, 0)
 	towerStatsLabel.Font = Enum.Font.Gotham
 	towerStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	towerStatsLabel.TextSize = 16
@@ -2185,8 +2144,8 @@ local function createGui()
 	ownershipLabel.Name = "OwnershipLabel"
 	ownershipLabel.BackgroundTransparency = 1
         ownershipLabel.AnchorPoint = Vector2.new(0, 0)
-        ownershipLabel.Position = UDim2.new(0.05, 0, 0.66, 0)
-        ownershipLabel.Size = UDim2.new(0.9, 0, 0.1, 0)
+        ownershipLabel.Position = UDim2.new(0.05, 0, 0.68, 0)
+        ownershipLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
 	ownershipLabel.Font = Enum.Font.Gotham
 	ownershipLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	ownershipLabel.TextSize = 16
@@ -2198,8 +2157,8 @@ local function createGui()
 	upgradeDescriptionLabel.Name = "UpgradeDescriptionLabel"
 	upgradeDescriptionLabel.BackgroundTransparency = 1
         upgradeDescriptionLabel.AnchorPoint = Vector2.new(0, 0)
-        upgradeDescriptionLabel.Position = UDim2.new(0.05, 0, 0.78, 0)
-        upgradeDescriptionLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
+        upgradeDescriptionLabel.Position = UDim2.new(0.05, 0, 0.76, 0)
+        upgradeDescriptionLabel.Size = UDim2.new(0.9, 0, 0.1, 0)
 	upgradeDescriptionLabel.Font = Enum.Font.Gotham
 	upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	upgradeDescriptionLabel.TextSize = 14
@@ -2211,7 +2170,7 @@ local function createGui()
 
         upgradeButton = Instance.new("TextButton")
         upgradeButton.Name = "UpgradeButton"
-        upgradeButton.Size = UDim2.new(0.44, 0, 0.14, 0)
+        upgradeButton.Size = UDim2.new(0.44, 0, 0.12, 0)
         upgradeButton.AnchorPoint = Vector2.new(0, 1)
         upgradeButton.Position = UDim2.new(0.05, 0, 0.98, 0)
 	upgradeButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
@@ -2238,7 +2197,7 @@ local function createGui()
 
         sellButton = Instance.new("TextButton")
         sellButton.Name = "SellButton"
-        sellButton.Size = UDim2.new(0.44, 0, 0.14, 0)
+        sellButton.Size = UDim2.new(0.44, 0, 0.12, 0)
         sellButton.AnchorPoint = Vector2.new(1, 1)
         sellButton.Position = UDim2.new(0.95, 0, 0.98, 0)
 	sellButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
@@ -2259,82 +2218,47 @@ local function createGui()
 		end
 	end)
 
-        priceLabelContainer = Instance.new("Frame")
-        priceLabelContainer.Name = "PlayerTowerPriceLabels"
-        priceLabelContainer.AnchorPoint = Vector2.new(0.5, 1)
-        priceLabelContainer.Size = UDim2.new(0.7, 0, 0.2, 0)
-        priceLabelContainer.Position = UDim2.new(0.5, 0, 0.84, 0)
-        priceLabelContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        priceLabelContainer.BackgroundTransparency = 0.2
-        priceLabelContainer.BorderSizePixel = 0
-        priceLabelContainer.Visible = false
-        priceLabelContainer.Parent = towerDetailsFrame
-
-        local priceCorner = Instance.new("UICorner")
-        priceCorner.CornerRadius = UDim.new(0.4, 0)
-        priceCorner.Parent = priceLabelContainer
-
-        upgradePriceLabel = Instance.new("TextLabel")
-        upgradePriceLabel.Name = "UpgradePriceLabel"
-        upgradePriceLabel.BackgroundTransparency = 1
-        upgradePriceLabel.AnchorPoint = Vector2.new(0, 0)
-        upgradePriceLabel.Position = UDim2.new(0.05, 0, 0.2, 0)
-        upgradePriceLabel.Size = UDim2.new(0.9, 0, 0.3, 0)
-	upgradePriceLabel.Font = Enum.Font.Gotham
-	upgradePriceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-	upgradePriceLabel.TextSize = 16
-	upgradePriceLabel.TextXAlignment = Enum.TextXAlignment.Left
-	upgradePriceLabel.Text = "Upgrade: $0"
-	upgradePriceLabel.Parent = priceLabelContainer
-
-        sellPriceLabel = Instance.new("TextLabel")
-        sellPriceLabel.Name = "SellPriceLabel"
-        sellPriceLabel.BackgroundTransparency = 1
-        sellPriceLabel.AnchorPoint = Vector2.new(0, 0)
-        sellPriceLabel.Position = UDim2.new(0.05, 0, 0.56, 0)
-        sellPriceLabel.Size = UDim2.new(0.9, 0, 0.3, 0)
-	sellPriceLabel.Font = Enum.Font.Gotham
-	sellPriceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-	sellPriceLabel.TextSize = 16
-	sellPriceLabel.TextXAlignment = Enum.TextXAlignment.Left
-	sellPriceLabel.Text = "Sell: $0"
-	sellPriceLabel.Parent = priceLabelContainer
-
         local function applyHudConstraints()
                 if not screenGui then
                         return
                 end
 
                 if shopFrame then
-                        if not shopFrame:FindFirstChild("AspectConstraint") then
-                                local aspect = Instance.new("UIAspectRatioConstraint")
+                        local aspect = shopFrame:FindFirstChild("AspectConstraint")
+                        if not aspect then
+                                aspect = Instance.new("UIAspectRatioConstraint")
                                 aspect.Name = "AspectConstraint"
-                                aspect.AspectRatio = 900 / 164
                                 aspect.Parent = shopFrame
                         end
+                        aspect.AspectRatio = 900 / 164
+                        aspect.DominantAxis = Enum.DominantAxis.Width
 
-                        if not shopFrame:FindFirstChild("SizeConstraint") then
-                                local sizeConstraint = Instance.new("UISizeConstraint")
+                        local sizeConstraint = shopFrame:FindFirstChild("SizeConstraint")
+                        if not sizeConstraint then
+                                sizeConstraint = Instance.new("UISizeConstraint")
                                 sizeConstraint.Name = "SizeConstraint"
-                                sizeConstraint.MinSize = Vector2.new(600, 140)
                                 sizeConstraint.Parent = shopFrame
                         end
+                        sizeConstraint.MinSize = Vector2.new(600, 140)
                 end
 
                 if towerDetailsFrame then
-                        if not towerDetailsFrame:FindFirstChild("AspectConstraint") then
-                                local aspect = Instance.new("UIAspectRatioConstraint")
+                        local aspect = towerDetailsFrame:FindFirstChild("AspectConstraint")
+                        if not aspect then
+                                aspect = Instance.new("UIAspectRatioConstraint")
                                 aspect.Name = "AspectConstraint"
-                                aspect.AspectRatio = 380 / 240
                                 aspect.Parent = towerDetailsFrame
                         end
+                        aspect.AspectRatio = 0.65
+                        aspect.DominantAxis = Enum.DominantAxis.Height
 
-                        if not towerDetailsFrame:FindFirstChild("SizeConstraint") then
-                                local sizeConstraint = Instance.new("UISizeConstraint")
+                        local sizeConstraint = towerDetailsFrame:FindFirstChild("SizeConstraint")
+                        if not sizeConstraint then
+                                sizeConstraint = Instance.new("UISizeConstraint")
                                 sizeConstraint.Name = "SizeConstraint"
-                                sizeConstraint.MinSize = Vector2.new(320, 220)
                                 sizeConstraint.Parent = towerDetailsFrame
                         end
+                        sizeConstraint.MinSize = Vector2.new(320, 420)
                 end
         end
 
@@ -2388,10 +2312,6 @@ local function clearSelection()
 	end
 	if sellButton then
 		sellButton.Visible = false
-	end
-	priceLabelsCanShow = false
-	if priceLabelContainer then
-		priceLabelContainer.Visible = false
 	end
 end
 
@@ -2493,26 +2413,6 @@ local function computePlacementValidity(position, hitInstance)
 	end
 
 	return isPositionClear(position)
-end
-
-local function updatePriceLabelHoverState()
-	if not priceLabelContainer then
-		return
-	end
-
-	if not priceLabelsCanShow or not selectedTower then
-		if priceLabelContainer.Visible then
-			priceLabelContainer.Visible = false
-		end
-		return
-	end
-
-	local target = mouse.Target
-	if target and target:IsDescendantOf(selectedTower) then
-		priceLabelContainer.Visible = true
-	elseif priceLabelContainer.Visible then
-		priceLabelContainer.Visible = false
-	end
 end
 
 local function updatePreview()
@@ -2836,9 +2736,7 @@ end
 RunService.RenderStepped:Connect(function()
 	updatePreview()
 	updateEnemyHover()
-	updatePriceLabelHoverState()
-
-	if selectedTower and (not selectedTower.Parent) then
-		clearSelection()
-	end
+        if selectedTower and (not selectedTower.Parent) then
+                clearSelection()
+        end
 end)
