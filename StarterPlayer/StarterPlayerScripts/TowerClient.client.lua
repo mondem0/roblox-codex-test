@@ -131,6 +131,32 @@ local function formatCountLimit(count, limit)
         return string.format("%d / ∞", numericCount)
 end
 
+local function applyScaledText(guiObject, minTextSize, maxTextSize)
+        if not guiObject then
+                return
+        end
+
+        local className = guiObject.ClassName
+        if className ~= "TextLabel" and className ~= "TextButton" and className ~= "TextBox" then
+                return
+        end
+
+        guiObject.TextScaled = true
+
+        local constraint = guiObject:FindFirstChild("TextSizeConstraint")
+        if not constraint or not constraint:IsA("UITextSizeConstraint") then
+                if constraint then
+                        constraint:Destroy()
+                end
+                constraint = Instance.new("UITextSizeConstraint")
+                constraint.Name = "TextSizeConstraint"
+                constraint.Parent = guiObject
+        end
+
+        constraint.MinTextSize = minTextSize or 12
+        constraint.MaxTextSize = maxTextSize or 48
+end
+
 local function getTowerCountEntry(towerType)
         if not towerType then
                 return nil
@@ -857,6 +883,7 @@ local function populateTowerSelectionButtons()
                         local cost = tonumber(config.Cost) or 0
                         local displayName = config.Name or towerType
                         button.Text = string.format("%s\n$%d", displayName, cost)
+                        applyScaledText(button, 12, 32)
 
                         button.MouseButton1Click:Connect(function()
                                 local slotIndex = selectionActiveSlot or findFirstEmptySlot() or 1
@@ -935,6 +962,7 @@ local function createSelectionGui()
         shopTitle.TextXAlignment = Enum.TextXAlignment.Left
         shopTitle.Text = "Tower Shop"
         shopTitle.Parent = shopPanel
+        applyScaledText(shopTitle, 16, 42)
 
         selectionTowerList = Instance.new("ScrollingFrame")
         selectionTowerList.Name = "TowerList"
@@ -967,6 +995,7 @@ local function createSelectionGui()
         lobbyStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
         lobbyStatusLabel.Text = ""
         lobbyStatusLabel.Parent = shopPanel
+        applyScaledText(lobbyStatusLabel, 14, 30)
 
         local roundPanel = Instance.new("Frame")
         roundPanel.Name = "RoundPanel"
@@ -994,6 +1023,7 @@ local function createSelectionGui()
         roundTitle.TextXAlignment = Enum.TextXAlignment.Left
         roundTitle.Text = "Select Round Type"
         roundTitle.Parent = roundPanel
+        applyScaledText(roundTitle, 16, 38)
 
         lobbyCountdownLabel = Instance.new("TextLabel")
         lobbyCountdownLabel.Name = "CountdownLabel"
@@ -1005,8 +1035,10 @@ local function createSelectionGui()
         lobbyCountdownLabel.TextSize = 18
         lobbyCountdownLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
         lobbyCountdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+        lobbyCountdownLabel.TextYAlignment = Enum.TextYAlignment.Center
         lobbyCountdownLabel.Text = ""
         lobbyCountdownLabel.Parent = roundPanel
+        applyScaledText(lobbyCountdownLabel, 14, 32)
 
         lobbyRoundList = Instance.new("ScrollingFrame")
         lobbyRoundList.Name = "RoundList"
@@ -1054,6 +1086,7 @@ local function createSelectionGui()
         loadoutTitle.TextXAlignment = Enum.TextXAlignment.Left
         loadoutTitle.Text = string.format("Your Towers (%d slots)", LOADOUT_SLOT_COUNT)
         loadoutTitle.Parent = loadoutPanel
+        applyScaledText(loadoutTitle, 16, 36)
 
         local slotsFrame = Instance.new("Frame")
         slotsFrame.Name = "SlotsFrame"
@@ -1087,6 +1120,7 @@ local function createSelectionGui()
                 button:SetAttribute("SlotIndex", i)
                 selectionSlotButtons[i] = button
                 selectionSlotOriginalText[i] = button.Text
+                applyScaledText(button, 12, 28)
 
                 button.MouseButton1Click:Connect(function()
                         if loadoutSelection[i] then
@@ -1117,6 +1151,7 @@ local function createSelectionGui()
         readyButton.Text = "Ready Up"
         readyButton.AutoButtonColor = true
         readyButton.Parent = loadoutPanel
+        applyScaledText(readyButton, 16, 36)
 
         readyButton.MouseButton1Click:Connect(function()
                 if not remotes.RequestReadyStatus then
@@ -1139,6 +1174,7 @@ local function createSelectionGui()
         leaveButton.AutoButtonColor = true
         leaveButton.Visible = false
         leaveButton.Parent = loadoutPanel
+        applyScaledText(leaveButton, 16, 36)
 
         leaveButton.MouseButton1Click:Connect(function()
                 if remotes.RequestLeaveRound then
@@ -1199,6 +1235,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         button.AutoButtonColor = true
                         button.Parent = lobbyRoundList
                         button:SetAttribute("RoundKey", roundKey)
+                        applyScaledText(button, 12, 32)
                         button.MouseButton1Click:Connect(function()
                                 local key = button:GetAttribute("RoundKey")
                                 if key and remotes.RequestJoinRound then
@@ -1393,6 +1430,7 @@ local function createMapSelectionGui()
         title.TextXAlignment = Enum.TextXAlignment.Left
         title.Text = "Vote for a Map"
         title.Parent = mapSelectionFrame
+        applyScaledText(title, 18, 42)
 
         mapSelectionStatusLabel = Instance.new("TextLabel")
         mapSelectionStatusLabel.Name = "StatusLabel"
@@ -1406,6 +1444,7 @@ local function createMapSelectionGui()
         mapSelectionStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
         mapSelectionStatusLabel.Text = "Choose one of the available battlegrounds."
         mapSelectionStatusLabel.Parent = mapSelectionFrame
+        applyScaledText(mapSelectionStatusLabel, 14, 30)
 
         mapOptionsContainer = Instance.new("Frame")
         mapOptionsContainer.Name = "OptionsContainer"
@@ -1463,6 +1502,7 @@ local function showMapSelection(options, totalPlayers)
                 nameLabel.TextWrapped = true
                 nameLabel.Text = option.Name or string.format("Map %d", index)
                 nameLabel.Parent = container
+                applyScaledText(nameLabel, 16, 36)
 
                 local descriptionLabel = Instance.new("TextLabel")
                 descriptionLabel.Name = "DescriptionLabel"
@@ -1476,6 +1516,7 @@ local function showMapSelection(options, totalPlayers)
                 descriptionLabel.TextWrapped = true
                 descriptionLabel.Text = option.Description or ""
                 descriptionLabel.Parent = container
+                applyScaledText(descriptionLabel, 12, 28)
 
                 local voteButton = Instance.new("TextButton")
                 voteButton.Name = "VoteButton"
@@ -1490,6 +1531,7 @@ local function showMapSelection(options, totalPlayers)
                 voteButton.Text = "Vote"
                 voteButton.AutoButtonColor = true
                 voteButton.Parent = container
+                applyScaledText(voteButton, 16, 34)
 
                 local voteLabel = Instance.new("TextLabel")
                 voteLabel.Name = "VoteLabel"
@@ -1502,6 +1544,7 @@ local function showMapSelection(options, totalPlayers)
                 voteLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
                 voteLabel.Text = "0 votes"
                 voteLabel.Parent = container
+                applyScaledText(voteLabel, 12, 26)
 
                 voteButton.MouseButton1Click:Connect(function()
                         if remotes.MapVoteSubmitted then
@@ -1599,6 +1642,7 @@ local function ensureHoverGui()
         hoverNameLabel.TextXAlignment = Enum.TextXAlignment.Left
         hoverNameLabel.Text = "Enemy"
         hoverNameLabel.Parent = hoverGui
+        applyScaledText(hoverNameLabel, 12, 28)
 
         hoverHealthLabel = Instance.new("TextLabel")
         hoverHealthLabel.Name = "HealthLabel"
@@ -1607,11 +1651,12 @@ local function ensureHoverGui()
         hoverHealthLabel.Position = UDim2.new(0.04, 0, 0.58, 0)
         hoverHealthLabel.Size = UDim2.new(0.92, 0, 0.32, 0)
 	hoverHealthLabel.Font = Enum.Font.Gotham
-	hoverHealthLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-	hoverHealthLabel.TextSize = 16
-	hoverHealthLabel.TextXAlignment = Enum.TextXAlignment.Left
-	hoverHealthLabel.Text = "HP: 0"
-	hoverHealthLabel.Parent = hoverGui
+        hoverHealthLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        hoverHealthLabel.TextSize = 16
+        hoverHealthLabel.TextXAlignment = Enum.TextXAlignment.Left
+        hoverHealthLabel.Text = "HP: 0"
+        hoverHealthLabel.Parent = hoverGui
+        applyScaledText(hoverHealthLabel, 12, 24)
 
 	hoverCombinedLabel = nil
 
@@ -1945,12 +1990,12 @@ local function createGui()
                 priceLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
                 priceLabel.Text = ""
                 priceLabel.TextXAlignment = Enum.TextXAlignment.Center
-		priceLabel.TextYAlignment = Enum.TextYAlignment.Center
-		priceLabel.TextWrapped = true
-		priceLabel.TextScaled = false
-		priceLabel.Visible = false
-		priceLabel.Parent = slotContainer
-		shopSlotPriceLabels[i] = priceLabel
+                priceLabel.TextYAlignment = Enum.TextYAlignment.Center
+                priceLabel.TextWrapped = true
+                priceLabel.Visible = false
+                priceLabel.Parent = slotContainer
+                shopSlotPriceLabels[i] = priceLabel
+                applyScaledText(priceLabel, 12, 26)
 
                 local button = Instance.new("TextButton")
                 button.Name = string.format("ShopSlot%d", i)
@@ -1968,6 +2013,7 @@ local function createGui()
                 button:SetAttribute("SlotIndex", i)
                 shopSlotButtons[i] = button
                 shopSlotOriginalText[i] = button.Text
+                applyScaledText(button, 14, 32)
 
                 local countLabel = Instance.new("TextLabel")
                 countLabel.Name = "CountLabel"
@@ -1985,6 +2031,7 @@ local function createGui()
                 countLabel.Visible = false
                 countLabel.Parent = slotContainer
                 shopSlotCountLabels[i] = countLabel
+                applyScaledText(countLabel, 12, 24)
         end
 
         statusFrame = Instance.new("Frame")
@@ -2012,11 +2059,12 @@ local function createGui()
         moneyLabel.Position = UDim2.new(0.04, 0, 0.05, 0)
         moneyLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
 	moneyLabel.Font = Enum.Font.GothamBold
-	moneyLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
-	moneyLabel.TextSize = 20
-	moneyLabel.TextXAlignment = Enum.TextXAlignment.Left
-	moneyLabel.Text = "$0"
-	moneyLabel.Parent = statusFrame
+        moneyLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
+        moneyLabel.TextSize = 20
+        moneyLabel.TextXAlignment = Enum.TextXAlignment.Left
+        moneyLabel.Text = "$0"
+        moneyLabel.Parent = statusFrame
+        applyScaledText(moneyLabel, 16, 36)
 
         livesLabel = Instance.new("TextLabel")
         livesLabel.Name = "LivesLabel"
@@ -2025,11 +2073,12 @@ local function createGui()
         livesLabel.Position = UDim2.new(0.04, 0, 0.24, 0)
         livesLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
 	livesLabel.Font = Enum.Font.Gotham
-	livesLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
-	livesLabel.TextSize = 18
-	livesLabel.TextXAlignment = Enum.TextXAlignment.Left
-	livesLabel.Text = "Lives: 0"
-	livesLabel.Parent = statusFrame
+        livesLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
+        livesLabel.TextSize = 18
+        livesLabel.TextXAlignment = Enum.TextXAlignment.Left
+        livesLabel.Text = "Lives: 0"
+        livesLabel.Parent = statusFrame
+        applyScaledText(livesLabel, 14, 32)
 
         waveLabel = Instance.new("TextLabel")
         waveLabel.Name = "WaveLabel"
@@ -2038,11 +2087,12 @@ local function createGui()
         waveLabel.Position = UDim2.new(0.04, 0, 0.43, 0)
         waveLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
 	waveLabel.Font = Enum.Font.Gotham
-	waveLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-	waveLabel.TextSize = 18
-	waveLabel.TextXAlignment = Enum.TextXAlignment.Left
+        waveLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+        waveLabel.TextSize = 18
+        waveLabel.TextXAlignment = Enum.TextXAlignment.Left
         waveLabel.Text = "Wave: 1"
         waveLabel.Parent = statusFrame
+        applyScaledText(waveLabel, 14, 32)
 
         playerTowerTotalLabel = Instance.new("TextLabel")
         playerTowerTotalLabel.Name = "PlayerTowerTotal"
@@ -2056,6 +2106,7 @@ local function createGui()
         playerTowerTotalLabel.TextXAlignment = Enum.TextXAlignment.Left
         playerTowerTotalLabel.Text = "Your Towers: 0 / ∞"
         playerTowerTotalLabel.Parent = statusFrame
+        applyScaledText(playerTowerTotalLabel, 12, 28)
 
         teamTowerTotalLabel = Instance.new("TextLabel")
         teamTowerTotalLabel.Name = "TeamTowerTotal"
@@ -2069,119 +2120,129 @@ local function createGui()
         teamTowerTotalLabel.TextXAlignment = Enum.TextXAlignment.Left
         teamTowerTotalLabel.Text = "Team Towers: 0 / ∞"
         teamTowerTotalLabel.Parent = statusFrame
+        applyScaledText(teamTowerTotalLabel, 12, 28)
 
         preRoundCountdownLabel = Instance.new("TextLabel")
         preRoundCountdownLabel.Name = "CountdownLabel"
         preRoundCountdownLabel.BackgroundTransparency = 1
-        preRoundCountdownLabel.AnchorPoint = Vector2.new(0, 0)
-        preRoundCountdownLabel.Position = UDim2.new(0.04, 0, 0.9, 0)
-        preRoundCountdownLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
+        preRoundCountdownLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+        preRoundCountdownLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+        preRoundCountdownLabel.Size = UDim2.new(0.5, 0, 0.12, 0)
         preRoundCountdownLabel.Font = Enum.Font.GothamBold
         preRoundCountdownLabel.TextSize = 18
         preRoundCountdownLabel.TextColor3 = Color3.fromRGB(255, 220, 120)
-        preRoundCountdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+        preRoundCountdownLabel.TextXAlignment = Enum.TextXAlignment.Center
+        preRoundCountdownLabel.TextYAlignment = Enum.TextYAlignment.Center
         preRoundCountdownLabel.Text = ""
         preRoundCountdownLabel.Visible = false
-        preRoundCountdownLabel.Parent = statusFrame
+        preRoundCountdownLabel.ZIndex = 10
+        preRoundCountdownLabel.Parent = screenGui
+        applyScaledText(preRoundCountdownLabel, 18, 48)
 
         towerDetailsFrame = Instance.new("Frame")
         towerDetailsFrame.Name = "TowerDetails"
         towerDetailsFrame.AnchorPoint = Vector2.new(1, 0.5)
-        towerDetailsFrame.Size = UDim2.new(0.3, 0, 0.46, 0)
+        towerDetailsFrame.Size = UDim2.new(0.26, 0, 0.34, 0)
         towerDetailsFrame.Position = UDim2.new(0.98, 0, 0.5, 0)
-	towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-	towerDetailsFrame.BackgroundTransparency = 0.1
-	towerDetailsFrame.BorderSizePixel = 0
-	towerDetailsFrame.Visible = false
-	towerDetailsFrame.Parent = screenGui
+        towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        towerDetailsFrame.BackgroundTransparency = 0.1
+        towerDetailsFrame.BorderSizePixel = 0
+        towerDetailsFrame.Visible = false
+        towerDetailsFrame.Parent = screenGui
 
         local detailsCorner = Instance.new("UICorner")
         detailsCorner.CornerRadius = UDim.new(0.05, 0)
 	detailsCorner.Parent = towerDetailsFrame
 
-	towerNameLabel = Instance.new("TextLabel")
-	towerNameLabel.Name = "TowerNameLabel"
-	towerNameLabel.BackgroundTransparency = 1
+        towerNameLabel = Instance.new("TextLabel")
+        towerNameLabel.Name = "TowerNameLabel"
+        towerNameLabel.BackgroundTransparency = 1
         towerNameLabel.AnchorPoint = Vector2.new(0, 0)
-        towerNameLabel.Position = UDim2.new(0.05, 0, 0.07, 0)
-        towerNameLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
-	towerNameLabel.Font = Enum.Font.GothamBold
-	towerNameLabel.TextColor3 = Color3.new(1, 1, 1)
-	towerNameLabel.TextSize = 20
-	towerNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	towerNameLabel.Text = "Tower"
-	towerNameLabel.Parent = towerDetailsFrame
+        towerNameLabel.Position = UDim2.new(0.05, 0, 0.08, 0)
+        towerNameLabel.Size = UDim2.new(0.9, 0, 0.16, 0)
+        towerNameLabel.Font = Enum.Font.GothamBold
+        towerNameLabel.TextColor3 = Color3.new(1, 1, 1)
+        towerNameLabel.TextSize = 20
+        towerNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerNameLabel.Text = "Tower"
+        towerNameLabel.Parent = towerDetailsFrame
+        applyScaledText(towerNameLabel, 16, 36)
 
-	towerLevelLabel = Instance.new("TextLabel")
-	towerLevelLabel.Name = "TowerLevelLabel"
-	towerLevelLabel.BackgroundTransparency = 1
+        towerLevelLabel = Instance.new("TextLabel")
+        towerLevelLabel.Name = "TowerLevelLabel"
+        towerLevelLabel.BackgroundTransparency = 1
         towerLevelLabel.AnchorPoint = Vector2.new(0, 0)
-        towerLevelLabel.Position = UDim2.new(0.05, 0, 0.24, 0)
-        towerLevelLabel.Size = UDim2.new(0.9, 0, 0.1, 0)
-	towerLevelLabel.Font = Enum.Font.Gotham
-	towerLevelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-	towerLevelLabel.TextSize = 16
-	towerLevelLabel.TextXAlignment = Enum.TextXAlignment.Left
-	towerLevelLabel.Text = "Level: 1"
-	towerLevelLabel.Parent = towerDetailsFrame
+        towerLevelLabel.Position = UDim2.new(0.05, 0, 0.26, 0)
+        towerLevelLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
+        towerLevelLabel.Font = Enum.Font.Gotham
+        towerLevelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        towerLevelLabel.TextSize = 16
+        towerLevelLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerLevelLabel.Text = "Level: 1"
+        towerLevelLabel.Parent = towerDetailsFrame
+        applyScaledText(towerLevelLabel, 14, 30)
 
-	towerStatsLabel = Instance.new("TextLabel")
-	towerStatsLabel.Name = "TowerStatsLabel"
-	towerStatsLabel.BackgroundTransparency = 1
+        towerStatsLabel = Instance.new("TextLabel")
+        towerStatsLabel.Name = "TowerStatsLabel"
+        towerStatsLabel.BackgroundTransparency = 1
         towerStatsLabel.AnchorPoint = Vector2.new(0, 0)
-        towerStatsLabel.Position = UDim2.new(0.05, 0, 0.32, 0)
-        towerStatsLabel.Size = UDim2.new(0.9, 0, 0.36, 0)
-	towerStatsLabel.Font = Enum.Font.Gotham
-	towerStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-	towerStatsLabel.TextSize = 16
-	towerStatsLabel.TextXAlignment = Enum.TextXAlignment.Left
-	towerStatsLabel.TextYAlignment = Enum.TextYAlignment.Top
-	towerStatsLabel.TextWrapped = true
-	towerStatsLabel.Text = ""
-	towerStatsLabel.Parent = towerDetailsFrame
+        towerStatsLabel.Position = UDim2.new(0.05, 0, 0.4, 0)
+        towerStatsLabel.Size = UDim2.new(0.9, 0, 0.24, 0)
+        towerStatsLabel.Font = Enum.Font.Gotham
+        towerStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        towerStatsLabel.TextSize = 16
+        towerStatsLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerStatsLabel.TextYAlignment = Enum.TextYAlignment.Top
+        towerStatsLabel.TextWrapped = true
+        towerStatsLabel.Text = ""
+        towerStatsLabel.Parent = towerDetailsFrame
+        applyScaledText(towerStatsLabel, 12, 26)
 
-	ownershipLabel = Instance.new("TextLabel")
-	ownershipLabel.Name = "OwnershipLabel"
-	ownershipLabel.BackgroundTransparency = 1
+        ownershipLabel = Instance.new("TextLabel")
+        ownershipLabel.Name = "OwnershipLabel"
+        ownershipLabel.BackgroundTransparency = 1
         ownershipLabel.AnchorPoint = Vector2.new(0, 0)
-        ownershipLabel.Position = UDim2.new(0.05, 0, 0.68, 0)
+        ownershipLabel.Position = UDim2.new(0.05, 0, 0.64, 0)
         ownershipLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
-	ownershipLabel.Font = Enum.Font.Gotham
-	ownershipLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-	ownershipLabel.TextSize = 16
-	ownershipLabel.TextXAlignment = Enum.TextXAlignment.Left
-	ownershipLabel.Text = "Owner"
-	ownershipLabel.Parent = towerDetailsFrame
+        ownershipLabel.Font = Enum.Font.Gotham
+        ownershipLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        ownershipLabel.TextSize = 16
+        ownershipLabel.TextXAlignment = Enum.TextXAlignment.Left
+        ownershipLabel.Text = "Owner"
+        ownershipLabel.Parent = towerDetailsFrame
+        applyScaledText(ownershipLabel, 12, 26)
 
-	upgradeDescriptionLabel = Instance.new("TextLabel")
-	upgradeDescriptionLabel.Name = "UpgradeDescriptionLabel"
-	upgradeDescriptionLabel.BackgroundTransparency = 1
+        upgradeDescriptionLabel = Instance.new("TextLabel")
+        upgradeDescriptionLabel.Name = "UpgradeDescriptionLabel"
+        upgradeDescriptionLabel.BackgroundTransparency = 1
         upgradeDescriptionLabel.AnchorPoint = Vector2.new(0, 0)
-        upgradeDescriptionLabel.Position = UDim2.new(0.05, 0, 0.76, 0)
-        upgradeDescriptionLabel.Size = UDim2.new(0.9, 0, 0.1, 0)
-	upgradeDescriptionLabel.Font = Enum.Font.Gotham
-	upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-	upgradeDescriptionLabel.TextSize = 14
-	upgradeDescriptionLabel.TextWrapped = true
-	upgradeDescriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
-	upgradeDescriptionLabel.TextYAlignment = Enum.TextYAlignment.Top
-	upgradeDescriptionLabel.Text = ""
-	upgradeDescriptionLabel.Parent = towerDetailsFrame
+        upgradeDescriptionLabel.Position = UDim2.new(0.05, 0, 0.72, 0)
+        upgradeDescriptionLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
+        upgradeDescriptionLabel.Font = Enum.Font.Gotham
+        upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        upgradeDescriptionLabel.TextSize = 14
+        upgradeDescriptionLabel.TextWrapped = true
+        upgradeDescriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
+        upgradeDescriptionLabel.TextYAlignment = Enum.TextYAlignment.Top
+        upgradeDescriptionLabel.Text = ""
+        upgradeDescriptionLabel.Parent = towerDetailsFrame
+        applyScaledText(upgradeDescriptionLabel, 12, 24)
 
         upgradeButton = Instance.new("TextButton")
         upgradeButton.Name = "UpgradeButton"
-        upgradeButton.Size = UDim2.new(0.44, 0, 0.12, 0)
+        upgradeButton.Size = UDim2.new(0.44, 0, 0.14, 0)
         upgradeButton.AnchorPoint = Vector2.new(0, 1)
         upgradeButton.Position = UDim2.new(0.05, 0, 0.98, 0)
-	upgradeButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
-	upgradeButton.BorderSizePixel = 0
-	upgradeButton.Font = Enum.Font.GothamBold
-	upgradeButton.TextSize = 16
-	upgradeButton.TextColor3 = Color3.new(1, 1, 1)
-	upgradeButton.Text = "Upgrade"
-	upgradeButton.AutoButtonColor = true
-	upgradeButton.Visible = false
-	upgradeButton.Parent = towerDetailsFrame
+        upgradeButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+        upgradeButton.BorderSizePixel = 0
+        upgradeButton.Font = Enum.Font.GothamBold
+        upgradeButton.TextSize = 16
+        upgradeButton.TextColor3 = Color3.new(1, 1, 1)
+        upgradeButton.Text = "Upgrade"
+        upgradeButton.AutoButtonColor = true
+        upgradeButton.Visible = false
+        upgradeButton.Parent = towerDetailsFrame
+        applyScaledText(upgradeButton, 14, 30)
 
 	upgradeButtonOriginalColor = upgradeButton.BackgroundColor3
 	upgradeButtonOriginalTextColor = upgradeButton.TextColor3
@@ -2197,18 +2258,19 @@ local function createGui()
 
         sellButton = Instance.new("TextButton")
         sellButton.Name = "SellButton"
-        sellButton.Size = UDim2.new(0.44, 0, 0.12, 0)
+        sellButton.Size = UDim2.new(0.44, 0, 0.14, 0)
         sellButton.AnchorPoint = Vector2.new(1, 1)
         sellButton.Position = UDim2.new(0.95, 0, 0.98, 0)
-	sellButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
-	sellButton.BorderSizePixel = 0
-	sellButton.Font = Enum.Font.GothamBold
-	sellButton.TextSize = 16
-	sellButton.TextColor3 = Color3.new(1, 1, 1)
-	sellButton.Text = "Sell"
-	sellButton.AutoButtonColor = true
-	sellButton.Visible = false
-	sellButton.Parent = towerDetailsFrame
+        sellButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+        sellButton.BorderSizePixel = 0
+        sellButton.Font = Enum.Font.GothamBold
+        sellButton.TextSize = 16
+        sellButton.TextColor3 = Color3.new(1, 1, 1)
+        sellButton.Text = "Sell"
+        sellButton.AutoButtonColor = true
+        sellButton.Visible = false
+        sellButton.Parent = towerDetailsFrame
+        applyScaledText(sellButton, 14, 30)
 
 	sellButtonOriginalAutoButtonColor = sellButton.AutoButtonColor
 
@@ -2223,6 +2285,10 @@ local function createGui()
                         return
                 end
 
+                local screenSize = screenGui.AbsoluteSize
+                local screenWidth = screenSize.X > 0 and screenSize.X or 1920
+                local screenHeight = screenSize.Y > 0 and screenSize.Y or 1080
+
                 if shopFrame then
                         local aspect = shopFrame:FindFirstChild("AspectConstraint")
                         if not aspect then
@@ -2230,7 +2296,10 @@ local function createGui()
                                 aspect.Name = "AspectConstraint"
                                 aspect.Parent = shopFrame
                         end
-                        aspect.AspectRatio = 900 / 164
+                        local widthScale = math.clamp(0.55 + (screenWidth / 1920) * 0.25, 0.6, 0.85)
+                        local heightScale = math.clamp(0.18 + (screenHeight / 1080) * 0.05, 0.18, 0.28)
+                        shopFrame.Size = UDim2.new(widthScale, 0, heightScale, 0)
+                        aspect.AspectRatio = widthScale / math.max(heightScale, 0.01)
                         aspect.DominantAxis = Enum.DominantAxis.Width
 
                         local sizeConstraint = shopFrame:FindFirstChild("SizeConstraint")
@@ -2239,7 +2308,7 @@ local function createGui()
                                 sizeConstraint.Name = "SizeConstraint"
                                 sizeConstraint.Parent = shopFrame
                         end
-                        sizeConstraint.MinSize = Vector2.new(600, 140)
+                        sizeConstraint.MinSize = Vector2.new(math.max(screenSize.X * 0.35, 420), math.max(screenSize.Y * 0.1, 120))
                 end
 
                 if towerDetailsFrame then
@@ -2249,7 +2318,9 @@ local function createGui()
                                 aspect.Name = "AspectConstraint"
                                 aspect.Parent = towerDetailsFrame
                         end
-                        aspect.AspectRatio = 0.65
+                        local towerWidthScale = math.clamp(0.22 + (screenWidth / 3840) * 0.04, 0.22, 0.26)
+                        towerDetailsFrame.Size = UDim2.new(towerWidthScale, 0, 0.34, 0)
+                        aspect.AspectRatio = 0.76
                         aspect.DominantAxis = Enum.DominantAxis.Height
 
                         local sizeConstraint = towerDetailsFrame:FindFirstChild("SizeConstraint")
@@ -2258,7 +2329,7 @@ local function createGui()
                                 sizeConstraint.Name = "SizeConstraint"
                                 sizeConstraint.Parent = towerDetailsFrame
                         end
-                        sizeConstraint.MinSize = Vector2.new(320, 420)
+                        sizeConstraint.MinSize = Vector2.new(math.max(screenSize.X * 0.16, 280), math.max(screenSize.Y * 0.16, 220))
                 end
         end
 
