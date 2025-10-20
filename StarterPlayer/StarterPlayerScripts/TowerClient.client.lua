@@ -1237,7 +1237,9 @@ local function applyLobbyState(state)
         if readyButton then
                 readyButton.Text = lobbyReadyState and "Unready" or "Ready Up"
                 readyButton.BackgroundColor3 = lobbyReadyState and Color3.fromRGB(110, 90, 160) or Color3.fromRGB(70, 130, 90)
-                local canReady = hasLoadout and playerRound ~= nil
+                local inLobbyRoom = playerRound ~= nil
+                local canReady = hasLoadout and inLobbyRoom
+                readyButton.Visible = inLobbyRoom
                 readyButton.Active = canReady
                 readyButton.AutoButtonColor = canReady
                 readyButton.TextTransparency = canReady and 0 or 0.35
