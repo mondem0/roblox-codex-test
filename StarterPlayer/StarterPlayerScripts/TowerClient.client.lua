@@ -1210,6 +1210,120 @@ local function updateInterfaceVisibility()
         end
 end
 
+local PLAYER_SLOT_PADDING = 0.025
+
+local function ensurePlayerSlots(entry, slotCount)
+        slotCount = math.max(slotCount or 0, 1)
+
+        entry.PlayerSlots = entry.PlayerSlots or {}
+        local container = entry.PlayerContainer
+        if not container then
+                return
+        end
+
+        local layout = container:FindFirstChildOfClass("UIListLayout")
+        if layout then
+                layout.Padding = UDim.new(PLAYER_SLOT_PADDING, 0)
+        end
+
+        local currentCount = entry.PlayerSlotCount or 0
+
+        if currentCount > slotCount then
+                for index = slotCount + 1, currentCount do
+                        local slot = entry.PlayerSlots[index]
+                        if slot and slot.Frame then
+                                slot.Frame:Destroy()
+                        end
+                        entry.PlayerSlots[index] = nil
+                end
+        end
+
+        if currentCount < slotCount then
+                for index = currentCount + 1, slotCount do
+                        local slotFrame = Instance.new("Frame")
+                        slotFrame.Name = string.format("PlayerSlot%d", index)
+                        slotFrame.AnchorPoint = Vector2.new(0, 0)
+                        slotFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                        slotFrame.BackgroundTransparency = 0.05
+                        slotFrame.BorderSizePixel = 0
+                        slotFrame.Parent = container
+
+                        local slotCorner = Instance.new("UICorner")
+                        slotCorner.CornerRadius = UDim.new(0.18, 0)
+                        slotCorner.Parent = slotFrame
+
+                        local slotPadding = Instance.new("UIPadding")
+                        slotPadding.PaddingLeft = UDim.new(0.03, 0)
+                        slotPadding.PaddingRight = UDim.new(0.03, 0)
+                        slotPadding.Parent = slotFrame
+
+                        local slotLayout = Instance.new("UIListLayout")
+                        slotLayout.FillDirection = Enum.FillDirection.Horizontal
+                        slotLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+                        slotLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+                        slotLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                        slotLayout.Padding = UDim.new(0.02, 0)
+                        slotLayout.Parent = slotFrame
+
+                        local nameLabel = Instance.new("TextLabel")
+                        nameLabel.Name = "NameLabel"
+                        nameLabel.BackgroundTransparency = 1
+                        nameLabel.Size = UDim2.new(0.5, 0, 1, 0)
+                        nameLabel.Font = Enum.Font.GothamMedium
+                        nameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+                        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        nameLabel.TextYAlignment = Enum.TextYAlignment.Center
+                        nameLabel.TextWrapped = true
+                        nameLabel.Parent = slotFrame
+                        applyScaledText(nameLabel, 14, 32)
+
+                        local readyFrame = Instance.new("Frame")
+                        readyFrame.Name = "ReadyFrame"
+                        readyFrame.AnchorPoint = Vector2.new(0, 0)
+                        readyFrame.Size = UDim2.new(0.5, 0, 1, 0)
+                        readyFrame.BackgroundColor3 = NOT_READY_COLOR
+                        readyFrame.BackgroundTransparency = 0.15
+                        readyFrame.BorderSizePixel = 0
+                        readyFrame.Parent = slotFrame
+
+                        local readyCorner = Instance.new("UICorner")
+                        readyCorner.CornerRadius = UDim.new(0.18, 0)
+                        readyCorner.Parent = readyFrame
+
+                        local readyLabel = Instance.new("TextLabel")
+                        readyLabel.Name = "ReadyLabel"
+                        readyLabel.BackgroundTransparency = 1
+                        readyLabel.Size = UDim2.new(1, 0, 1, 0)
+                        readyLabel.Font = Enum.Font.GothamBold
+                        readyLabel.TextColor3 = Color3.new(1, 1, 1)
+                        readyLabel.TextXAlignment = Enum.TextXAlignment.Center
+                        readyLabel.TextYAlignment = Enum.TextYAlignment.Center
+                        readyLabel.TextWrapped = true
+                        readyLabel.Parent = readyFrame
+                        applyScaledText(readyLabel, 13, 30)
+
+                        entry.PlayerSlots[index] = {
+                                Frame = slotFrame,
+                                NameLabel = nameLabel,
+                                ReadyFrame = readyFrame,
+                                ReadyLabel = readyLabel,
+                        }
+                end
+        end
+
+        local totalPadding = PLAYER_SLOT_PADDING * math.max(slotCount - 1, 0)
+        local rowHeight = (1 - totalPadding) / slotCount
+        for index = 1, slotCount do
+                        local slot = entry.PlayerSlots[index]
+                        if slot and slot.Frame then
+                                slot.Frame.LayoutOrder = index
+                                slot.Frame.Size = UDim2.new(1, 0, rowHeight, 0)
+                        end
+        end
+
+        entry.PlayerSlotCount = slotCount
+end
+
 local function updateRoundButtons(rounds, playerRound, hasLoadout)
         if not selectionScreenGui then
                 createSelectionGui()
@@ -1229,7 +1343,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         local frame = Instance.new("Frame")
                         frame.Name = string.format("Round%sEntry", roundKey)
                         frame.AnchorPoint = Vector2.new(0, 0)
-                        frame.Size = UDim2.new(1, 0, 0.42, 0)
+                        frame.Size = UDim2.new(1, 0, 0.56, 0)
                         frame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
                         frame.BackgroundTransparency = 0.05
                         frame.BorderSizePixel = 0
@@ -1256,8 +1370,8 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         local joinButton = Instance.new("TextButton")
                         joinButton.Name = "JoinButton"
                         joinButton.AnchorPoint = Vector2.new(0, 0)
-                        joinButton.Position = UDim2.new(0.03, 0, 0.28, 0)
-                        joinButton.Size = UDim2.new(0.44, 0, 0.26, 0)
+                        joinButton.Position = UDim2.new(0.03, 0, 0.22, 0)
+                        joinButton.Size = UDim2.new(0.44, 0, 0.2, 0)
                         joinButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
                         joinButton.BorderSizePixel = 0
                         joinButton.Font = Enum.Font.GothamBold
@@ -1279,8 +1393,8 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         local countdownLabel = Instance.new("TextLabel")
                         countdownLabel.Name = "CountdownLabel"
                         countdownLabel.AnchorPoint = Vector2.new(0, 0)
-                        countdownLabel.Position = UDim2.new(0.5, 0, 0.28, 0)
-                        countdownLabel.Size = UDim2.new(0.47, 0, 0.26, 0)
+                        countdownLabel.Position = UDim2.new(0.5, 0, 0.22, 0)
+                        countdownLabel.Size = UDim2.new(0.47, 0, 0.2, 0)
                         countdownLabel.BackgroundTransparency = 1
                         countdownLabel.Font = Enum.Font.Gotham
                         countdownLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
@@ -1294,8 +1408,8 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         local playerContainer = Instance.new("Frame")
                         playerContainer.Name = "PlayerContainer"
                         playerContainer.AnchorPoint = Vector2.new(0, 0)
-                        playerContainer.Position = UDim2.new(0.03, 0, 0.62, 0)
-                        playerContainer.Size = UDim2.new(0.94, 0, 0.36, 0)
+                        playerContainer.Position = UDim2.new(0.03, 0, 0.46, 0)
+                        playerContainer.Size = UDim2.new(0.94, 0, 0.5, 0)
                         playerContainer.BackgroundTransparency = 1
                         playerContainer.Parent = frame
 
@@ -1303,27 +1417,8 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         playerLayout.FillDirection = Enum.FillDirection.Vertical
                         playerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
                         playerLayout.SortOrder = Enum.SortOrder.LayoutOrder
-                        playerLayout.Padding = UDim.new(0.04, 0)
+                        playerLayout.Padding = UDim.new(PLAYER_SLOT_PADDING, 0)
                         playerLayout.Parent = playerContainer
-
-                        local playerPadding = Instance.new("UIPadding")
-                        playerPadding.PaddingTop = UDim.new(0.02, 0)
-                        playerPadding.PaddingBottom = UDim.new(0.02, 0)
-                        playerPadding.Parent = playerContainer
-
-                        local emptyLabel = Instance.new("TextLabel")
-                        emptyLabel.Name = "EmptyLabel"
-                        emptyLabel.BackgroundTransparency = 1
-                        emptyLabel.Size = UDim2.new(1, 0, 0.22, 0)
-                        emptyLabel.Font = Enum.Font.Gotham
-                        emptyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-                        emptyLabel.TextXAlignment = Enum.TextXAlignment.Left
-                        emptyLabel.TextYAlignment = Enum.TextYAlignment.Center
-                        emptyLabel.TextWrapped = true
-                        emptyLabel.Text = "Waiting for players..."
-                        emptyLabel.Parent = playerContainer
-                        emptyLabel.LayoutOrder = 0
-                        applyScaledText(emptyLabel, 12, 26)
 
                         entry = {
                                 Frame = frame,
@@ -1331,15 +1426,11 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                                 JoinButton = joinButton,
                                 CountdownLabel = countdownLabel,
                                 PlayerContainer = playerContainer,
-                                EmptyLabel = emptyLabel,
-                                PlayerEntries = {},
+                                PlayerSlots = {},
+                                PlayerSlotCount = 0,
                         }
                         roundButtons[roundKey] = entry
                 end
-
-                entry.Frame.Size = UDim2.new(1, 0, 0.42, 0)
-                entry.Frame.LayoutOrder = round.RequiredPlayers or index
-                entry.TitleLabel.Text = round.DisplayName or roundKey
 
                 local players = round.Players or {}
                 local occupantCount = #players
@@ -1351,6 +1442,19 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 end
 
                 local requiredPlayers = tonumber(round.RequiredPlayers) or 0
+                local slotCount = requiredPlayers > 0 and requiredPlayers or math.max(occupantCount, 1)
+                ensurePlayerSlots(entry, slotCount)
+
+                local slotAreaHeight = math.clamp(0.18 * slotCount + (PLAYER_SLOT_PADDING * math.max(slotCount - 1, 0)) + 0.08, 0.26, 0.62)
+                entry.PlayerContainer.Size = UDim2.new(0.94, 0, slotAreaHeight, 0)
+                local slotTop = math.max(0.3, math.min(0.46, 1 - slotAreaHeight - 0.05))
+                entry.PlayerContainer.Position = UDim2.new(0.03, 0, slotTop, 0)
+
+                local frameHeight = math.clamp(0.32 + slotAreaHeight, 0.52, 0.98)
+                entry.Frame.Size = UDim2.new(1, 0, frameHeight, 0)
+                entry.Frame.LayoutOrder = round.RequiredPlayers or index
+                entry.TitleLabel.Text = round.DisplayName or roundKey
+
                 local requiredText = requiredPlayers > 0 and tostring(requiredPlayers) or "∞"
                 entry.JoinButton:SetAttribute("RoundKey", roundKey)
                 entry.JoinButton.Active = hasLoadout
@@ -1368,96 +1472,33 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 local occupancyText = string.format("%d/%s Players", occupantCount, requiredText)
                 entry.CountdownLabel.Text = string.format("%s\n%s", occupancyText, countdownText)
 
-                entry.EmptyLabel.Visible = occupantCount == 0
-                entry.EmptyLabel.Size = UDim2.new(1, 0, occupantCount == 0 and 0.22 or 0, 0)
+                for slotIndex = 1, slotCount do
+                        local slot = entry.PlayerSlots[slotIndex]
+                        local occupant = players[slotIndex]
+                        if slot then
+                                if occupant then
+                                        slot.Frame.BackgroundTransparency = 0.05
+                                        slot.NameLabel.Text = occupant.Name or "Player"
+                                        slot.NameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+                                        slot.NameLabel.TextTransparency = 0
 
-                local activeEntries = {}
-                for index, occupant in ipairs(players) do
-                        local playerKey = occupant.UserId or occupant.Name or tostring(index)
-                        activeEntries[playerKey] = true
-
-                        local playerEntry = entry.PlayerEntries[playerKey]
-                        if not playerEntry then
-                                local row = Instance.new("Frame")
-                                row.Name = string.format("Player_%s", playerKey)
-                                row.BackgroundTransparency = 1
-                                row.Size = UDim2.new(1, 0, 0.26, 0)
-                                row.Parent = entry.PlayerContainer
-
-                                local rowPadding = Instance.new("UIPadding")
-                                rowPadding.PaddingLeft = UDim.new(0.02, 0)
-                                rowPadding.PaddingRight = UDim.new(0.02, 0)
-                                rowPadding.Parent = row
-
-                                local rowLayout = Instance.new("UIListLayout")
-                                rowLayout.FillDirection = Enum.FillDirection.Horizontal
-                                rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-                                rowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-                                rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
-                                rowLayout.Padding = UDim.new(0.03, 0)
-                                rowLayout.Parent = row
-
-                                local nameLabel = Instance.new("TextLabel")
-                                nameLabel.Name = "NameLabel"
-                                nameLabel.BackgroundTransparency = 1
-                                nameLabel.Size = UDim2.new(0.65, 0, 1, 0)
-                                nameLabel.Font = Enum.Font.GothamMedium
-                                nameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
-                                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-                                nameLabel.TextYAlignment = Enum.TextYAlignment.Center
-                                nameLabel.TextWrapped = true
-                                nameLabel.Parent = row
-                                applyScaledText(nameLabel, 14, 32)
-
-                                local readyFrame = Instance.new("Frame")
-                                readyFrame.Name = "ReadyFrame"
-                                readyFrame.Size = UDim2.new(0.32, 0, 1, 0)
-                                readyFrame.BackgroundColor3 = NOT_READY_COLOR
-                                readyFrame.BackgroundTransparency = 0.15
-                                readyFrame.Parent = row
-
-                                local readyCorner = Instance.new("UICorner")
-                                readyCorner.CornerRadius = UDim.new(0.35, 0)
-                                readyCorner.Parent = readyFrame
-
-                                local readyLabel = Instance.new("TextLabel")
-                                readyLabel.Name = "ReadyLabel"
-                                readyLabel.BackgroundTransparency = 1
-                                readyLabel.Size = UDim2.new(1, 0, 1, 0)
-                                readyLabel.Font = Enum.Font.GothamBold
-                                readyLabel.TextColor3 = Color3.new(1, 1, 1)
-                                readyLabel.TextXAlignment = Enum.TextXAlignment.Center
-                                readyLabel.TextYAlignment = Enum.TextYAlignment.Center
-                                readyLabel.TextWrapped = true
-                                readyLabel.Parent = readyFrame
-                                applyScaledText(readyLabel, 13, 30)
-
-                                playerEntry = {
-                                        Frame = row,
-                                        NameLabel = nameLabel,
-                                        ReadyLabel = readyLabel,
-                                        ReadyFrame = readyFrame,
-                                }
-                                entry.PlayerEntries[playerKey] = playerEntry
-                        end
-
-                        playerEntry.Frame.LayoutOrder = index
-                        playerEntry.NameLabel.Text = occupant.Name or "Player"
-                        local isReady = occupant.Ready == true
-                        playerEntry.ReadyLabel.Text = isReady and "Ready" or "Not Ready"
-                        playerEntry.ReadyLabel.TextColor3 = Color3.new(1, 1, 1)
-                        if playerEntry.ReadyFrame then
-                                playerEntry.ReadyFrame.BackgroundColor3 = isReady and READY_COLOR or NOT_READY_COLOR
-                                playerEntry.ReadyFrame.BackgroundTransparency = isReady and 0.05 or 0.15
-                        end
-                end
-
-                for key, info in pairs(entry.PlayerEntries) do
-                        if not activeEntries[key] then
-                                if info.Frame then
-                                        info.Frame:Destroy()
+                                        local isReady = occupant.Ready == true
+                                        slot.ReadyLabel.Text = isReady and "Ready" or "Not Ready"
+                                        slot.ReadyLabel.TextColor3 = Color3.new(1, 1, 1)
+                                        slot.ReadyLabel.TextTransparency = 0
+                                        slot.ReadyFrame.BackgroundColor3 = isReady and READY_COLOR or NOT_READY_COLOR
+                                        slot.ReadyFrame.BackgroundTransparency = isReady and 0.05 or 0.15
+                                else
+                                        slot.Frame.BackgroundTransparency = 0.25
+                                        slot.NameLabel.Text = "Empty Slot"
+                                        slot.NameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                                        slot.NameLabel.TextTransparency = 0.35
+                                        slot.ReadyLabel.Text = "Waiting"
+                                        slot.ReadyLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+                                        slot.ReadyLabel.TextTransparency = 0.35
+                                        slot.ReadyFrame.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+                                        slot.ReadyFrame.BackgroundTransparency = 0.5
                                 end
-                                entry.PlayerEntries[key] = nil
                         end
                 end
 
