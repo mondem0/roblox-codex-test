@@ -21,6 +21,7 @@ local hoverNameLabel
 local hoverHealthLabel
 local hoverCombinedLabel
 local selectedTower
+local lastRemovedSelectedTower
 local screenGui
 local shopFrame
 local statusFrame
@@ -2598,13 +2599,23 @@ local function showTowerSelection()
 	applyLoadoutToShop()
 end
 
-local function clearSelection()
-	selectedTower = nil
-	disconnectSelectedConnections()
-	destroyRangeIndicator()
-	if towerDetailsFrame then
-		towerDetailsFrame.Visible = false
-	end
+local function clearSelection(reason)
+        if selectedTower then
+                if reason == "destroyed" then
+                        lastRemovedSelectedTower = selectedTower
+                else
+                        lastRemovedSelectedTower = nil
+                end
+        else
+                lastRemovedSelectedTower = nil
+        end
+
+        selectedTower = nil
+        disconnectSelectedConnections()
+        destroyRangeIndicator()
+        if towerDetailsFrame then
+                towerDetailsFrame.Visible = false
+        end
 	if upgradeDescriptionLabel then
 		upgradeDescriptionLabel.Text = ""
 	end
@@ -2624,16 +2635,17 @@ local function selectTower(towerModel)
 		return
 	end
 
-	clearSelection()
-	selectedTower = towerModel
-	updateTowerDetails(towerModel)
+        clearSelection()
+        selectedTower = towerModel
+        lastRemovedSelectedTower = nil
+        updateTowerDetails(towerModel)
 
-	selectedTowerConnections = {
-		towerModel.AncestryChanged:Connect(function(_, parent)
-			if not parent then
-				clearSelection()
-			end
-		end),
+        selectedTowerConnections = {
+                towerModel.AncestryChanged:Connect(function(_, parent)
+                        if not parent then
+                                clearSelection("destroyed")
+                        end
+                end),
 		towerModel:GetAttributeChangedSignal("Level"):Connect(function()
 			if selectedTower == towerModel then
 				updateTowerDetails(towerModel)
@@ -3101,7 +3113,12 @@ remotes.TowerUpgraded.OnClientEvent:Connect(function(towerModel, _, previousMode
                 return
         end
 
-        if selectedTower and (towerModel == selectedTower or previousModel == selectedTower) then
+        if selectedTower == towerModel or selectedTower == previousModel then
+                selectTower(towerModel)
+                return
+        end
+
+        if lastRemovedSelectedTower and (lastRemovedSelectedTower == previousModel or lastRemovedSelectedTower == towerModel) then
                 selectTower(towerModel)
         end
 end)
@@ -3119,9 +3136,9 @@ if remotes:FindFirstChild("TowerStunPulse") then
 end
 
 RunService.RenderStepped:Connect(function()
-	updatePreview()
-	updateEnemyHover()
+        updatePreview()
+        updateEnemyHover()
         if selectedTower and (not selectedTower.Parent) then
-                clearSelection()
+                clearSelection("destroyed")
         end
 end)
