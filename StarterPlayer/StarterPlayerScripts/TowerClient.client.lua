@@ -1000,8 +1000,8 @@ local function createSelectionGui()
         local roundPanel = Instance.new("Frame")
         roundPanel.Name = "RoundPanel"
         roundPanel.AnchorPoint = Vector2.new(1, 0)
-        roundPanel.Size = UDim2.new(0.32, 0, 0.42, 0)
-        roundPanel.Position = UDim2.new(0.97, 0, 0.07, 0)
+        roundPanel.Size = UDim2.new(0.36, 0, 0.55, 0)
+        roundPanel.Position = UDim2.new(0.97, 0, 0.05, 0)
         roundPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         roundPanel.BackgroundTransparency = 0.05
         roundPanel.BorderSizePixel = 0
@@ -1043,7 +1043,7 @@ local function createSelectionGui()
         lobbyRoundList = Instance.new("ScrollingFrame")
         lobbyRoundList.Name = "RoundList"
         lobbyRoundList.AnchorPoint = Vector2.new(0, 0)
-        lobbyRoundList.Size = UDim2.new(0.94, 0, 0.62, 0)
+        lobbyRoundList.Size = UDim2.new(0.94, 0, 0.64, 0)
         lobbyRoundList.Position = UDim2.new(0.03, 0, 0.42, 0)
         lobbyRoundList.BackgroundTransparency = 1
         lobbyRoundList.BorderSizePixel = 0
@@ -1221,79 +1221,223 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 local roundKey = round.Key or tostring(index)
                 existing[roundKey] = true
 
-                local button = roundButtons[roundKey]
-                if not button then
-                        button = Instance.new("TextButton")
-                        button.Name = string.format("Round%sButton", roundKey)
-                        button.Size = UDim2.new(1, 0, 0.24, 0)
-                        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-                        button.BorderSizePixel = 0
-                        button.Font = Enum.Font.Gotham
-                        button.TextSize = 18
-                        button.TextColor3 = Color3.new(1, 1, 1)
-                        button.TextWrapped = true
-                        button.AutoButtonColor = true
-                        button.Parent = lobbyRoundList
-                        button:SetAttribute("RoundKey", roundKey)
-                        applyScaledText(button, 12, 32)
-                        button.MouseButton1Click:Connect(function()
-                                local key = button:GetAttribute("RoundKey")
+                local entry = roundButtons[roundKey]
+                if not entry then
+                        local frame = Instance.new("Frame")
+                        frame.Name = string.format("Round%sEntry", roundKey)
+                        frame.AnchorPoint = Vector2.new(0, 0)
+                        frame.Size = UDim2.new(1, 0, 0.42, 0)
+                        frame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                        frame.BackgroundTransparency = 0.05
+                        frame.BorderSizePixel = 0
+                        frame.Parent = lobbyRoundList
+
+                        local frameCorner = Instance.new("UICorner")
+                        frameCorner.CornerRadius = UDim.new(0.04, 0)
+                        frameCorner.Parent = frame
+
+                        local titleLabel = Instance.new("TextLabel")
+                        titleLabel.Name = "RoundName"
+                        titleLabel.AnchorPoint = Vector2.new(0, 0)
+                        titleLabel.Position = UDim2.new(0.03, 0, 0.05, 0)
+                        titleLabel.Size = UDim2.new(0.94, 0, 0.18, 0)
+                        titleLabel.BackgroundTransparency = 1
+                        titleLabel.Font = Enum.Font.GothamBold
+                        titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        titleLabel.TextYAlignment = Enum.TextYAlignment.Center
+                        titleLabel.Text = ""
+                        titleLabel.Parent = frame
+                        applyScaledText(titleLabel, 14, 34)
+
+                        local joinButton = Instance.new("TextButton")
+                        joinButton.Name = "JoinButton"
+                        joinButton.AnchorPoint = Vector2.new(0, 0)
+                        joinButton.Position = UDim2.new(0.03, 0, 0.28, 0)
+                        joinButton.Size = UDim2.new(0.44, 0, 0.26, 0)
+                        joinButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
+                        joinButton.BorderSizePixel = 0
+                        joinButton.Font = Enum.Font.GothamBold
+                        joinButton.TextColor3 = Color3.new(1, 1, 1)
+                        joinButton.TextWrapped = true
+                        joinButton.TextXAlignment = Enum.TextXAlignment.Center
+                        joinButton.TextYAlignment = Enum.TextYAlignment.Center
+                        joinButton.Text = "Join"
+                        joinButton.AutoButtonColor = true
+                        joinButton.Parent = frame
+                        applyScaledText(joinButton, 14, 32)
+                        joinButton.MouseButton1Click:Connect(function()
+                                local key = joinButton:GetAttribute("RoundKey")
                                 if key and remotes.RequestJoinRound then
                                         remotes.RequestJoinRound:FireServer(key)
                                 end
                         end)
-                        roundButtons[roundKey] = button
+
+                        local countdownLabel = Instance.new("TextLabel")
+                        countdownLabel.Name = "CountdownLabel"
+                        countdownLabel.AnchorPoint = Vector2.new(0, 0)
+                        countdownLabel.Position = UDim2.new(0.5, 0, 0.28, 0)
+                        countdownLabel.Size = UDim2.new(0.47, 0, 0.26, 0)
+                        countdownLabel.BackgroundTransparency = 1
+                        countdownLabel.Font = Enum.Font.Gotham
+                        countdownLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+                        countdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        countdownLabel.TextYAlignment = Enum.TextYAlignment.Center
+                        countdownLabel.TextWrapped = true
+                        countdownLabel.Text = ""
+                        countdownLabel.Parent = frame
+                        applyScaledText(countdownLabel, 12, 28)
+
+                        local playerContainer = Instance.new("Frame")
+                        playerContainer.Name = "PlayerContainer"
+                        playerContainer.AnchorPoint = Vector2.new(0, 0)
+                        playerContainer.Position = UDim2.new(0.03, 0, 0.62, 0)
+                        playerContainer.Size = UDim2.new(0.94, 0, 0.36, 0)
+                        playerContainer.BackgroundTransparency = 1
+                        playerContainer.Parent = frame
+
+                        local playerLayout = Instance.new("UIListLayout")
+                        playerLayout.FillDirection = Enum.FillDirection.Vertical
+                        playerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+                        playerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                        playerLayout.Padding = UDim.new(0.04, 0)
+                        playerLayout.Parent = playerContainer
+
+                        local emptyLabel = Instance.new("TextLabel")
+                        emptyLabel.Name = "EmptyLabel"
+                        emptyLabel.BackgroundTransparency = 1
+                        emptyLabel.Size = UDim2.new(1, 0, 0.22, 0)
+                        emptyLabel.Font = Enum.Font.Gotham
+                        emptyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                        emptyLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        emptyLabel.TextYAlignment = Enum.TextYAlignment.Center
+                        emptyLabel.TextWrapped = true
+                        emptyLabel.Text = "Waiting for players..."
+                        emptyLabel.Parent = playerContainer
+                        emptyLabel.LayoutOrder = 0
+                        applyScaledText(emptyLabel, 12, 26)
+
+                        entry = {
+                                Frame = frame,
+                                TitleLabel = titleLabel,
+                                JoinButton = joinButton,
+                                CountdownLabel = countdownLabel,
+                                PlayerContainer = playerContainer,
+                                EmptyLabel = emptyLabel,
+                                PlayerEntries = {},
+                        }
+                        roundButtons[roundKey] = entry
                 end
 
-                button.Size = UDim2.new(1, 0, 0.24, 0)
-                button.LayoutOrder = round.RequiredPlayers or index
-                button:SetAttribute("RoundKey", roundKey)
-                button.Active = hasLoadout
-                button.AutoButtonColor = hasLoadout
-                button.TextTransparency = hasLoadout and 0 or 0.25
+                entry.Frame.Size = UDim2.new(1, 0, 0.42, 0)
+                entry.Frame.LayoutOrder = round.RequiredPlayers or index
+                entry.TitleLabel.Text = round.DisplayName or roundKey
 
                 local players = round.Players or {}
                 local occupantCount = #players
                 local readyCount = 0
-                local names = {}
                 for _, occupant in ipairs(players) do
                         if occupant.Ready then
                                 readyCount += 1
                         end
-                        if occupant.Name then
-                                table.insert(names, occupant.Name)
+                end
+
+                local requiredPlayers = tonumber(round.RequiredPlayers) or 0
+                local requiredText = requiredPlayers > 0 and tostring(requiredPlayers) or "∞"
+                entry.JoinButton:SetAttribute("RoundKey", roundKey)
+                entry.JoinButton.Active = hasLoadout
+                entry.JoinButton.AutoButtonColor = hasLoadout
+                entry.JoinButton.TextTransparency = hasLoadout and 0 or 0.35
+                entry.JoinButton.Text = string.format("Join\n%d/%s Players", occupantCount, requiredText)
+
+                entry.CountdownLabel.TextTransparency = hasLoadout and 0 or 0.35
+                local countdownText = "Waiting for players"
+                if round.Countdown and round.Countdown > 0 then
+                        countdownText = string.format("Countdown: %ds", round.Countdown)
+                elseif readyCount > 0 then
+                        countdownText = string.format("%d ready", readyCount)
+                end
+                entry.CountdownLabel.Text = countdownText
+
+                entry.EmptyLabel.Visible = occupantCount == 0
+                entry.EmptyLabel.Size = UDim2.new(1, 0, occupantCount == 0 and 0.22 or 0, 0)
+
+                local activeEntries = {}
+                for index, occupant in ipairs(players) do
+                        local playerKey = occupant.UserId or occupant.Name or tostring(index)
+                        activeEntries[playerKey] = true
+
+                        local playerEntry = entry.PlayerEntries[playerKey]
+                        if not playerEntry then
+                                local row = Instance.new("Frame")
+                                row.Name = string.format("Player_%s", playerKey)
+                                row.BackgroundTransparency = 1
+                                row.Size = UDim2.new(1, 0, 0.22, 0)
+                                row.Parent = entry.PlayerContainer
+
+                                local nameLabel = Instance.new("TextLabel")
+                                nameLabel.Name = "NameLabel"
+                                nameLabel.BackgroundTransparency = 1
+                                nameLabel.AnchorPoint = Vector2.new(0, 0)
+                                nameLabel.Position = UDim2.new(0, 0, 0, 0)
+                                nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
+                                nameLabel.Font = Enum.Font.Gotham
+                                nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+                                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                                nameLabel.TextYAlignment = Enum.TextYAlignment.Center
+                                nameLabel.TextWrapped = true
+                                nameLabel.Parent = row
+                                applyScaledText(nameLabel, 12, 28)
+
+                                local readyLabel = Instance.new("TextLabel")
+                                readyLabel.Name = "ReadyLabel"
+                                readyLabel.BackgroundTransparency = 1
+                                readyLabel.AnchorPoint = Vector2.new(1, 0)
+                                readyLabel.Position = UDim2.new(1, 0, 0, 0)
+                                readyLabel.Size = UDim2.new(0.3, 0, 1, 0)
+                                readyLabel.Font = Enum.Font.GothamBold
+                                readyLabel.TextXAlignment = Enum.TextXAlignment.Right
+                                readyLabel.TextYAlignment = Enum.TextYAlignment.Center
+                                readyLabel.TextWrapped = true
+                                readyLabel.Parent = row
+                                applyScaledText(readyLabel, 12, 28)
+
+                                playerEntry = {
+                                        Frame = row,
+                                        NameLabel = nameLabel,
+                                        ReadyLabel = readyLabel,
+                                }
+                                entry.PlayerEntries[playerKey] = playerEntry
+                        end
+
+                        playerEntry.Frame.LayoutOrder = index
+                        playerEntry.NameLabel.Text = occupant.Name or "Player"
+                        local isReady = occupant.Ready == true
+                        playerEntry.ReadyLabel.Text = isReady and "Ready" or "Not Ready"
+                        playerEntry.ReadyLabel.TextColor3 = isReady and Color3.fromRGB(120, 220, 160) or Color3.fromRGB(220, 140, 120)
+                end
+
+                for key, info in pairs(entry.PlayerEntries) do
+                        if not activeEntries[key] then
+                                if info.Frame then
+                                        info.Frame:Destroy()
+                                end
+                                entry.PlayerEntries[key] = nil
                         end
                 end
 
-                local lines = {
-                        round.DisplayName or roundKey,
-                        string.format("%d/%d players", occupantCount, round.RequiredPlayers or 0),
-                }
-
-                if readyCount > 0 then
-                        table.insert(lines, string.format("%d ready", readyCount))
-                end
-
-                if round.Countdown and round.Countdown > 0 then
-                        table.insert(lines, string.format("Countdown: %ds", round.Countdown))
-                end
-
-                if #names > 0 then
-                        table.insert(lines, table.concat(names, ", "))
-                end
-
-                button.Text = table.concat(lines, "\n")
-
                 if playerRound == roundKey then
-                        button.BackgroundColor3 = Color3.fromRGB(90, 110, 160)
+                        entry.Frame.BackgroundColor3 = Color3.fromRGB(90, 110, 160)
                 else
-                        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                        entry.Frame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
                 end
         end
 
-        for key, button in pairs(roundButtons) do
+        for key, entry in pairs(roundButtons) do
                 if not existing[key] then
-                        button:Destroy()
+                        if entry.Frame then
+                                entry.Frame:Destroy()
+                        end
                         roundButtons[key] = nil
                 end
         end
@@ -2036,9 +2180,9 @@ local function createGui()
 
         statusFrame = Instance.new("Frame")
         statusFrame.Name = "Status"
-        statusFrame.AnchorPoint = Vector2.new(1, 1)
+        statusFrame.AnchorPoint = Vector2.new(0, 1)
         statusFrame.Size = UDim2.new(0.22, 0, 0.34, 0)
-        statusFrame.Position = UDim2.new(0.98, 0, 0.98, 0)
+        statusFrame.Position = UDim2.new(0.02, 0, 0.98, 0)
         statusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
         statusFrame.BackgroundTransparency = 0.1
         statusFrame.BorderSizePixel = 0
