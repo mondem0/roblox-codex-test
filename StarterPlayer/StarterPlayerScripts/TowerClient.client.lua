@@ -1101,7 +1101,7 @@ end
 
 local function updateInterfaceVisibility()
         if selectionScreenGui then
-                selectionScreenGui.Enabled = lobbyPhase ~= "inRound"
+                selectionScreenGui.Enabled = lobbyPhase == "lobby"
         end
 
         if mapSelectionGui then
@@ -1834,8 +1834,8 @@ local function createGui()
         shopFrame = Instance.new("Frame")
         shopFrame.Name = "Shop"
         shopFrame.Size = UDim2.fromOffset(900, 164)
-        shopFrame.AnchorPoint = Vector2.new(0.5, 0)
-        shopFrame.Position = UDim2.new(0.5, 0, 0, 0)
+        shopFrame.AnchorPoint = Vector2.new(0, 1)
+        shopFrame.Position = UDim2.fromOffset(0, 164)
         shopFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
         shopFrame.BackgroundTransparency = 0.1
         shopFrame.BorderSizePixel = 0
@@ -2176,7 +2176,7 @@ local function createGui()
 		if shopFrame then
 			local shopSize = shopFrame.AbsoluteSize
 			local shopX = math.max(math.floor((absoluteSize.X - shopSize.X) * 0.5), 0)
-			local shopY = math.max(absoluteSize.Y - shopSize.Y - 10, 0)
+			local shopY = math.max(absoluteSize.Y - 10, shopSize.Y)
 			shopFrame.Position = UDim2.fromOffset(shopX, shopY)
 		end
 
