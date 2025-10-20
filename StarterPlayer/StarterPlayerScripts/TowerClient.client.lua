@@ -57,6 +57,8 @@ local upgradeButtonOriginalTextTransparency
 local upgradeButtonOriginalAutoButtonColor
 local sellButtonOriginalAutoButtonColor
 local GREY_COLOR = Color3.new(0.5, 0.5, 0.5)
+local READY_COLOR = Color3.fromRGB(120, 220, 160)
+local NOT_READY_COLOR = Color3.fromRGB(220, 140, 120)
 
 local playerTowerTotalLabel
 local teamTowerTotalLabel
@@ -100,6 +102,7 @@ local mapSelectionGui
 local mapSelectionFrame
 local mapOptionButtons = {}
 local mapVoteLabels = {}
+local mapVoteTotalPlayers = 0
 local mapSelectionStatusLabel
 local mapOptionsContainer
 
@@ -1282,11 +1285,11 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         countdownLabel.Font = Enum.Font.Gotham
                         countdownLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
                         countdownLabel.TextXAlignment = Enum.TextXAlignment.Left
-                        countdownLabel.TextYAlignment = Enum.TextYAlignment.Center
+                        countdownLabel.TextYAlignment = Enum.TextYAlignment.Top
                         countdownLabel.TextWrapped = true
                         countdownLabel.Text = ""
                         countdownLabel.Parent = frame
-                        applyScaledText(countdownLabel, 12, 28)
+                        applyScaledText(countdownLabel, 13, 30)
 
                         local playerContainer = Instance.new("Frame")
                         playerContainer.Name = "PlayerContainer"
@@ -1302,6 +1305,11 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         playerLayout.SortOrder = Enum.SortOrder.LayoutOrder
                         playerLayout.Padding = UDim.new(0.04, 0)
                         playerLayout.Parent = playerContainer
+
+                        local playerPadding = Instance.new("UIPadding")
+                        playerPadding.PaddingTop = UDim.new(0.02, 0)
+                        playerPadding.PaddingBottom = UDim.new(0.02, 0)
+                        playerPadding.Parent = playerContainer
 
                         local emptyLabel = Instance.new("TextLabel")
                         emptyLabel.Name = "EmptyLabel"
@@ -1348,7 +1356,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 entry.JoinButton.Active = hasLoadout
                 entry.JoinButton.AutoButtonColor = hasLoadout
                 entry.JoinButton.TextTransparency = hasLoadout and 0 or 0.35
-                entry.JoinButton.Text = string.format("Join\n%d/%s Players", occupantCount, requiredText)
+                entry.JoinButton.Text = "Join"
 
                 entry.CountdownLabel.TextTransparency = hasLoadout and 0 or 0.35
                 local countdownText = "Waiting for players"
@@ -1357,7 +1365,8 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 elseif readyCount > 0 then
                         countdownText = string.format("%d ready", readyCount)
                 end
-                entry.CountdownLabel.Text = countdownText
+                local occupancyText = string.format("%d/%s Players", occupantCount, requiredText)
+                entry.CountdownLabel.Text = string.format("%s\n%s", occupancyText, countdownText)
 
                 entry.EmptyLabel.Visible = occupantCount == 0
                 entry.EmptyLabel.Size = UDim2.new(1, 0, occupantCount == 0 and 0.22 or 0, 0)
@@ -1372,40 +1381,62 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                                 local row = Instance.new("Frame")
                                 row.Name = string.format("Player_%s", playerKey)
                                 row.BackgroundTransparency = 1
-                                row.Size = UDim2.new(1, 0, 0.22, 0)
+                                row.Size = UDim2.new(1, 0, 0.26, 0)
                                 row.Parent = entry.PlayerContainer
+
+                                local rowPadding = Instance.new("UIPadding")
+                                rowPadding.PaddingLeft = UDim.new(0.02, 0)
+                                rowPadding.PaddingRight = UDim.new(0.02, 0)
+                                rowPadding.Parent = row
+
+                                local rowLayout = Instance.new("UIListLayout")
+                                rowLayout.FillDirection = Enum.FillDirection.Horizontal
+                                rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+                                rowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+                                rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                                rowLayout.Padding = UDim.new(0.03, 0)
+                                rowLayout.Parent = row
 
                                 local nameLabel = Instance.new("TextLabel")
                                 nameLabel.Name = "NameLabel"
                                 nameLabel.BackgroundTransparency = 1
-                                nameLabel.AnchorPoint = Vector2.new(0, 0)
-                                nameLabel.Position = UDim2.new(0, 0, 0, 0)
-                                nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
-                                nameLabel.Font = Enum.Font.Gotham
-                                nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+                                nameLabel.Size = UDim2.new(0.65, 0, 1, 0)
+                                nameLabel.Font = Enum.Font.GothamMedium
+                                nameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
                                 nameLabel.TextXAlignment = Enum.TextXAlignment.Left
                                 nameLabel.TextYAlignment = Enum.TextYAlignment.Center
                                 nameLabel.TextWrapped = true
                                 nameLabel.Parent = row
-                                applyScaledText(nameLabel, 12, 28)
+                                applyScaledText(nameLabel, 14, 32)
+
+                                local readyFrame = Instance.new("Frame")
+                                readyFrame.Name = "ReadyFrame"
+                                readyFrame.Size = UDim2.new(0.32, 0, 1, 0)
+                                readyFrame.BackgroundColor3 = NOT_READY_COLOR
+                                readyFrame.BackgroundTransparency = 0.15
+                                readyFrame.Parent = row
+
+                                local readyCorner = Instance.new("UICorner")
+                                readyCorner.CornerRadius = UDim.new(0.35, 0)
+                                readyCorner.Parent = readyFrame
 
                                 local readyLabel = Instance.new("TextLabel")
                                 readyLabel.Name = "ReadyLabel"
                                 readyLabel.BackgroundTransparency = 1
-                                readyLabel.AnchorPoint = Vector2.new(1, 0)
-                                readyLabel.Position = UDim2.new(1, 0, 0, 0)
-                                readyLabel.Size = UDim2.new(0.3, 0, 1, 0)
+                                readyLabel.Size = UDim2.new(1, 0, 1, 0)
                                 readyLabel.Font = Enum.Font.GothamBold
-                                readyLabel.TextXAlignment = Enum.TextXAlignment.Right
+                                readyLabel.TextColor3 = Color3.new(1, 1, 1)
+                                readyLabel.TextXAlignment = Enum.TextXAlignment.Center
                                 readyLabel.TextYAlignment = Enum.TextYAlignment.Center
                                 readyLabel.TextWrapped = true
-                                readyLabel.Parent = row
-                                applyScaledText(readyLabel, 12, 28)
+                                readyLabel.Parent = readyFrame
+                                applyScaledText(readyLabel, 13, 30)
 
                                 playerEntry = {
                                         Frame = row,
                                         NameLabel = nameLabel,
                                         ReadyLabel = readyLabel,
+                                        ReadyFrame = readyFrame,
                                 }
                                 entry.PlayerEntries[playerKey] = playerEntry
                         end
@@ -1414,7 +1445,11 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         playerEntry.NameLabel.Text = occupant.Name or "Player"
                         local isReady = occupant.Ready == true
                         playerEntry.ReadyLabel.Text = isReady and "Ready" or "Not Ready"
-                        playerEntry.ReadyLabel.TextColor3 = isReady and Color3.fromRGB(120, 220, 160) or Color3.fromRGB(220, 140, 120)
+                        playerEntry.ReadyLabel.TextColor3 = Color3.new(1, 1, 1)
+                        if playerEntry.ReadyFrame then
+                                playerEntry.ReadyFrame.BackgroundColor3 = isReady and READY_COLOR or NOT_READY_COLOR
+                                playerEntry.ReadyFrame.BackgroundTransparency = isReady and 0.05 or 0.15
+                        end
                 end
 
                 for key, info in pairs(entry.PlayerEntries) do
@@ -1621,6 +1656,8 @@ local function showMapSelection(options, totalPlayers)
         createMapSelectionGui()
         clearMapOptions()
 
+        mapVoteTotalPlayers = totalPlayers or 0
+
         for index, option in ipairs(options or {}) do
                 local container = Instance.new("Frame")
                 container.Name = string.format("Option%d", index)
@@ -1686,7 +1723,11 @@ local function showMapSelection(options, totalPlayers)
                 voteLabel.Font = Enum.Font.Gotham
                 voteLabel.TextSize = 16
                 voteLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-                voteLabel.Text = "0 votes"
+                if mapVoteTotalPlayers > 0 then
+                        voteLabel.Text = string.format("0 / %d votes", mapVoteTotalPlayers)
+                else
+                        voteLabel.Text = "0 votes"
+                end
                 voteLabel.Parent = container
                 applyScaledText(voteLabel, 12, 26)
 
@@ -1716,11 +1757,21 @@ local function showMapSelection(options, totalPlayers)
 end
 
 local function updateMapVoteCounts(counts, totalPlayers)
+        if totalPlayers then
+                mapVoteTotalPlayers = totalPlayers
+        end
+
+        local displayTotal = mapVoteTotalPlayers or 0
+
         for index, label in pairs(mapVoteLabels) do
-                        local votes = counts and counts[index] or 0
-                        if label then
-                                label.Text = string.format("%d / %d votes", votes, totalPlayers or 0)
+                local votes = counts and counts[index] or 0
+                if label then
+                        if displayTotal > 0 then
+                                label.Text = string.format("%d / %d votes", votes, displayTotal)
+                        else
+                                label.Text = string.format("%d votes", votes)
                         end
+                end
         end
 end
 
