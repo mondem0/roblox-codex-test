@@ -10,6 +10,36 @@ TowerService.__index = TowerService
 local TOWER_BASE_HALF_SIZE = 2
 local DEFAULT_BASE_SIZE = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
 local PLACEMENT_EDGE_EPSILON = 0.01
+
+local function shouldIgnoreForGround(instance, ground)
+    if not instance then
+        return true
+    end
+
+    if instance == ground or (ground and instance:IsDescendantOf(ground)) then
+        return false
+    end
+
+    if instance == workspace.Terrain then
+        return false
+    end
+
+    if instance:IsA("BasePart") then
+        if instance.CanCollide then
+            return false
+        end
+
+        if instance.Transparency >= 0.95 then
+            return true
+        end
+
+        if not instance.CanCollide then
+            return true
+        end
+    end
+
+    return not instance:IsA("BasePart")
+end
 local TowerFootprints = {}
 local TowerLimits = {}
 local OverallPlacementLimitCache
@@ -655,77 +685,83 @@ function TowerService:HasReachedTowerLimit(player, towerType)
 end
 
 function TowerService:IsPlacementValid(position, towerType)
-	if not position then
-		return false
-	end
+        if not position then
+                return false
+        end
 
-	local candidateSize = getTowerBaseSize(towerType)
-	local candidateHalfX = math.max(0.05, candidateSize.X / 2)
-	local candidateHalfZ = math.max(0.05, candidateSize.Z / 2)
+        local map = workspace:FindFirstChild("Map")
+        local ground = map and map:FindFirstChild("PathGround")
+        if not ground then
+                return false
+        end
 
-	local resolvedPosition = Vector3.new(position.X, position.Y, position.Z)
+        local candidateSize = getTowerBaseSize(towerType)
+        local candidateHalfX = math.max(0.05, candidateSize.X / 2)
+        local candidateHalfZ = math.max(0.05, candidateSize.Z / 2)
 
-	local map = workspace:FindFirstChild("Map")
-	local ground = map and map:FindFirstChild("PathGround")
-	if ground then
-		local params = RaycastParams.new()
-		params.FilterType = Enum.RaycastFilterType.Blacklist
-		params.IgnoreWater = true
+        local resolvedPosition = Vector3.new(position.X, position.Y, position.Z)
 
-		local ignoreList = {}
-		local towersFolderInstance = workspace:FindFirstChild("Towers")
-		if towersFolderInstance then
-			table.insert(ignoreList, towersFolderInstance)
-		end
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Blacklist
+        params.IgnoreWater = true
 
-		params.FilterDescendantsInstances = ignoreList
+        local ignoreList = {}
+        local towersFolderInstance = workspace:FindFirstChild("Towers")
+        if towersFolderInstance then
+                table.insert(ignoreList, towersFolderInstance)
+        end
 
-		local rayOrigin = Vector3.new(position.X, position.Y + 200, position.Z)
-		local rayDirection = Vector3.new(0, -400, 0)
-		local result
+        params.FilterDescendantsInstances = ignoreList
 
-		for _ = 1, 10 do
-			result = workspace:Raycast(rayOrigin, rayDirection, params)
-			if not result then
-				return false
-			end
+        local rayOrigin = Vector3.new(position.X, position.Y + 200, position.Z)
+        local rayDirection = Vector3.new(0, -400, 0)
+        local result
 
-			if result.Instance == ground or result.Instance:IsDescendantOf(ground) then
-				resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
-				break
-			end
+        for _ = 1, 10 do
+                result = workspace:Raycast(rayOrigin, rayDirection, params)
+                if not result then
+                        return false
+                end
 
-			table.insert(ignoreList, result.Instance)
-			params.FilterDescendantsInstances = ignoreList
-			rayOrigin = result.Position - Vector3.new(0, 0.05, 0)
-		end
+                if result.Instance == ground or result.Instance:IsDescendantOf(ground) then
+                        resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
+                        break
+                end
 
-		if not result or (result.Instance ~= ground and not result.Instance:IsDescendantOf(ground)) then
-			return false
-		end
-	end
+                if not shouldIgnoreForGround(result.Instance, ground) then
+                        return false
+                end
 
-	local towersFolder = workspace:FindFirstChild("Towers")
-	if towersFolder then
-		for _, tower in ipairs(towersFolder:GetChildren()) do
-			local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
-			if primary then
-				local otherPos = primary.Position
-				local otherSize = sanitizeBaseSize(primary.Size)
-				local otherHalfX = math.max(0.05, otherSize.X / 2)
-				local otherHalfZ = math.max(0.05, otherSize.Z / 2)
-				local deltaX = math.abs(otherPos.X - resolvedPosition.X)
-				local deltaZ = math.abs(otherPos.Z - resolvedPosition.Z)
-				local limitX = otherHalfX + candidateHalfX + PLACEMENT_EDGE_EPSILON
-				local limitZ = otherHalfZ + candidateHalfZ + PLACEMENT_EDGE_EPSILON
-				if deltaX <= limitX and deltaZ <= limitZ then
-					return false
-				end
-			end
-		end
-	end
+                table.insert(ignoreList, result.Instance)
+                params.FilterDescendantsInstances = ignoreList
+                rayOrigin = result.Position - Vector3.new(0, 0.05, 0)
+        end
 
-	return true, resolvedPosition
+        if not result or (result.Instance ~= ground and not result.Instance:IsDescendantOf(ground)) then
+                return false
+        end
+
+        local towersFolder = workspace:FindFirstChild("Towers")
+        if towersFolder then
+                for _, tower in ipairs(towersFolder:GetChildren()) do
+                        local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
+                        if primary then
+                                local otherPos = primary.Position
+                                local otherSize = sanitizeBaseSize(primary.Size)
+                                local otherHalfX = math.max(0.05, otherSize.X / 2)
+                                local otherHalfZ = math.max(0.05, otherSize.Z / 2)
+                                local deltaX = math.abs(otherPos.X - resolvedPosition.X)
+                                local deltaZ = math.abs(otherPos.Z - resolvedPosition.Z)
+                                local limitX = otherHalfX + candidateHalfX + PLACEMENT_EDGE_EPSILON
+                                local limitZ = otherHalfZ + candidateHalfZ + PLACEMENT_EDGE_EPSILON
+                                if deltaX <= limitX and deltaZ <= limitZ then
+                                        return false
+                                end
+                        end
+                end
+        end
+
+        return true, resolvedPosition
 end
 
 function TowerService:AddTower(player, towerType, position)

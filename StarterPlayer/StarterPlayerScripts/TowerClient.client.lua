@@ -2678,36 +2678,70 @@ local function createPlacementValidationParams()
 		table.insert(ignoreList, towersFolder)
 	end
 
-	params.FilterDescendantsInstances = ignoreList
-	return params, ignoreList
+        params.FilterDescendantsInstances = ignoreList
+        return params, ignoreList
+end
+
+local function shouldIgnoreGroundHit(instance, ground)
+        if not instance then
+                return true
+        end
+
+        if instance == ground or (ground and instance:IsDescendantOf(ground)) then
+                return false
+        end
+
+        if instance == workspace.Terrain then
+                return false
+        end
+
+        if instance:IsA("BasePart") then
+                if instance.CanCollide then
+                        return false
+                end
+
+                if instance.Transparency >= 0.95 then
+                        return true
+                end
+
+                if not instance.CanCollide then
+                        return true
+                end
+        end
+
+        return not instance:IsA("BasePart")
 end
 local function findGroundBeneath(position)
-	local map = workspace:FindFirstChild("Map")
-	local ground = map and map:FindFirstChild("PathGround")
-	if not ground then
-		return nil
+        local map = workspace:FindFirstChild("Map")
+        local ground = map and map:FindFirstChild("PathGround")
+        if not ground then
+                return nil
 	end
 
 	local params, ignoreList = createPlacementValidationParams()
 	local origin = position + Vector3.new(0, 200, 0)
 	local direction = Vector3.new(0, -400, 0)
 
-	for _ = 1, MAX_GROUND_RAYCAST_ATTEMPTS do
-		local result = workspace:Raycast(origin, direction, params)
-		if not result then
-			return nil
-		end
+        for _ = 1, MAX_GROUND_RAYCAST_ATTEMPTS do
+                local result = workspace:Raycast(origin, direction, params)
+                if not result then
+                        return nil
+                end
 
-		if result.Instance == ground or result.Instance:IsDescendantOf(ground) then
-			return result
-		end
+                if result.Instance == ground or result.Instance:IsDescendantOf(ground) then
+                        return result
+                end
 
-		table.insert(ignoreList, result.Instance)
-		params.FilterDescendantsInstances = ignoreList
-		origin = result.Position - Vector3.new(0, 0.05, 0)
-	end
+                if not shouldIgnoreGroundHit(result.Instance, ground) then
+                        return nil
+                end
 
-	return nil
+                table.insert(ignoreList, result.Instance)
+                params.FilterDescendantsInstances = ignoreList
+                origin = result.Position - Vector3.new(0, 0.05, 0)
+        end
+
+        return nil
 end
 local function isPositionClear(position)
 	local towersFolder = workspace:FindFirstChild("Towers")
