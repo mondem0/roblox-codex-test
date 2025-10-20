@@ -109,11 +109,11 @@ local mapOptionsContainer
 local preRoundCountdownLabel
 
 local DEFAULT_PREVIEW_SIZE = Vector3.new(4, 1, 4)
-local DEFAULT_PREVIEW_RADIUS = math.max(DEFAULT_PREVIEW_SIZE.X, DEFAULT_PREVIEW_SIZE.Z) / 2
 local previewFootprintSize = DEFAULT_PREVIEW_SIZE
-local previewFootprintRadius = DEFAULT_PREVIEW_RADIUS
 local footprintCache = {}
 local RANGE_RING_HEIGHT = 0.05
+local MAX_GROUND_RAYCAST_ATTEMPTS = 8
+local PLACEMENT_EDGE_EPSILON = 0.01
 
 local function updateStartButtonVisual()
         -- The manual wave start button is no longer present in the HUD.
@@ -402,9 +402,7 @@ local function cancelPlacement()
 	destroyPreviewRangeIndicator()
 	placementValid = false
 	previewFootprintSize = DEFAULT_PREVIEW_SIZE
-	previewFootprintRadius = DEFAULT_PREVIEW_RADIUS
 end
-
 function beginPlacement(towerType)
 	if not towerType or not towerConfigs[towerType] then
 		return
@@ -425,7 +423,6 @@ function beginPlacement(towerType)
 
 	local footprint = getTowerFootprint(placingTowerType)
 	previewFootprintSize = Vector3.new(footprint.X, math.max(0.2, footprint.Y), footprint.Z)
-	previewFootprintRadius = math.max(previewFootprintSize.X, previewFootprintSize.Z) / 2
 	previewPart.Size = previewFootprintSize
 
 	local config = towerConfigs[placingTowerType]
@@ -2660,42 +2657,78 @@ local function selectTower(towerModel)
 	}
 end
 
-local function isOnBuildableGround(hitInstance)
-	if not hitInstance then
-		return false
+local function createPlacementValidationParams()
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.IgnoreWater = true
+
+	local ignoreList = { player.Character }
+	if previewPart then
+		table.insert(ignoreList, previewPart)
+	end
+	if previewRangeRing then
+		table.insert(ignoreList, previewRangeRing)
+	end
+	if rangeRing then
+		table.insert(ignoreList, rangeRing)
 	end
 
-	local map = workspace:FindFirstChild("Map")
-	if not map then
-		return false
+	local towersFolder = workspace:FindFirstChild("Towers")
+	if towersFolder then
+		table.insert(ignoreList, towersFolder)
 	end
 
-	local ground = map:FindFirstChild("PathGround")
-	if not ground then
-		return false
-	end
-
-	if hitInstance == ground then
-		return true
-	end
-
-	return hitInstance:IsDescendantOf(ground)
+	params.FilterDescendantsInstances = ignoreList
+	return params, ignoreList
 end
+local function findGroundBeneath(position)
+	local map = workspace:FindFirstChild("Map")
+	local ground = map and map:FindFirstChild("PathGround")
+	if not ground then
+		return nil
+	end
 
+	local params, ignoreList = createPlacementValidationParams()
+	local origin = position + Vector3.new(0, 200, 0)
+	local direction = Vector3.new(0, -400, 0)
+
+	for _ = 1, MAX_GROUND_RAYCAST_ATTEMPTS do
+		local result = workspace:Raycast(origin, direction, params)
+		if not result then
+			return nil
+		end
+
+		if result.Instance == ground or result.Instance:IsDescendantOf(ground) then
+			return result
+		end
+
+		table.insert(ignoreList, result.Instance)
+		params.FilterDescendantsInstances = ignoreList
+		origin = result.Position - Vector3.new(0, 0.05, 0)
+	end
+
+	return nil
+end
 local function isPositionClear(position)
 	local towersFolder = workspace:FindFirstChild("Towers")
 	if not towersFolder then
 		return true
 	end
 
+	local candidateHalfX = math.max(0.05, previewFootprintSize.X / 2)
+	local candidateHalfZ = math.max(0.05, previewFootprintSize.Z / 2)
+
 	for _, tower in ipairs(towersFolder:GetChildren()) do
 		local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
 		if primary then
 			local towerPos = primary.Position
-			local horizontalDistance = (Vector3.new(towerPos.X, 0, towerPos.Z) - Vector3.new(position.X, 0, position.Z)).Magnitude
-			local otherRadius = math.max(primary.Size.X, primary.Size.Z) / 2
-			local spacing = otherRadius + previewFootprintRadius
-			if horizontalDistance < spacing then
+			local otherHalfX = math.max(0.05, primary.Size.X / 2)
+			local otherHalfZ = math.max(0.05, primary.Size.Z / 2)
+			local deltaX = math.abs(towerPos.X - position.X)
+			local deltaZ = math.abs(towerPos.Z - position.Z)
+			local limitX = otherHalfX + candidateHalfX + PLACEMENT_EDGE_EPSILON
+			local limitZ = otherHalfZ + candidateHalfZ + PLACEMENT_EDGE_EPSILON
+			if deltaX <= limitX and deltaZ <= limitZ then
 				return false
 			end
 		end
@@ -2703,19 +2736,24 @@ local function isPositionClear(position)
 
 	return true
 end
-
-local function computePlacementValidity(position, hitInstance)
-	if not hitInstance then
+local function evaluatePlacement(position)
+	local groundResult = findGroundBeneath(position)
+	if not groundResult then
 		return false
 	end
 
-	if not isOnBuildableGround(hitInstance) then
+	local placementPosition = Vector3.new(
+		groundResult.Position.X,
+		groundResult.Position.Y,
+		groundResult.Position.Z
+	)
+
+	if not isPositionClear(placementPosition) then
 		return false
 	end
 
-	return isPositionClear(position)
+	return true, placementPosition
 end
-
 local function updatePreview()
 	if not placingTowerType or not previewPart then
 		placementValid = false
@@ -2726,14 +2764,24 @@ local function updatePreview()
 	local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
 	if rayResult then
 		local hitPosition = rayResult.Position
-		local previewPosition = Vector3.new(hitPosition.X, hitPosition.Y + previewPart.Size.Y / 2, hitPosition.Z)
-		previewPart.CFrame = CFrame.new(previewPosition)
+		local valid, placementPosition = evaluatePlacement(hitPosition)
+		placementValid = valid and true or false
+
+		local previewVector
+		if placementValid and placementPosition then
+			previewVector = Vector3.new(placementPosition.X, placementPosition.Y + previewPart.Size.Y / 2, placementPosition.Z)
+		else
+			previewVector = Vector3.new(hitPosition.X, hitPosition.Y + previewPart.Size.Y / 2, hitPosition.Z)
+		end
+
+		previewPart.CFrame = CFrame.new(previewVector)
 		local config = towerConfigs[placingTowerType]
 		if previewRangeRing and previewRangeAdornment and config and config.Range then
-			local ringY = hitPosition.Y + 0.05
-			updateRangeRing(previewRangeRing, previewRangeAdornment, config.Range, Vector3.new(hitPosition.X, ringY, hitPosition.Z))
+			local ringBase = placementValid and placementPosition or hitPosition
+			local ringY = ringBase.Y + 0.05
+			updateRangeRing(previewRangeRing, previewRangeAdornment, config.Range, Vector3.new(ringBase.X, ringY, ringBase.Z))
 		end
-		placementValid = computePlacementValidity(hitPosition, rayResult.Instance)
+
 		local validColor = placementValid and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 100, 100)
 		previewPart.Color = validColor
 		if previewRangeAdornment then
@@ -2754,7 +2802,6 @@ local function updatePreview()
 		end
 	end
 end
-
 local function updateEnemyHover()
         local target = mouse.Target
         local enemyModel = getEnemyModelFromInstance(target)
@@ -2972,12 +3019,15 @@ UserInputService.InputBegan:Connect(function(input, processed)
                 if lobbyPhase ~= "inRound" then
                         return
                 end
-                if placingTowerType then
-                        local unitRay = mouse.UnitRay
-                        local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
-			if rayResult and computePlacementValidity(rayResult.Position, rayResult.Instance) then
-				remotes.TowerPlaced:FireServer(placingTowerType, rayResult.Position)
-				cancelPlacement()
+		if placingTowerType then
+			local unitRay = mouse.UnitRay
+			local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
+			if rayResult then
+				local valid, placementPosition = evaluatePlacement(rayResult.Position)
+				if valid and placementPosition then
+					remotes.TowerPlaced:FireServer(placingTowerType, placementPosition)
+					cancelPlacement()
+				end
 			end
 		else
 			local towerModel = getTowerModelFromInstance(mouse.Target)

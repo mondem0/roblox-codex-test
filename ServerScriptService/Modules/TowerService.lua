@@ -9,6 +9,7 @@ TowerService.__index = TowerService
 
 local TOWER_BASE_HALF_SIZE = 2
 local DEFAULT_BASE_SIZE = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
+local PLACEMENT_EDGE_EPSILON = 0.01
 local TowerFootprints = {}
 local TowerLimits = {}
 local OverallPlacementLimitCache
@@ -654,58 +655,77 @@ function TowerService:HasReachedTowerLimit(player, towerType)
 end
 
 function TowerService:IsPlacementValid(position, towerType)
-    if not position then
-        return false
-    end
+	if not position then
+		return false
+	end
 
-    local candidateSize = getTowerBaseSize(towerType)
-    local candidateRadius = math.max(candidateSize.X, candidateSize.Z) / 2
-    if candidateRadius <= 0 then
-        candidateRadius = TOWER_BASE_HALF_SIZE
-    end
+	local candidateSize = getTowerBaseSize(towerType)
+	local candidateHalfX = math.max(0.05, candidateSize.X / 2)
+	local candidateHalfZ = math.max(0.05, candidateSize.Z / 2)
 
-    local map = workspace:FindFirstChild("Map")
-    local ground = map and map:FindFirstChild("PathGround")
-    if ground then
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Blacklist
-        params.IgnoreWater = true
+	local resolvedPosition = Vector3.new(position.X, position.Y, position.Z)
 
-        local ignoreList = {}
-        local towersFolderInstance = workspace:FindFirstChild("Towers")
-        if towersFolderInstance then
-            table.insert(ignoreList, towersFolderInstance)
-        end
+	local map = workspace:FindFirstChild("Map")
+	local ground = map and map:FindFirstChild("PathGround")
+	if ground then
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Blacklist
+		params.IgnoreWater = true
 
-        params.FilterDescendantsInstances = ignoreList
+		local ignoreList = {}
+		local towersFolderInstance = workspace:FindFirstChild("Towers")
+		if towersFolderInstance then
+			table.insert(ignoreList, towersFolderInstance)
+		end
 
-        local rayOrigin = Vector3.new(position.X, position.Y + 50, position.Z)
-        local rayDirection = Vector3.new(0, -200, 0)
-        local result = workspace:Raycast(rayOrigin, rayDirection, params)
-        if not result or (result.Instance ~= ground and not result.Instance:IsDescendantOf(ground)) then
-            return false
-        end
-    end
+		params.FilterDescendantsInstances = ignoreList
 
-    local towersFolder = workspace:FindFirstChild("Towers")
-    if not towersFolder then
-        return true
-    end
+		local rayOrigin = Vector3.new(position.X, position.Y + 200, position.Z)
+		local rayDirection = Vector3.new(0, -400, 0)
+		local result
 
-    for _, tower in ipairs(towersFolder:GetChildren()) do
-        local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
-        if primary then
-            local otherPos = primary.Position
-            local horizontalDistance = (Vector3.new(otherPos.X, 0, otherPos.Z) - Vector3.new(position.X, 0, position.Z)).Magnitude
-            local otherRadius = math.max(primary.Size.X, primary.Size.Z) / 2
-            local spacing = otherRadius + candidateRadius
-            if horizontalDistance < spacing then
-                return false
-            end
-        end
-    end
+		for _ = 1, 10 do
+			result = workspace:Raycast(rayOrigin, rayDirection, params)
+			if not result then
+				return false
+			end
 
-    return true
+			if result.Instance == ground or result.Instance:IsDescendantOf(ground) then
+				resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
+				break
+			end
+
+			table.insert(ignoreList, result.Instance)
+			params.FilterDescendantsInstances = ignoreList
+			rayOrigin = result.Position - Vector3.new(0, 0.05, 0)
+		end
+
+		if not result or (result.Instance ~= ground and not result.Instance:IsDescendantOf(ground)) then
+			return false
+		end
+	end
+
+	local towersFolder = workspace:FindFirstChild("Towers")
+	if towersFolder then
+		for _, tower in ipairs(towersFolder:GetChildren()) do
+			local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
+			if primary then
+				local otherPos = primary.Position
+				local otherSize = sanitizeBaseSize(primary.Size)
+				local otherHalfX = math.max(0.05, otherSize.X / 2)
+				local otherHalfZ = math.max(0.05, otherSize.Z / 2)
+				local deltaX = math.abs(otherPos.X - resolvedPosition.X)
+				local deltaZ = math.abs(otherPos.Z - resolvedPosition.Z)
+				local limitX = otherHalfX + candidateHalfX + PLACEMENT_EDGE_EPSILON
+				local limitZ = otherHalfZ + candidateHalfZ + PLACEMENT_EDGE_EPSILON
+				if deltaX <= limitX and deltaZ <= limitZ then
+					return false
+				end
+			end
+		end
+	end
+
+	return true, resolvedPosition
 end
 
 function TowerService:AddTower(player, towerType, position)
@@ -718,9 +738,12 @@ function TowerService:AddTower(player, towerType, position)
         return
     end
 
-    if not self:IsPlacementValid(position, towerType) then
+    local placementValid, resolvedPosition = self:IsPlacementValid(position, towerType)
+    if not placementValid then
         return
     end
+
+    position = resolvedPosition or position
 
     local towerModel, head, barrel = buildTowerModel(towerType)
     if not towerModel then
