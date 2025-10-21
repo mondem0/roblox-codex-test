@@ -958,10 +958,11 @@ function WaveService:RequestWaveSkip(player)
         return
     end
 
+    local currentWave = self.ActiveWave
     self.SkipWaveRequested = true
     local nextWave
-    if self.TotalWaves and self.ActiveWave < self.TotalWaves then
-        nextWave = self.ActiveWave + 1
+    if self.TotalWaves and currentWave < self.TotalWaves then
+        nextWave = currentWave + 1
     end
 
     local extra = {
@@ -972,7 +973,8 @@ function WaveService:RequestWaveSkip(player)
 
     self:ClearSkipOffer("skipped", extra, true)
     self.IsSpawning = false
-    self:BeginNextWave()
+    local targetWave = (nextWave or (currentWave + 1))
+    self:BeginWave(targetWave, false)
 end
 
 function WaveService:GetEnemyHealthMultiplier()
@@ -1239,33 +1241,45 @@ function WaveService:IsWaveComplete()
     return true
 end
 
-function WaveService:BeginNextWave()
+function WaveService:BeginWave(waveNumber, clearReason)
     if self.GameEnded then
         return
     end
-    if self.TotalWaves and self.ActiveWave >= self.TotalWaves then
+    local totalWaves = self.TotalWaves
+    if totalWaves and waveNumber > totalWaves then
         self:WinGame()
         return
     end
 
-    self:ClearSkipOffer("advance")
+    if waveNumber <= self.ActiveWave then
+        return
+    end
+
+    if clearReason ~= false then
+        self:ClearSkipOffer(clearReason or "advance")
+    end
     self.SkipOfferToken += 1
 
-    self.ActiveWave += 1
+    self.ActiveWave = waveNumber
     self.SkipWaveRequested = false
     self.IsSpawning = true
-    self.Remotes.WaveStarted:FireAllClients(self.ActiveWave)
-    self:ScheduleSkipOffer(self.ActiveWave)
+    self.Remotes.WaveStarted:FireAllClients(waveNumber)
+    self:ScheduleSkipOffer(waveNumber)
 
     task.spawn(function()
-        local waveNumber = self.ActiveWave
-        self:SpawnWave(waveNumber)
+        local activeWave = waveNumber
+        self:SpawnWave(activeWave)
         self.IsSpawning = false
         if not self.GameEnded and self:IsWaveComplete() then
             self:ClearSkipOffer("completed")
             self:BeginNextWave()
         end
     end)
+end
+
+function WaveService:BeginNextWave()
+    local nextWave = self.ActiveWave + 1
+    self:BeginWave(nextWave, "advance")
 end
 
 function WaveService:SpawnWave(waveNumber)

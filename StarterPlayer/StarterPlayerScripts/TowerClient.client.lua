@@ -114,8 +114,8 @@ local waveSkipTween
 local waveSkipTweenConnection
 local waveSkipOfferActive = false
 local waveSkipRequestPending = false
-local waveSkipHiddenPosition = UDim2.new(0.5, 0, -0.15, 0)
-local waveSkipVisiblePosition = UDim2.new(0.5, 0, 0.875, 0)
+local waveSkipHiddenPosition = UDim2.new(0.5, 0, -0.18, 0)
+local waveSkipVisiblePosition = UDim2.new(0.5, 0, 0.065, 0)
 local waveSkipShowTweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local waveSkipHideTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
@@ -2500,11 +2500,11 @@ local function createGui()
         if not waveSkipButton then
                 waveSkipButton = Instance.new("TextButton")
                 waveSkipButton.Name = "SkipWaveButton"
-                waveSkipButton.AnchorPoint = Vector2.new(0.5, 0.5)
+                waveSkipButton.AnchorPoint = Vector2.new(0.5, 0)
                 waveSkipButton.Position = waveSkipHiddenPosition
-                waveSkipButton.Size = UDim2.new(0.28, 0, 0.1, 0)
-                waveSkipButton.BackgroundColor3 = Color3.fromRGB(70, 130, 220)
-                waveSkipButton.BackgroundTransparency = 0.05
+                waveSkipButton.Size = UDim2.new(0.26, 0, 0.085, 0)
+                waveSkipButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+                waveSkipButton.BackgroundTransparency = 0.08
                 waveSkipButton.BorderSizePixel = 0
                 waveSkipButton.Text = "Skip Wave"
                 waveSkipButton.Font = Enum.Font.GothamBold
@@ -2518,14 +2518,8 @@ local function createGui()
                 applyScaledText(waveSkipButton, 18, 44)
 
                 local skipCorner = Instance.new("UICorner")
-                skipCorner.CornerRadius = UDim.new(0.12, 0)
+                skipCorner.CornerRadius = UDim.new(0.06, 0)
                 skipCorner.Parent = waveSkipButton
-
-                local skipStroke = Instance.new("UIStroke")
-                skipStroke.Thickness = 1.5
-                skipStroke.Color = Color3.fromRGB(200, 220, 255)
-                skipStroke.Transparency = 0.2
-                skipStroke.Parent = waveSkipButton
 
                 waveSkipButton.MouseButton1Click:Connect(function()
                         if waveSkipRequestPending then
