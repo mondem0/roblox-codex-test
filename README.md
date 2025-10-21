@@ -624,7 +624,7 @@ All core systems are data driven so designers can tweak the experience without t
 
 ### Combat Balance
 
-* **Towers** – [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) is the single source of truth for tower stats, upgrade trees, placement surfaces, and model names. Copy the `Cliff Sniper` entry as a template when adding more specialized towers—set `ValidSurfaces` to `{ "Cliff" }`, `{ "Ground" }`, or include multiple entries to allow both.
+* **Towers** – [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) is the single source of truth for tower stats, upgrade trees, placement surfaces, and model names. Copy the `Cliff Sniper` entry as a template when adding more specialized towers—set `ValidSurfaces` to `{ "Cliff" }`, `{ "Ground" }`, or include multiple entries to allow both. To target bespoke build pads, fill in `PlacementSurfaceParts` (or `PlacementSurfacePartNames`) with the exact part names that should accept placements.
 * **Enemies & waves** – Use [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua) to tune health, speed, immunities, and spawn rewards. Compose encounters by editing the `Streams` tables inside [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua); the `SkipPromptDelay`, cash payouts, and boss abilities all live alongside each wave definition.
 
 ### User Interface

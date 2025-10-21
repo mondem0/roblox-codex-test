@@ -91,8 +91,103 @@ local function getPlacementSurface(towerType)
     return surface or DEFAULT_PLACEMENT_SURFACE
 end
 
-local function isAllowedPlacementHit(instance, mapModel, ground, placementSurface)
+local function addPlacementPartName(target, value)
+    if typeof(value) == "string" then
+        local trimmed = string.gsub(value, "^%s*(.-)%s*$", "%1")
+        if trimmed ~= "" then
+            target[string.lower(trimmed)] = true
+        end
+    elseif typeof(value) == "Instance" then
+        local name = value.Name
+        if name and name ~= "" then
+            target[string.lower(name)] = true
+        end
+    elseif typeof(value) == "table" then
+        for _, entry in pairs(value) do
+            addPlacementPartName(target, entry)
+        end
+    end
+end
+
+local PlacementPartCache = {}
+
+local function getPlacementPartSet(towerType)
+    local cached = PlacementPartCache[towerType]
+    if cached ~= nil then
+        if cached == false then
+            return nil
+        end
+        return cached
+    end
+
+    local config = towerType and TowerConfigs[towerType]
+    if not config then
+        PlacementPartCache[towerType] = false
+        return nil
+    end
+
+    local partNames = {}
+    addPlacementPartName(partNames, config.PlacementSurfacePart)
+    addPlacementPartName(partNames, config.PlacementSurfacePartName)
+    addPlacementPartName(partNames, config.PlacementSurfaceParts)
+    addPlacementPartName(partNames, config.PlacementSurfacePartNames)
+    addPlacementPartName(partNames, config.RequiredSurfacePart)
+    addPlacementPartName(partNames, config.RequiredSurfaceParts)
+    addPlacementPartName(partNames, config.AllowedSurfacePart)
+    addPlacementPartName(partNames, config.AllowedSurfaceParts)
+    addPlacementPartName(partNames, config.ValidSurfaceParts)
+    addPlacementPartName(partNames, config.ValidPlacementParts)
+
+    if next(partNames) then
+        PlacementPartCache[towerType] = partNames
+        return partNames
+    end
+
+    PlacementPartCache[towerType] = false
+    return nil
+end
+
+local function matchesAllowedPlacementPart(instance, mapModel, allowedParts)
+    if not instance or not allowedParts or not next(allowedParts) then
+        return false
+    end
+
+    local current = instance
+    while current do
+        if current == mapModel then
+            local lowered = string.lower(current.Name)
+            if allowedParts[lowered] then
+                return true
+            end
+            break
+        end
+
+        local name = current.Name
+        if name then
+            local lowered = string.lower(name)
+            if allowedParts[lowered] then
+                if not mapModel or current:IsDescendantOf(mapModel) or current == mapModel then
+                    return true
+                end
+            end
+        end
+
+        current = current.Parent
+    end
+
+    return false
+end
+
+local function isAllowedPlacementHit(instance, mapModel, ground, placementSurface, allowedPlacementParts)
     if not instance then
+        return false
+    end
+
+    if allowedPlacementParts and next(allowedPlacementParts) then
+        if matchesAllowedPlacementPart(instance, mapModel, allowedPlacementParts) then
+            return true
+        end
+
         return false
     end
 
@@ -135,8 +230,28 @@ local function isAllowedPlacementHit(instance, mapModel, ground, placementSurfac
     return false
 end
 
-local function shouldIgnorePlacementHit(instance, mapModel, ground, placementSurface)
+local function shouldIgnorePlacementHit(instance, mapModel, ground, placementSurface, allowedPlacementParts)
     if not instance then
+        return true
+    end
+
+    if allowedPlacementParts and next(allowedPlacementParts) then
+        if matchesAllowedPlacementPart(instance, mapModel, allowedPlacementParts) then
+            return false
+        end
+
+        if instance == workspace.Terrain then
+            return false
+        end
+
+        if instance:IsA("BasePart") then
+            if instance.CanCollide and (not instance.Transparency or instance.Transparency < 0.95) then
+                return false
+            end
+
+            return true
+        end
+
         return true
     end
 
@@ -823,8 +938,9 @@ function TowerService:IsPlacementValid(position, towerType)
 
         local ground = map:FindFirstChild("PathGround")
         local placementSurface = getPlacementSurface(towerType)
-        if placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
-                return false
+        local allowedPlacementParts = getPlacementPartSet(towerType)
+        if (not allowedPlacementParts or not next(allowedPlacementParts)) and placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
+            return false
         end
 
         local candidateSize = getTowerBaseSize(towerType)
@@ -856,13 +972,13 @@ function TowerService:IsPlacementValid(position, towerType)
                         return false
                 end
 
-                if isAllowedPlacementHit(result.Instance, map, ground, placementSurface) then
+                if isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
                         resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
                         finalResult = result
                         break
                 end
 
-                if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface) then
+                if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
                         return false
                 end
 

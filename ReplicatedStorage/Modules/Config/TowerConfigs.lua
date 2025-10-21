@@ -119,6 +119,7 @@ local TowerConfigs = {
         Cost = 400,
         PlacementLimit = 6,
         PlacementSurface = "Cliff",
+        PlacementSurfaceParts = { "CliffPlacement" },
         BaseSize = Vector3.new(3.5, 1, 3.5),
         Range = 40,
         Damage = 30,
