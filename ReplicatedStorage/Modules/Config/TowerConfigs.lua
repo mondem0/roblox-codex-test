@@ -112,6 +112,41 @@ local TowerConfigs = {
                 Description = "Freezing blasts cripple enemies"
             }
         }
+    },
+    CliffSniper = {
+        Name = "Cliff Sniper",
+        ModelName = "CliffSniper",
+        Cost = 400,
+        PlacementLimit = 6,
+        PlacementSurface = "Cliff",
+        BaseSize = Vector3.new(3.5, 1, 3.5),
+        Range = 40,
+        Damage = 30,
+        FireRate = 2.25,
+        Targeting = "Strong",
+        HiddenDetection = true,
+        FireSound = {
+            SoundId = "rbxassetid://2234567893",
+            Volume = 1,
+        },
+        Upgrades = {
+            {
+                Cost = 450,
+                Range = 44,
+                Damage = 42,
+                FireRate = 1.9,
+                ModelName = "CliffSniperTier2",
+                Description = "+12 damage, +4 range, faster shots",
+            },
+            {
+                Cost = 650,
+                Range = 50,
+                Damage = 60,
+                FireRate = 1.6,
+                ModelName = "CliffSniperTier3",
+                Description = "Massive range and high-powered rounds",
+            }
+        }
     }
 }
 

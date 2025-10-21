@@ -10,6 +10,8 @@ TowerService.__index = TowerService
 local TOWER_BASE_HALF_SIZE = 2
 local DEFAULT_BASE_SIZE = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
 local PLACEMENT_EDGE_EPSILON = 0.01
+local DEFAULT_PLACEMENT_SURFACE = "ground"
+local CLIFF_PLACEMENT_SURFACE = "cliff"
 
 local function shouldIgnoreForGround(instance, ground)
     if not instance then
@@ -39,6 +41,126 @@ local function shouldIgnoreForGround(instance, ground)
     end
 
     return not instance:IsA("BasePart")
+end
+
+local function normalizePlacementSurfaceValue(value)
+    if typeof(value) == "string" then
+        local lowered = string.lower(value)
+        lowered = lowered:gsub("%s+", "")
+        lowered = lowered:gsub("_", "")
+        lowered = lowered:gsub("-", "")
+
+        if lowered == "cliff" or lowered == "cliffs" or lowered == "cliffonly" or lowered == "clifftop"
+            or lowered == "highground" or lowered == "highgrounds" or lowered == "elevated"
+        then
+            return CLIFF_PLACEMENT_SURFACE
+        end
+
+        if lowered == "ground" or lowered == "path" or lowered == "pathground" or lowered == "default"
+            or lowered == "grass" or lowered == "field"
+        then
+            return DEFAULT_PLACEMENT_SURFACE
+        end
+    elseif typeof(value) == "table" then
+        for _, entry in pairs(value) do
+            local normalized = normalizePlacementSurfaceValue(entry)
+            if normalized then
+                return normalized
+            end
+        end
+    end
+
+    return nil
+end
+
+local function getPlacementSurface(towerType)
+    local config = towerType and TowerConfigs[towerType]
+    if not config then
+        return DEFAULT_PLACEMENT_SURFACE
+    end
+
+    local surface = normalizePlacementSurfaceValue(config.PlacementSurface)
+        or normalizePlacementSurfaceValue(config.SurfaceType)
+        or normalizePlacementSurfaceValue(config.RequiredSurface)
+        or normalizePlacementSurfaceValue(config.AllowedSurface)
+
+    if not surface and config.CliffOnly == true then
+        surface = CLIFF_PLACEMENT_SURFACE
+    end
+
+    return surface or DEFAULT_PLACEMENT_SURFACE
+end
+
+local function isAllowedPlacementHit(instance, mapModel, ground, placementSurface)
+    if not instance then
+        return false
+    end
+
+    if placementSurface == CLIFF_PLACEMENT_SURFACE then
+        if ground and (instance == ground or instance:IsDescendantOf(ground)) then
+            return false
+        end
+
+        if instance == workspace.Terrain then
+            return false
+        end
+
+        if not instance:IsA("BasePart") then
+            return false
+        end
+
+        if mapModel and not instance:IsDescendantOf(mapModel) then
+            return false
+        end
+
+        if instance.Transparency and instance.Transparency >= 0.95 then
+            return false
+        end
+
+        if instance.CanCollide == false then
+            return false
+        end
+
+        return true
+    end
+
+    if ground and (instance == ground or instance:IsDescendantOf(ground)) then
+        return true
+    end
+
+    if instance == workspace.Terrain then
+        return true
+    end
+
+    return false
+end
+
+local function shouldIgnorePlacementHit(instance, mapModel, ground, placementSurface)
+    if not instance then
+        return true
+    end
+
+    if placementSurface == CLIFF_PLACEMENT_SURFACE then
+        if ground and (instance == ground or instance:IsDescendantOf(ground)) then
+            return true
+        end
+
+        if instance == workspace.Terrain then
+            return false
+        end
+
+        if instance:IsA("BasePart") then
+            if instance.CanCollide and (not instance.Transparency or instance.Transparency < 0.95) then
+                return false
+            end
+
+            return true
+        end
+
+        return true
+    end
+
+    return shouldIgnoreForGround(instance, ground)
 end
 local TowerFootprints = {}
 local TowerLimits = {}
@@ -506,6 +628,11 @@ local function buildTowerModel(towerType, overrideConfig)
         head.Color = Color3.fromRGB(20, 20, 20)
     elseif towerType == "FrostMage" then
         head.Color = Color3.fromRGB(160, 220, 255)
+    elseif towerType == "CliffSniper" then
+        head.Size = Vector3.new(1.6, 2.4, 1.6)
+        head.Color = Color3.fromRGB(235, 235, 215)
+        barrel.Size = Vector3.new(0.25, 0.25, 3.4)
+        barrel.Color = Color3.fromRGB(210, 210, 210)
     end
 
     head.CFrame = base.CFrame * CFrame.new(0, (base.Size.Y + head.Size.Y) / 2, 0)
@@ -690,8 +817,13 @@ function TowerService:IsPlacementValid(position, towerType)
         end
 
         local map = workspace:FindFirstChild("Map")
-        local ground = map and map:FindFirstChild("PathGround")
-        if not ground then
+        if not map then
+                return false
+        end
+
+        local ground = map:FindFirstChild("PathGround")
+        local placementSurface = getPlacementSurface(towerType)
+        if placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
                 return false
         end
 
@@ -716,6 +848,7 @@ function TowerService:IsPlacementValid(position, towerType)
         local rayOrigin = Vector3.new(position.X, position.Y + 200, position.Z)
         local rayDirection = Vector3.new(0, -400, 0)
         local result
+        local finalResult
 
         for _ = 1, 10 do
                 result = workspace:Raycast(rayOrigin, rayDirection, params)
@@ -723,12 +856,13 @@ function TowerService:IsPlacementValid(position, towerType)
                         return false
                 end
 
-                if result.Instance == ground or result.Instance:IsDescendantOf(ground) then
+                if isAllowedPlacementHit(result.Instance, map, ground, placementSurface) then
                         resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
+                        finalResult = result
                         break
                 end
 
-                if not shouldIgnoreForGround(result.Instance, ground) then
+                if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface) then
                         return false
                 end
 
@@ -737,7 +871,7 @@ function TowerService:IsPlacementValid(position, towerType)
                 rayOrigin = result.Position - Vector3.new(0, 0.05, 0)
         end
 
-        if not result or (result.Instance ~= ground and not result.Instance:IsDescendantOf(ground)) then
+        if not finalResult then
                 return false
         end
 

@@ -125,6 +125,154 @@ local footprintCache = {}
 local RANGE_RING_HEIGHT = 0.05
 local MAX_GROUND_RAYCAST_ATTEMPTS = 8
 local PLACEMENT_EDGE_EPSILON = 0.01
+local DEFAULT_PLACEMENT_SURFACE = "ground"
+local CLIFF_PLACEMENT_SURFACE = "cliff"
+
+local function normalizePlacementSurfaceValue(value)
+        if typeof(value) == "string" then
+                local lowered = string.lower(value)
+                lowered = lowered:gsub("%s+", "")
+                lowered = lowered:gsub("_", "")
+                lowered = lowered:gsub("-", "")
+
+                if lowered == "cliff" or lowered == "cliffs" or lowered == "cliffonly" or lowered == "clifftop"
+                        or lowered == "highground" or lowered == "highgrounds" or lowered == "elevated"
+                then
+                        return CLIFF_PLACEMENT_SURFACE
+                end
+
+                if lowered == "ground" or lowered == "path" or lowered == "pathground" or lowered == "default"
+                        or lowered == "grass" or lowered == "field"
+                then
+                        return DEFAULT_PLACEMENT_SURFACE
+                end
+        elseif typeof(value) == "table" then
+                for _, entry in pairs(value) do
+                        local normalized = normalizePlacementSurfaceValue(entry)
+                        if normalized then
+                                return normalized
+                        end
+                end
+        end
+
+        return nil
+end
+
+local function getPlacementSurface(towerType)
+        if not towerType then
+                return DEFAULT_PLACEMENT_SURFACE
+        end
+
+        local config = towerConfigs[towerType]
+        if not config then
+                return DEFAULT_PLACEMENT_SURFACE
+        end
+
+        local surface = normalizePlacementSurfaceValue(config.PlacementSurface)
+                or normalizePlacementSurfaceValue(config.SurfaceType)
+                or normalizePlacementSurfaceValue(config.RequiredSurface)
+                or normalizePlacementSurfaceValue(config.AllowedSurface)
+
+        if not surface and config.CliffOnly == true then
+                surface = CLIFF_PLACEMENT_SURFACE
+        end
+
+        return surface or DEFAULT_PLACEMENT_SURFACE
+end
+
+local function isAllowedPlacementHit(instance, mapModel, ground, placementSurface)
+        if not instance then
+                return false
+        end
+
+        if placementSurface == CLIFF_PLACEMENT_SURFACE then
+                if ground and (instance == ground or (instance:IsDescendantOf(ground))) then
+                        return false
+                end
+
+                if instance == workspace.Terrain then
+                        return false
+                end
+
+                if not instance:IsA("BasePart") then
+                        return false
+                end
+
+                if mapModel and not instance:IsDescendantOf(mapModel) then
+                        return false
+                end
+
+                if instance.Transparency and instance.Transparency >= 0.95 then
+                        return false
+                end
+
+                if instance.CanCollide == false then
+                        return false
+                end
+
+                return true
+        end
+
+        if ground and (instance == ground or instance:IsDescendantOf(ground)) then
+                return true
+        end
+
+        if instance == workspace.Terrain then
+                return true
+        end
+
+        return false
+end
+
+local function shouldIgnorePlacementHit(instance, mapModel, ground, placementSurface)
+        if not instance then
+                return true
+        end
+
+        if placementSurface == CLIFF_PLACEMENT_SURFACE then
+                if ground and (instance == ground or instance:IsDescendantOf(ground)) then
+                        return true
+                end
+
+                if instance == workspace.Terrain then
+                        return false
+                end
+
+                if instance:IsA("BasePart") then
+                        if instance.CanCollide and (not instance.Transparency or instance.Transparency < 0.95) then
+                                return false
+                        end
+
+                        return true
+                end
+
+                return true
+        end
+
+        if instance == workspace.Terrain then
+                return false
+        end
+
+        if instance == ground or (ground and instance:IsDescendantOf(ground)) then
+                return false
+        end
+
+        if instance:IsA("BasePart") then
+                if instance.CanCollide then
+                        return false
+                end
+
+                if instance.Transparency and instance.Transparency >= 0.95 then
+                        return true
+                end
+
+                if not instance.CanCollide then
+                        return true
+                end
+        end
+
+        return not instance:IsA("BasePart")
+end
 
 local function updateStartButtonVisual()
         -- The manual wave start button is no longer present in the HUD.
@@ -2269,13 +2417,19 @@ local function updateTowerDetails(towerModel)
 		if stats.SplashRadius then
 			table.insert(lines, string.format("Splash Radius: %.1f", stats.SplashRadius))
 		end
-		if stats.SlowPercent then
-			table.insert(lines, string.format("Slow: %d%% for %.1fs", math.floor(stats.SlowPercent * 100 + 0.5), stats.SlowDuration or 0))
-		end
-		towerStatsLabel.Text = table.concat(lines, "\n")
-	elseif towerStatsLabel then
-		towerStatsLabel.Text = ""
-	end
+                if stats.SlowPercent then
+                        table.insert(lines, string.format("Slow: %d%% for %.1fs", math.floor(stats.SlowPercent * 100 + 0.5), stats.SlowDuration or 0))
+                end
+                local placementSurface = getPlacementSurface(towerType)
+                if placementSurface == CLIFF_PLACEMENT_SURFACE then
+                        table.insert(lines, "Placement: Cliffs only")
+                elseif placementSurface == DEFAULT_PLACEMENT_SURFACE then
+                        table.insert(lines, "Placement: Ground only")
+                end
+                towerStatsLabel.Text = table.concat(lines, "\n")
+        elseif towerStatsLabel then
+                towerStatsLabel.Text = ""
+        end
 
 	if ownershipLabel then
 		if ownerUserId == player.UserId then
@@ -2867,45 +3021,21 @@ local function createPlacementValidationParams()
         return params, ignoreList
 end
 
-local function shouldIgnoreGroundHit(instance, ground)
-        if not instance then
-                return true
-        end
-
-        if instance == ground or (ground and instance:IsDescendantOf(ground)) then
-                return false
-        end
-
-        if instance == workspace.Terrain then
-                return false
-        end
-
-        if instance:IsA("BasePart") then
-                if instance.CanCollide then
-                        return false
-                end
-
-                if instance.Transparency >= 0.95 then
-                        return true
-                end
-
-                if not instance.CanCollide then
-                        return true
-                end
-        end
-
-        return not instance:IsA("BasePart")
-end
-local function findGroundBeneath(position)
+local function findPlacementSurface(position, towerType)
         local map = workspace:FindFirstChild("Map")
-        local ground = map and map:FindFirstChild("PathGround")
-        if not ground then
+        if not map then
                 return nil
-	end
+        end
 
-	local params, ignoreList = createPlacementValidationParams()
-	local origin = position + Vector3.new(0, 200, 0)
-	local direction = Vector3.new(0, -400, 0)
+        local ground = map:FindFirstChild("PathGround")
+        local placementSurface = getPlacementSurface(towerType)
+        if placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
+                return nil
+        end
+
+        local params, ignoreList = createPlacementValidationParams()
+        local origin = position + Vector3.new(0, 200, 0)
+        local direction = Vector3.new(0, -400, 0)
 
         for _ = 1, MAX_GROUND_RAYCAST_ATTEMPTS do
                 local result = workspace:Raycast(origin, direction, params)
@@ -2913,11 +3043,11 @@ local function findGroundBeneath(position)
                         return nil
                 end
 
-                if result.Instance == ground or result.Instance:IsDescendantOf(ground) then
+                if isAllowedPlacementHit(result.Instance, map, ground, placementSurface) then
                         return result
                 end
 
-                if not shouldIgnoreGroundHit(result.Instance, ground) then
+                if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface) then
                         return nil
                 end
 
@@ -2956,13 +3086,13 @@ local function isPositionClear(position)
 	return true
 end
 local function evaluatePlacement(position)
-	local groundResult = findGroundBeneath(position)
-	if not groundResult then
-		return false
-	end
+        local groundResult = findPlacementSurface(position, placingTowerType)
+        if not groundResult then
+                return false
+        end
 
-	local placementPosition = Vector3.new(
-		groundResult.Position.X,
+        local placementPosition = Vector3.new(
+                groundResult.Position.X,
 		groundResult.Position.Y,
 		groundResult.Position.Z
 	)
