@@ -109,6 +109,16 @@ local mapOptionsContainer
 
 local preRoundCountdownLabel
 
+local waveSkipButton
+local waveSkipTween
+local waveSkipTweenConnection
+local waveSkipOfferActive = false
+local waveSkipRequestPending = false
+local waveSkipHiddenPosition = UDim2.new(0.5, 0, -0.15, 0)
+local waveSkipVisiblePosition = UDim2.new(0.5, 0, 0.875, 0)
+local waveSkipShowTweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local waveSkipHideTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
 local DEFAULT_PREVIEW_SIZE = Vector3.new(4, 1, 4)
 local previewFootprintSize = DEFAULT_PREVIEW_SIZE
 local footprintCache = {}
@@ -159,6 +169,122 @@ local function applyScaledText(guiObject, minTextSize, maxTextSize)
 
         constraint.MinTextSize = minTextSize or 12
         constraint.MaxTextSize = maxTextSize or 48
+end
+
+local function cancelWaveSkipTween()
+        if waveSkipTween then
+                waveSkipTween:Cancel()
+                waveSkipTween = nil
+        end
+
+        if waveSkipTweenConnection then
+                waveSkipTweenConnection:Disconnect()
+                waveSkipTweenConnection = nil
+        end
+end
+
+local function resetWaveSkipButton()
+        waveSkipOfferActive = false
+        waveSkipRequestPending = false
+
+        if not waveSkipButton then
+                return
+        end
+
+        cancelWaveSkipTween()
+        waveSkipButton.Visible = false
+        waveSkipButton.Active = false
+        waveSkipButton.AutoButtonColor = true
+        waveSkipButton.Position = waveSkipHiddenPosition
+        waveSkipButton.Text = "Skip Wave"
+end
+
+local function showWaveSkipButton(payload)
+        if not waveSkipButton then
+                return
+        end
+
+        if lobbyPhase ~= "inRound" then
+                return
+        end
+
+        cancelWaveSkipTween()
+        waveSkipOfferActive = true
+        waveSkipRequestPending = false
+
+        local label = "Skip Wave"
+        if payload then
+                local nextWave = payload.NextWave
+                if typeof(nextWave) == "number" then
+                        label = string.format("Skip to Wave %d", nextWave)
+                else
+                        local waveNumber = payload.Wave
+                        if typeof(waveNumber) == "number" then
+                                label = string.format("Skip Wave %d", waveNumber)
+                        end
+                end
+        end
+
+        waveSkipButton.Text = label
+        waveSkipButton.AutoButtonColor = true
+        waveSkipButton.Active = true
+        waveSkipButton.Visible = true
+        waveSkipButton.Position = waveSkipHiddenPosition
+
+        waveSkipTween = TweenService:Create(waveSkipButton, waveSkipShowTweenInfo, {
+                Position = waveSkipVisiblePosition,
+        })
+        waveSkipTween:Play()
+end
+
+local function hideWaveSkipButton(payload)
+        waveSkipOfferActive = false
+        waveSkipRequestPending = false
+
+        if not waveSkipButton then
+                return
+        end
+
+        if not waveSkipButton.Visible then
+                resetWaveSkipButton()
+                return
+        end
+
+        cancelWaveSkipTween()
+        waveSkipButton.Active = false
+        waveSkipButton.AutoButtonColor = false
+
+        if payload and payload.Skipped then
+                waveSkipButton.Text = "Skipping..."
+        elseif payload and payload.Reason == "completed" then
+                waveSkipButton.Text = "Wave Cleared"
+        elseif payload and payload.Reason == "victory" then
+                waveSkipButton.Text = "Round Complete"
+        elseif payload and payload.Reason == "gameOver" then
+                waveSkipButton.Text = "Defeat"
+        elseif payload and payload.Reason == "advance" then
+                waveSkipButton.Text = "Preparing..."
+        else
+                waveSkipButton.Text = "Skip Unavailable"
+        end
+
+        waveSkipTween = TweenService:Create(waveSkipButton, waveSkipHideTweenInfo, {
+                Position = waveSkipHiddenPosition,
+        })
+
+        waveSkipTweenConnection = waveSkipTween.Completed:Connect(function()
+                if waveSkipTweenConnection then
+                        waveSkipTweenConnection:Disconnect()
+                        waveSkipTweenConnection = nil
+                end
+                waveSkipTween = nil
+                waveSkipButton.Visible = false
+                waveSkipButton.AutoButtonColor = true
+                waveSkipButton.Text = "Skip Wave"
+                waveSkipButton.Position = waveSkipHiddenPosition
+        end)
+
+        waveSkipTween:Play()
 end
 
 local function getTowerCountEntry(towerType)
@@ -1204,7 +1330,11 @@ local function updateInterfaceVisibility()
         end
 
         if screenGui then
-                screenGui.Enabled = lobbyPhase == "inRound"
+                local inRound = lobbyPhase == "inRound"
+                screenGui.Enabled = inRound
+                if not inRound then
+                        resetWaveSkipButton()
+                end
         end
 end
 
@@ -2367,6 +2497,55 @@ local function createGui()
         preRoundCountdownLabel.Parent = screenGui
         applyScaledText(preRoundCountdownLabel, 18, 48)
 
+        if not waveSkipButton then
+                waveSkipButton = Instance.new("TextButton")
+                waveSkipButton.Name = "SkipWaveButton"
+                waveSkipButton.AnchorPoint = Vector2.new(0.5, 0.5)
+                waveSkipButton.Position = waveSkipHiddenPosition
+                waveSkipButton.Size = UDim2.new(0.28, 0, 0.1, 0)
+                waveSkipButton.BackgroundColor3 = Color3.fromRGB(70, 130, 220)
+                waveSkipButton.BackgroundTransparency = 0.05
+                waveSkipButton.BorderSizePixel = 0
+                waveSkipButton.Text = "Skip Wave"
+                waveSkipButton.Font = Enum.Font.GothamBold
+                waveSkipButton.TextColor3 = Color3.new(1, 1, 1)
+                waveSkipButton.TextXAlignment = Enum.TextXAlignment.Center
+                waveSkipButton.TextYAlignment = Enum.TextYAlignment.Center
+                waveSkipButton.Visible = false
+                waveSkipButton.AutoButtonColor = true
+                waveSkipButton.ZIndex = 12
+                waveSkipButton.Parent = screenGui
+                applyScaledText(waveSkipButton, 18, 44)
+
+                local skipCorner = Instance.new("UICorner")
+                skipCorner.CornerRadius = UDim.new(0.12, 0)
+                skipCorner.Parent = waveSkipButton
+
+                local skipStroke = Instance.new("UIStroke")
+                skipStroke.Thickness = 1.5
+                skipStroke.Color = Color3.fromRGB(200, 220, 255)
+                skipStroke.Transparency = 0.2
+                skipStroke.Parent = waveSkipButton
+
+                waveSkipButton.MouseButton1Click:Connect(function()
+                        if waveSkipRequestPending then
+                                return
+                        end
+                        if not waveSkipOfferActive then
+                                return
+                        end
+                        if not remotes.RequestWaveSkip then
+                                return
+                        end
+
+                        waveSkipRequestPending = true
+                        waveSkipButton.Active = false
+                        waveSkipButton.AutoButtonColor = false
+                        waveSkipButton.Text = "Requesting..."
+                        remotes.RequestWaveSkip:FireServer()
+                end)
+        end
+
         towerDetailsFrame = Instance.new("Frame")
         towerDetailsFrame.Name = "TowerDetails"
         towerDetailsFrame.AnchorPoint = Vector2.new(1, 0.5)
@@ -2952,6 +3131,27 @@ if remotes:FindFirstChild("WaveStarted") then
                         preRoundCountdownLabel.Visible = false
                         preRoundCountdownLabel.Text = ""
                 end
+                hideWaveSkipButton({ Reason = "advance" })
+        end)
+end
+
+if remotes:FindFirstChild("WaveSkipOfferUpdated") then
+        remotes.WaveSkipOfferUpdated.OnClientEvent:Connect(function(payload)
+                if lobbyPhase ~= "inRound" then
+                        resetWaveSkipButton()
+                        return
+                end
+
+                if typeof(payload) ~= "table" then
+                        resetWaveSkipButton()
+                        return
+                end
+
+                if payload.Active then
+                        showWaveSkipButton(payload)
+                else
+                        hideWaveSkipButton(payload)
+                end
         end)
 end
 
@@ -2962,6 +3162,11 @@ if remotes:FindFirstChild("GameEnded") then
                 if preRoundCountdownLabel then
                         preRoundCountdownLabel.Visible = false
                         preRoundCountdownLabel.Text = ""
+                end
+                if victory ~= nil then
+                        hideWaveSkipButton({ Reason = victory and "victory" or "gameOver" })
+                else
+                        hideWaveSkipButton({ Reason = "gameOver" })
                 end
         end)
 end
@@ -3012,6 +3217,7 @@ if remotes:FindFirstChild("RoundSetupComplete") then
                 end
                 createGui()
                 applyLoadoutToShop()
+                resetWaveSkipButton()
                 if payload and payload.MapName and preRoundCountdownLabel then
                         preRoundCountdownLabel.Text = string.format("%s selected", payload.MapName)
                         preRoundCountdownLabel.Visible = true

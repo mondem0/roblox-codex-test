@@ -196,6 +196,33 @@ local function normalizeSpawnEntries(raw)
     return normalized
 end
 
+local function getSkipPromptDelay(waveNumber)
+    local definitions = WaveConfigs.Definitions
+    if not definitions then
+        return nil
+    end
+
+    local metadata = definitions[waveNumber]
+    if not metadata then
+        return nil
+    end
+
+    local delay = metadata.SkipPromptDelay or metadata.SkipOfferDelay
+    if delay == nil then
+        local nested = metadata.Metadata
+        if type(nested) == "table" then
+            delay = nested.SkipPromptDelay or nested.SkipOfferDelay
+        end
+    end
+
+    delay = tonumber(delay)
+    if delay and delay > 0 then
+        return delay
+    end
+
+    return nil
+end
+
 local function toVector3(value)
     if typeof(value) == "Vector3" then
         return value
@@ -790,6 +817,10 @@ function WaveService.new(mapModel, remotes)
     self.TowerService = nil
     self.RoundFinishedCallback = nil
     self.ActivePlayerCount = 1
+    self.TotalWaves = #WaveConfigs
+    self.SkipOfferToken = 0
+    self.ActiveSkipOffer = nil
+    self.SkipWaveRequested = false
 
     local towersFolder = Instance.new("Folder")
     towersFolder.Name = "Towers"
@@ -828,6 +859,122 @@ function WaveService:GetActivePlayerCount()
     return self.ActivePlayerCount or 1
 end
 
+function WaveService:BroadcastSkipOffer(payload, targetPlayer)
+    if not (self.Remotes and self.Remotes.WaveSkipOfferUpdated) then
+        return
+    end
+
+    if targetPlayer then
+        self.Remotes.WaveSkipOfferUpdated:FireClient(targetPlayer, payload)
+    else
+        self.Remotes.WaveSkipOfferUpdated:FireAllClients(payload)
+    end
+end
+
+function WaveService:ClearSkipOffer(reason, extraPayload, forceBroadcast)
+    local hadOffer = self.ActiveSkipOffer ~= nil
+    local wave = self.ActiveSkipOffer and self.ActiveSkipOffer.Wave or self.ActiveWave
+    self.ActiveSkipOffer = nil
+
+    if not (hadOffer or forceBroadcast) then
+        return
+    end
+
+    local payload = {
+        Active = false,
+        Wave = wave,
+        Reason = reason,
+    }
+
+    if type(extraPayload) == "table" then
+        for key, value in pairs(extraPayload) do
+            payload[key] = value
+        end
+    end
+
+    self:BroadcastSkipOffer(payload)
+end
+
+function WaveService:ShowSkipOffer(waveNumber)
+    self.ActiveSkipOffer = {
+        Wave = waveNumber,
+    }
+
+    local nextWave
+    if self.TotalWaves and waveNumber < self.TotalWaves then
+        nextWave = waveNumber + 1
+    end
+
+    self:BroadcastSkipOffer({
+        Active = true,
+        Wave = waveNumber,
+        NextWave = nextWave,
+    })
+end
+
+function WaveService:ScheduleSkipOffer(waveNumber)
+    local token = self.SkipOfferToken
+    local delay = getSkipPromptDelay(waveNumber)
+    if not delay or delay <= 0 then
+        return
+    end
+
+    task.spawn(function()
+        task.wait(delay)
+
+        if self.GameEnded then
+            return
+        end
+        if self.ActiveWave ~= waveNumber then
+            return
+        end
+        if self.SkipOfferToken ~= token then
+            return
+        end
+        if self.SkipWaveRequested then
+            return
+        end
+        if self:IsWaveComplete() then
+            return
+        end
+
+        self:ShowSkipOffer(waveNumber)
+    end)
+end
+
+function WaveService:RequestWaveSkip(player)
+    if self.GameEnded then
+        return
+    end
+    if not player or not self.PlayerStats[player] then
+        return
+    end
+
+    local offer = self.ActiveSkipOffer
+    if not (offer and offer.Wave == self.ActiveWave) then
+        return
+    end
+    if self.SkipWaveRequested then
+        return
+    end
+
+    self.SkipWaveRequested = true
+    local nextWave
+    if self.TotalWaves and self.ActiveWave < self.TotalWaves then
+        nextWave = self.ActiveWave + 1
+    end
+
+    local extra = {
+        Skipped = true,
+        RequestedBy = player.UserId,
+        NextWave = nextWave,
+    }
+
+    self:ClearSkipOffer("skipped", extra, true)
+    self.IsSpawning = false
+    self:BeginNextWave()
+end
+
 function WaveService:GetEnemyHealthMultiplier()
     local playerCount = self:GetActivePlayerCount()
     if playerCount <= 1 then
@@ -856,6 +1003,20 @@ function WaveService:SetupPlayer(player)
     self.Remotes.LivesChanged:FireClient(player, self.BaseHealth)
     if self.TowerService and self.TowerService.SendTowerCounts then
         self.TowerService:SendTowerCounts(player)
+    end
+
+    if self.ActiveSkipOffer then
+        local wave = self.ActiveSkipOffer.Wave
+        local nextWave
+        if self.TotalWaves and wave and wave < self.TotalWaves then
+            nextWave = wave + 1
+        end
+
+        self:BroadcastSkipOffer({
+            Active = true,
+            Wave = wave,
+            NextWave = nextWave,
+        }, player)
     end
 end
 
@@ -892,6 +1053,9 @@ end
 function WaveService:GameOver()
     self.IsSpawning = false
     self.GameEnded = true
+    self.SkipOfferToken += 1
+    self.SkipWaveRequested = false
+    self:ClearSkipOffer("gameOver", nil, true)
     for enemyModel in pairs(self.Enemies) do
         if enemyModel then
             enemyModel:Destroy()
@@ -907,6 +1071,9 @@ end
 function WaveService:WinGame()
     self.IsSpawning = false
     self.GameEnded = true
+    self.SkipOfferToken += 1
+    self.SkipWaveRequested = false
+    self:ClearSkipOffer("victory", nil, true)
     self.Remotes.GameEnded:FireAllClients(true)
     if self.RoundFinishedCallback then
         pcall(self.RoundFinishedCallback, true)
@@ -1052,6 +1219,7 @@ function WaveService:KillEnemy(enemyModel, enemyData)
     end
     self.Enemies[enemyModel] = nil
     if not self.GameEnded and self:IsWaveComplete() then
+        self:ClearSkipOffer("completed")
         self:BeginNextWave()
     end
 end
@@ -1075,19 +1243,26 @@ function WaveService:BeginNextWave()
     if self.GameEnded then
         return
     end
-    if self.ActiveWave >= #WaveConfigs then
+    if self.TotalWaves and self.ActiveWave >= self.TotalWaves then
         self:WinGame()
         return
     end
 
+    self:ClearSkipOffer("advance")
+    self.SkipOfferToken += 1
+
     self.ActiveWave += 1
+    self.SkipWaveRequested = false
     self.IsSpawning = true
     self.Remotes.WaveStarted:FireAllClients(self.ActiveWave)
+    self:ScheduleSkipOffer(self.ActiveWave)
 
     task.spawn(function()
-        self:SpawnWave(self.ActiveWave)
+        local waveNumber = self.ActiveWave
+        self:SpawnWave(waveNumber)
         self.IsSpawning = false
         if not self.GameEnded and self:IsWaveComplete() then
+            self:ClearSkipOffer("completed")
             self:BeginNextWave()
         end
     end)
@@ -1103,12 +1278,27 @@ function WaveService:SpawnWave(waveNumber)
         if self.GameEnded then
             return
         end
-        self:SpawnGroup(group)
+        if self.SkipWaveRequested then
+            return
+        end
+        if self.ActiveWave ~= waveNumber then
+            return
+        end
+        self:SpawnGroup(group, waveNumber)
+        if self.SkipWaveRequested or self.ActiveWave ~= waveNumber then
+            return
+        end
     end
 end
 
-function WaveService:SpawnGroup(group)
+function WaveService:SpawnGroup(group, waveNumber)
     if not group then
+        return
+    end
+
+    local activeWave = waveNumber or self.ActiveWave
+
+    if self.GameEnded or self.SkipWaveRequested or self.ActiveWave ~= activeWave then
         return
     end
 
@@ -1129,6 +1319,11 @@ function WaveService:SpawnGroup(group)
             if config then
                 activeStreams += 1
                 task.spawn(function()
+                    if self.GameEnded or self.SkipWaveRequested or self.ActiveWave ~= activeWave then
+                        markStreamFinished()
+                        return
+                    end
+
                     local count = math.max(1, stream.Count or 1)
                     local interval = 0
                     if type(stream.Interval) == "number" then
@@ -1148,10 +1343,14 @@ function WaveService:SpawnGroup(group)
 
                     if startDelay > 0 then
                         task.wait(startDelay)
+                        if self.GameEnded or self.SkipWaveRequested or self.ActiveWave ~= activeWave then
+                            markStreamFinished()
+                            return
+                        end
                     end
 
                     for index = 1, count do
-                        if self.GameEnded then
+                        if self.GameEnded or self.SkipWaveRequested or self.ActiveWave ~= activeWave then
                             break
                         end
 
@@ -1159,6 +1358,9 @@ function WaveService:SpawnGroup(group)
 
                         if index < count and interval > 0 then
                             task.wait(interval)
+                            if self.GameEnded or self.SkipWaveRequested or self.ActiveWave ~= activeWave then
+                                break
+                            end
                         end
                     end
 
@@ -1176,6 +1378,9 @@ function WaveService:SpawnGroup(group)
         local delay = group.Delay or 0
         if delay > 0 then
             task.wait(delay)
+            if self.GameEnded or self.SkipWaveRequested or self.ActiveWave ~= activeWave then
+                return
+            end
         end
 
         return
@@ -1190,17 +1395,23 @@ function WaveService:SpawnGroup(group)
     local count = math.max(1, group.Count or 1)
     local delay = group.Delay or 0
     for index = 1, count do
-        if self.GameEnded then
+        if self.GameEnded or self.SkipWaveRequested or self.ActiveWave ~= activeWave then
             return
         end
         self:SpawnEnemy(enemyType, config)
         if index < count and delay > 0 then
             task.wait(delay)
+            if self.GameEnded or self.SkipWaveRequested or self.ActiveWave ~= activeWave then
+                return
+            end
         end
     end
 
     if delay > 0 then
         task.wait(delay)
+        if self.GameEnded or self.SkipWaveRequested or self.ActiveWave ~= activeWave then
+            return
+        end
     end
 end
 
@@ -1529,6 +1740,9 @@ end
 function WaveService:ResetGame()
     self.IsSpawning = false
     self.GameEnded = false
+    self.SkipOfferToken += 1
+    self.SkipWaveRequested = false
+    self:ClearSkipOffer("reset", nil, true)
     for enemyModel in pairs(self.Enemies) do
         if enemyModel then
             enemyModel:Destroy()
@@ -1662,6 +1876,7 @@ function WaveService:EnemyReachedGoal(enemyModel)
         enemyModel:Destroy()
         self.Enemies[enemyModel] = nil
         if self:IsWaveComplete() then
+            self:ClearSkipOffer("completed")
             self:BeginNextWave()
         end
     end
