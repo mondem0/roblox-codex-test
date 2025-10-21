@@ -342,6 +342,8 @@ local function normalizeAbilityEntry(typeHint, abilityConfig)
     }
 end
 
+local enemyImmuneTo
+
 local function getEnemySpeed(enemyData)
     if not enemyData then
         return 0
@@ -350,7 +352,7 @@ local function getEnemySpeed(enemyData)
     local speed = enemyData.Speed or 0
 
     if enemyData.Slow then
-        if enemyImmuneTo(enemyData, "Slow") then
+        if enemyImmuneTo and enemyImmuneTo(enemyData, "Slow") then
             enemyData.Slow = nil
         elseif enemyData.Slow.EndsAt > tick() then
             speed = speed * (1 - enemyData.Slow.Percent)
@@ -691,7 +693,7 @@ local function normalizeImmunityMap(raw)
 end
 
 
-local function enemyImmuneTo(enemyData, debuffType)
+enemyImmuneTo = function(enemyData, debuffType)
     if not enemyData or not debuffType then
         return false
     end
