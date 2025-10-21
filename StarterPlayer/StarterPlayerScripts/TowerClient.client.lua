@@ -2540,12 +2540,6 @@ local function updateTowerDetails(towerModel)
                 if stats.SlowPercent then
                         table.insert(lines, string.format("Slow: %d%% for %.1fs", math.floor(stats.SlowPercent * 100 + 0.5), stats.SlowDuration or 0))
                 end
-                local placementSurface = getPlacementSurface(towerType)
-                if placementSurface == CLIFF_PLACEMENT_SURFACE then
-                        table.insert(lines, "Placement: Cliffs only")
-                elseif placementSurface == DEFAULT_PLACEMENT_SURFACE then
-                        table.insert(lines, "Placement: Ground only")
-                end
                 towerStatsLabel.Text = table.concat(lines, "\n")
         elseif towerStatsLabel then
                 towerStatsLabel.Text = ""
