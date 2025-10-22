@@ -196,13 +196,39 @@ local function normalizeSpawnEntries(raw)
     return normalized
 end
 
-local function getSkipPromptDelay(waveNumber)
+local function getWaveDefinition(waveNumber)
     local definitions = WaveConfigs.Definitions
     if not definitions then
         return nil
     end
 
-    local metadata = definitions[waveNumber]
+    return definitions[waveNumber]
+end
+
+local function getWaveReward(waveNumber)
+    local metadata = getWaveDefinition(waveNumber)
+    if not metadata then
+        return nil
+    end
+
+    local reward = metadata.Reward
+    if reward == nil then
+        local nested = metadata.Metadata
+        if type(nested) == "table" then
+            reward = nested.Reward
+        end
+    end
+
+    reward = tonumber(reward)
+    if reward then
+        return reward
+    end
+
+    return nil
+end
+
+local function getSkipPromptDelay(waveNumber)
+    local metadata = getWaveDefinition(waveNumber)
     if not metadata then
         return nil
     end
@@ -821,6 +847,7 @@ function WaveService.new(mapModel, remotes)
     self.SkipOfferToken = 0
     self.ActiveSkipOffer = nil
     self.SkipWaveRequested = false
+    self.LastRewardedWave = 0
 
     local towersFolder = Instance.new("Folder")
     towersFolder.Name = "Towers"
@@ -1042,6 +1069,26 @@ function WaveService:BroadcastMoney(amount)
     end
 end
 
+function WaveService:GrantWaveReward(waveNumber)
+    local completedWave = tonumber(waveNumber)
+    if not completedWave or completedWave <= 0 then
+        return
+    end
+
+    if self.LastRewardedWave == completedWave then
+        return
+    end
+
+    local reward = getWaveReward(completedWave)
+    self.LastRewardedWave = completedWave
+
+    if not reward or reward == 0 then
+        return
+    end
+
+    self:BroadcastMoney(reward)
+end
+
 function WaveService:DamageBase(amount)
     self.BaseHealth = math.max(0, self.BaseHealth - amount)
     for player in pairs(self.PlayerStats) do
@@ -1221,6 +1268,7 @@ function WaveService:KillEnemy(enemyModel, enemyData)
     end
     self.Enemies[enemyModel] = nil
     if not self.GameEnded and self:IsWaveComplete() then
+        self:GrantWaveReward(self.ActiveWave)
         self:ClearSkipOffer("completed")
         self:BeginNextWave()
     end
@@ -1271,6 +1319,7 @@ function WaveService:BeginWave(waveNumber, clearReason)
         self:SpawnWave(activeWave)
         self.IsSpawning = false
         if not self.GameEnded and self:IsWaveComplete() then
+            self:GrantWaveReward(activeWave)
             self:ClearSkipOffer("completed")
             self:BeginNextWave()
         end
@@ -1766,6 +1815,7 @@ function WaveService:ResetGame()
     self.Enemies = {}
     self.ActiveWave = 0
     self.BaseHealth = 30
+    self.LastRewardedWave = 0
     for player in pairs(self.PlayerStats) do
         self.PlayerStats[player] = { Money = 350, Lives = self.BaseHealth }
         self.Remotes.MoneyChanged:FireClient(player, 350)
@@ -1890,6 +1940,7 @@ function WaveService:EnemyReachedGoal(enemyModel)
         enemyModel:Destroy()
         self.Enemies[enemyModel] = nil
         if self:IsWaveComplete() then
+            self:GrantWaveReward(self.ActiveWave)
             self:ClearSkipOffer("completed")
             self:BeginNextWave()
         end
