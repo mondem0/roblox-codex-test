@@ -2350,19 +2350,32 @@ local function resolveTowerType(towerModel)
 end
 
 local function showRangeIndicator(towerModel, range)
-	destroyRangeIndicator()
-	if not range then
-		return
-	end
+        destroyRangeIndicator()
+        if not range then
+                return
+        end
 
-	local base = towerModel.PrimaryPart or towerModel:FindFirstChild("Base")
-	if not base then
-		return
-	end
+        local base = towerModel.PrimaryPart or towerModel:FindFirstChild("Base")
+        if not base then
+                return
+        end
 
-	rangeRing, rangeRingAdornment = createRangeRing("TowerRangeRing", Color3.fromRGB(80, 200, 255), 0.35)
-	local groundY = base.Position.Y - (base.Size.Y / 2) + 0.05
-	updateRangeRing(rangeRing, rangeRingAdornment, range, Vector3.new(base.Position.X, groundY, base.Position.Z))
+        local towerType = resolveTowerType(towerModel)
+        local surfaceResult = findPlacementSurface(base.Position, towerType)
+        local groundPosition
+        if surfaceResult then
+                groundPosition = surfaceResult.Position
+        else
+                groundPosition = Vector3.new(base.Position.X, base.Position.Y - (base.Size.Y / 2), base.Position.Z)
+        end
+
+        rangeRing, rangeRingAdornment = createRangeRing("TowerRangeRing", Color3.fromRGB(80, 200, 255), 0.35)
+        updateRangeRing(
+                rangeRing,
+                rangeRingAdornment,
+                range,
+                Vector3.new(groundPosition.X, groundPosition.Y + 0.05, groundPosition.Z)
+        )
 end
 
 local function applyUpgradeButtonStyle(disabled)
@@ -3200,23 +3213,75 @@ local function isPositionClear(position)
 
 	return true
 end
-local function evaluatePlacement(position)
-        local groundResult = findPlacementSurface(position, placingTowerType)
+local function evaluatePlacement(rayResult)
+        if not placingTowerType or not rayResult then
+                return false
+        end
+
+        local hitInstance = rayResult.Instance
+        local hitPosition = rayResult.Position
+        if not hitInstance or not hitPosition then
+                return false
+        end
+
+        local map = workspace:FindFirstChild("Map")
+        if not map then
+                return false
+        end
+
+        local ground = map:FindFirstChild("PathGround")
+        local placementSurface = getPlacementSurface(placingTowerType)
+        local allowedPlacementParts = getPlacementPartSet(placingTowerType)
+
+        if (not allowedPlacementParts or not next(allowedPlacementParts))
+                and placementSurface ~= CLIFF_PLACEMENT_SURFACE
+                and not ground
+        then
+                return false
+        end
+
+        local directHitAllowed = isAllowedPlacementHit(
+                hitInstance,
+                map,
+                ground,
+                placementSurface,
+                allowedPlacementParts
+        )
+
+        local normal = rayResult.Normal
+        local normalY = normal and normal.Y or 0
+        if directHitAllowed and normalY < 0.3 then
+                return false
+        end
+
+        local groundResult = findPlacementSurface(hitPosition, placingTowerType)
         if not groundResult then
                 return false
         end
 
+        if directHitAllowed then
+                local resolvedInstance = groundResult.Instance
+                if resolvedInstance and hitInstance then
+                        if resolvedInstance ~= hitInstance
+                                and not hitInstance:IsDescendantOf(resolvedInstance)
+                                and not resolvedInstance:IsDescendantOf(hitInstance)
+                        then
+                                return false
+                        end
+                end
+        end
+
         local placementPosition = Vector3.new(
                 groundResult.Position.X,
-		groundResult.Position.Y,
-		groundResult.Position.Z
-	)
+                groundResult.Position.Y,
+                groundResult.Position.Z
+        )
 
-	if not isPositionClear(placementPosition) then
-		return false
-	end
+        if not isPositionClear(placementPosition) then
+                return false
+        end
 
-	return true, placementPosition
+        return true, placementPosition
 end
 local function updatePreview()
 	if not placingTowerType or not previewPart then
@@ -3225,46 +3290,66 @@ local function updatePreview()
 	end
 
 	local unitRay = mouse.UnitRay
-	local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
-	if rayResult then
-		local hitPosition = rayResult.Position
-		local valid, placementPosition = evaluatePlacement(hitPosition)
-		placementValid = valid and true or false
+        local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
 
-		local previewVector
-		if placementValid and placementPosition then
-			previewVector = Vector3.new(placementPosition.X, placementPosition.Y + previewPart.Size.Y / 2, placementPosition.Z)
-		else
-			previewVector = Vector3.new(hitPosition.X, hitPosition.Y + previewPart.Size.Y / 2, hitPosition.Z)
-		end
+        if rayResult then
+                local valid, resolvedPosition = evaluatePlacement(rayResult)
+                placementValid = valid and true or false
 
-		previewPart.CFrame = CFrame.new(previewVector)
-		local config = towerConfigs[placingTowerType]
-		if previewRangeRing and previewRangeAdornment and config and config.Range then
-			local ringBase = placementValid and placementPosition or hitPosition
-			local ringY = ringBase.Y + 0.05
-			updateRangeRing(previewRangeRing, previewRangeAdornment, config.Range, Vector3.new(ringBase.X, ringY, ringBase.Z))
-		end
+                local targetPosition = resolvedPosition or rayResult.Position
+                if targetPosition then
+                        previewPart.CFrame = CFrame.new(
+                                Vector3.new(
+                                        targetPosition.X,
+                                        targetPosition.Y + previewPart.Size.Y / 2,
+                                        targetPosition.Z
+                                )
+                        )
+                end
 
-		local validColor = placementValid and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 100, 100)
-		previewPart.Color = validColor
-		if previewRangeAdornment then
-			if placementValid then
-				previewRangeAdornment.Color3 = Color3.fromRGB(120, 220, 255)
-				previewRangeAdornment.Transparency = 0.45
-			else
-				previewRangeAdornment.Color3 = Color3.fromRGB(255, 150, 150)
-				previewRangeAdornment.Transparency = 0.6
-			end
-		end
-	else
-		placementValid = false
-		previewPart.Color = Color3.fromRGB(255, 100, 100)
-		if previewRangeAdornment then
-			previewRangeAdornment.Color3 = Color3.fromRGB(255, 150, 150)
-			previewRangeAdornment.Transparency = 0.6
-		end
-	end
+                local config = towerConfigs[placingTowerType]
+                if previewRangeRing and previewRangeAdornment and config and config.Range then
+                        local ringBase
+                        if resolvedPosition then
+                                ringBase = resolvedPosition
+                        else
+                                local surfaceResult = findPlacementSurface(rayResult.Position, placingTowerType)
+                                if surfaceResult then
+                                        ringBase = surfaceResult.Position
+                                else
+                                        ringBase = rayResult.Position
+                                end
+                        end
+
+                        if ringBase then
+                                updateRangeRing(
+                                        previewRangeRing,
+                                        previewRangeAdornment,
+                                        config.Range,
+                                        Vector3.new(ringBase.X, ringBase.Y + 0.05, ringBase.Z)
+                                )
+                        end
+                end
+
+                local validColor = placementValid and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 100, 100)
+                previewPart.Color = validColor
+                if previewRangeAdornment then
+                        if placementValid then
+                                previewRangeAdornment.Color3 = Color3.fromRGB(120, 220, 255)
+                                previewRangeAdornment.Transparency = 0.45
+                        else
+                                previewRangeAdornment.Color3 = Color3.fromRGB(255, 150, 150)
+                                previewRangeAdornment.Transparency = 0.6
+                        end
+                end
+        else
+                placementValid = false
+                previewPart.Color = Color3.fromRGB(255, 100, 100)
+                if previewRangeAdornment then
+                        previewRangeAdornment.Color3 = Color3.fromRGB(255, 150, 150)
+                        previewRangeAdornment.Transparency = 0.6
+                end
+        end
 end
 local function updateEnemyHover()
         local target = mouse.Target
@@ -3513,12 +3598,12 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		if placingTowerType then
 			local unitRay = mouse.UnitRay
 			local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, createRaycastParams())
-			if rayResult then
-				local valid, placementPosition = evaluatePlacement(rayResult.Position)
-				if valid and placementPosition then
-					remotes.TowerPlaced:FireServer(placingTowerType, placementPosition)
-					cancelPlacement()
-				end
+                        if rayResult then
+                                local valid, placementPosition = evaluatePlacement(rayResult)
+                                if valid and placementPosition then
+                                        remotes.TowerPlaced:FireServer(placingTowerType, placementPosition)
+                                        cancelPlacement()
+                                end
 			end
 		else
 			local towerModel = getTowerModelFromInstance(mouse.Target)
