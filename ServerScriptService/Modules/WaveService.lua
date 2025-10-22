@@ -999,6 +999,7 @@ function WaveService:RequestWaveSkip(player)
     }
 
     self:ClearSkipOffer("skipped", extra, true)
+    self:GrantWaveReward(currentWave)
     self.IsSpawning = false
     local targetWave = (nextWave or (currentWave + 1))
     self:BeginWave(targetWave, false)
