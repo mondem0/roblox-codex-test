@@ -716,6 +716,29 @@ local function ensureBaseState(basePart)
         return state
 end
 
+local function getPlacementTransparencyModifier(basePart)
+        if not basePart then
+                return TOWER_BASE_PLACEMENT_TRANSPARENCY
+        end
+
+        local desiredTransparency = TOWER_BASE_PLACEMENT_TRANSPARENCY
+        local baseTransparency = basePart.Transparency or 0
+        local modifier = desiredTransparency - baseTransparency
+
+        return math.clamp(modifier, -1, 1)
+end
+
+local function getHiddenTransparencyModifier(basePart)
+        if not basePart then
+                return 1
+        end
+
+        local baseTransparency = basePart.Transparency or 0
+        local modifier = 1 - baseTransparency
+
+        return math.clamp(modifier, -1, 1)
+end
+
 local function applyBaseVisibilityToPart(basePart)
         local state = ensureBaseState(basePart)
         if not state then
@@ -723,9 +746,9 @@ local function applyBaseVisibilityToPart(basePart)
         end
 
         if towerBaseTracker.enabled then
-                basePart.LocalTransparencyModifier = TOWER_BASE_PLACEMENT_TRANSPARENCY
+                basePart.LocalTransparencyModifier = getPlacementTransparencyModifier(basePart)
         else
-                basePart.LocalTransparencyModifier = 1
+                basePart.LocalTransparencyModifier = getHiddenTransparencyModifier(basePart)
         end
 end
 
