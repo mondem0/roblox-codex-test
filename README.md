@@ -612,3 +612,29 @@ Make sure those upgrade models exist under `ReplicatedStorage/Assets/Towers` (or
 9. With one of your towers selected, press **`E`** to purchase an upgrade (if available) and press **`X`** to sell it. Confirm upgrade costs apply and 50% refunds are awarded on sale.
 
 Enjoy customizing the visuals, adding sound effects, or expanding with new towers and waves!
+
+## Customization Reference
+
+All core systems are data driven so designers can tweak the experience without touching gameplay scripts.
+
+### Lobby & Round Flow
+
+* **Round sizes and map rotation** – Adjust [`ReplicatedStorage/Modules/Config/LobbyConfig.lua`](ReplicatedStorage/Modules/Config/LobbyConfig.lua). Each round entry defines the player capacity, countdown, and any maps eligible for that queue. Update `MapPool` here to add, remove, or weight arenas.
+* **Wave skipping** – Every wave in [`ReplicatedStorage/Modules/Config/WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua) supports an optional `SkipPromptDelay` value. Set it to the number of seconds after the wave begins before the skip button slides into view. Omit the field (or set it to `nil`) to disable skipping for that wave entirely.
+
+### Combat Balance
+
+* **Towers** – [`TowerConfigs.lua`](ReplicatedStorage/Modules/Config/TowerConfigs.lua) is the single source of truth for tower stats, upgrade trees, placement surfaces, and model names. Copy the `Cliff Sniper` entry as a template when adding more specialized towers—set `ValidSurfaces` to `{ "Cliff" }`, `{ "Ground" }`, or include multiple entries to allow both. To target bespoke build pads, fill in `PlacementSurfaceParts` (or `PlacementSurfacePartNames`) with the exact part names that should accept placements.
+* **Enemies & waves** – Use [`EnemyConfigs.lua`](ReplicatedStorage/Modules/Config/EnemyConfigs.lua) to tune health, speed, immunities, and spawn rewards. Compose encounters by editing the `Streams` tables inside [`WaveConfigs.lua`](ReplicatedStorage/Modules/Config/WaveConfigs.lua); the `SkipPromptDelay`, cash payouts, and boss abilities all live alongside each wave definition.
+
+### User Interface
+
+* **Color palette & fonts** – Modify the constants near the top of [`StarterPlayer/StarterPlayerScripts/TowerClient.client.lua`](StarterPlayer/StarterPlayerScripts/TowerClient.client.lua). Search for `UI_PALETTE` and `FONT_FAMILY` to update every panel at once.
+* **Layout tweaks** – The interface is assembled dynamically, so resizing panels or moving HUD elements only requires adjusting the `create*` helper functions inside the same client script. Each helper contains a commented block explaining the anchors, constraints, and scaling rules it applies.
+
+### Audio & Visual Effects
+
+* **Sound hooks** – [`ServerScriptService/Modules/SoundEffects.lua`](ServerScriptService/Modules/SoundEffects.lua) centralizes all sound triggers. Drop new `Sound` instances into `ReplicatedStorage/Assets/Sounds`, then reference them from the matching tables to replace the defaults.
+* **Particles & animations** – Towers expose a `ModelBuilder` callback hook in their config. Supply a function that clones your FX or kicks off an animation whenever a tower spawns or upgrades. Enemy death effects can be assigned per entry in `EnemyConfigs` using the `DeathEffect` key.
+
+With these configuration files you can rebalance the roster, introduce new maps, or overhaul the presentation while keeping the underlying systems untouched.

@@ -28,6 +28,8 @@ local Remotes = {
     WaveStarted = getOrCreateRemote("WaveStarted", "RemoteEvent"),
     GameEnded = getOrCreateRemote("GameEnded", "RemoteEvent"),
     RequestWaveStart = getOrCreateRemote("RequestWaveStart", "RemoteEvent"),
+    WaveSkipOfferUpdated = getOrCreateRemote("WaveSkipOfferUpdated", "RemoteEvent"),
+    RequestWaveSkip = getOrCreateRemote("RequestWaveSkip", "RemoteEvent"),
     TowerUpgraded = getOrCreateRemote("TowerUpgraded", "RemoteEvent"),
     RequestRestart = getOrCreateRemote("RequestRestart", "RemoteEvent"),
     GameRestarted = getOrCreateRemote("GameRestarted", "RemoteEvent"),
@@ -75,6 +77,9 @@ end
 
 local function clearActivePlayers()
     activeRoundPlayers = {}
+    if waveService and waveService.SetActivePlayerCount then
+        waveService:SetActivePlayerCount(1)
+    end
 end
 
 local function isActivePlayer(player)
@@ -261,6 +266,10 @@ local function beginRound(groupInfo)
         return
     end
 
+    if waveService and waveService.SetActivePlayerCount then
+        waveService:SetActivePlayerCount(#participants)
+    end
+
     towerService:Reset()
     waveService:ResetGame()
 
@@ -327,6 +336,14 @@ Remotes.MapVoteSubmitted.OnServerEvent:Connect(function(player, optionIndex)
 end)
 
 Remotes.RequestWaveStart.OnServerEvent:Connect(function() end)
+
+Remotes.RequestWaveSkip.OnServerEvent:Connect(function(player)
+    if not isActivePlayer(player) then
+        return
+    end
+
+    waveService:RequestWaveSkip(player)
+end)
 
 Remotes.TowerPlaced.OnServerEvent:Connect(function(player, towerType, position)
     if not lobbyService:IsActivePlayer(player) then

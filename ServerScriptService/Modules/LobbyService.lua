@@ -270,7 +270,11 @@ function LobbyService:CancelCountdown(roundKey)
 
     room.CountdownActive = false
     room.CountdownRemaining = 0
+    local countdownTask = room.CountdownTask
     room.CountdownTask = nil
+    if countdownTask then
+        task.cancel(countdownTask)
+    end
     self:BroadcastLobbyState()
 end
 

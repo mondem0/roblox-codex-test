@@ -55,6 +55,7 @@ addWave({
     Name = "wave1",
     Description = "Warm-up wave of slow Grunts to let players place their first towers.",
     Reward = 65,
+    SkipPromptDelay = 12,
     Groups = {
         { Type = "Grunt", Count = 12, Delay = 0.75 },
     },
@@ -64,6 +65,7 @@ addWave({
     Name = "wave2",
     Description = "Introduces Runners while keeping a steady trickle of Grunts.",
     Reward = 75,
+    SkipPromptDelay = 16,
     Groups = {
         { Type = "Grunt", Count = 14, Delay = 0.7 },
         { Type = "Runner", Count = 6, Delay = 0.6 },
@@ -81,6 +83,7 @@ addWave({
     Name = "wave3",
     Description = "Faster mixed packs that challenge maze coverage.",
     Reward = 90,
+    SkipPromptDelay = 18,
     Groups = {
         {
             Streams = {
@@ -97,6 +100,7 @@ addWave({
     Name = "wave4",
     Description = "Adds Tanks to force single-target upgrades.",
     Reward = 110,
+    SkipPromptDelay = 20,
     Groups = {
         { Type = "Tank", Count = 6, Delay = 1.3 },
         {
@@ -113,6 +117,7 @@ addWave({
     Name = "wave5",
     Description = "Shield phalanx introduces explosion-resistant frontline units.",
     Reward = 150,
+    SkipPromptDelay = 22,
     Groups = {
         { Type = "Runner", Count = 10, Delay = 0.6 },
         {
@@ -130,6 +135,7 @@ addWave({
     Name = "wave6",
     Description = "Storm Tyrant arrives with unstoppable, explosion-proof bodyguards.",
     Reward = 260,
+    SkipPromptDelay = 24,
     Groups = {
         {
             Streams = {
@@ -150,6 +156,7 @@ addWave({
     Name = "wave7",
     Description = "Broodmothers split into fresh attackers the moment they fall.",
     Reward = 210,
+    SkipPromptDelay = 26,
     Groups = {
         {
             Streams = {
@@ -173,6 +180,7 @@ addWave({
     Name = "wave8",
     Description = "Frost Warden shockwaves disable towers that collapse too close.",
     Reward = 280,
+    SkipPromptDelay = 28,
     Groups = {
         { Type = "FrostWarden", Count = 3, Delay = 3 },
         {
@@ -197,6 +205,7 @@ addWave({
     Name = "wave9",
     Description = "Stealthed Shades slip past defenses until a detector spots them.",
     Reward = 320,
+    SkipPromptDelay = 30,
     Groups = {
         {
             Streams = {
@@ -223,6 +232,7 @@ addWave({
     Name = "wave10",
     Description = "Riftbreaker warps ahead mid-fight and unleashes a stunning collapse.",
     Reward = 420,
+    SkipPromptDelay = 32,
     Groups = {
         {
             Streams = {
@@ -253,6 +263,7 @@ addWave({
     Name = "wave11",
     Description = "Warcallers rally reinforcements while other elites close in.",
     Reward = 480,
+    SkipPromptDelay = 34,
     Groups = {
         {
             Streams = {

@@ -9,6 +9,232 @@ TowerService.__index = TowerService
 
 local TOWER_BASE_HALF_SIZE = 2
 local DEFAULT_BASE_SIZE = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
+local PLACEMENT_EDGE_EPSILON = 0.01
+local DEFAULT_PLACEMENT_SURFACE = "ground"
+local CLIFF_PLACEMENT_SURFACE = "cliff"
+
+local function normalizePlacementSurfaceValue(value)
+    if typeof(value) == "string" then
+        local lowered = string.lower(value)
+        lowered = lowered:gsub("%s+", "")
+        lowered = lowered:gsub("_", "")
+        lowered = lowered:gsub("-", "")
+
+        if lowered == "cliff" or lowered == "cliffs" or lowered == "cliffonly" or lowered == "clifftop"
+            or lowered == "highground" or lowered == "highgrounds" or lowered == "elevated"
+        then
+            return CLIFF_PLACEMENT_SURFACE
+        end
+
+        if lowered == "ground" or lowered == "path" or lowered == "pathground" or lowered == "default"
+            or lowered == "grass" or lowered == "field"
+        then
+            return DEFAULT_PLACEMENT_SURFACE
+        end
+    elseif typeof(value) == "table" then
+        for _, entry in pairs(value) do
+            local normalized = normalizePlacementSurfaceValue(entry)
+            if normalized then
+                return normalized
+            end
+        end
+    end
+
+    return nil
+end
+
+local function getPlacementSurface(towerType)
+    local config = towerType and TowerConfigs[towerType]
+    if not config then
+        return DEFAULT_PLACEMENT_SURFACE
+    end
+
+    local surface = normalizePlacementSurfaceValue(config.PlacementSurface)
+        or normalizePlacementSurfaceValue(config.SurfaceType)
+        or normalizePlacementSurfaceValue(config.RequiredSurface)
+        or normalizePlacementSurfaceValue(config.AllowedSurface)
+
+    if not surface and config.CliffOnly == true then
+        surface = CLIFF_PLACEMENT_SURFACE
+    end
+
+    return surface or DEFAULT_PLACEMENT_SURFACE
+end
+
+local function addPlacementPartName(target, value)
+    if typeof(value) == "string" then
+        local trimmed = string.gsub(value, "^%s*(.-)%s*$", "%1")
+        if trimmed ~= "" then
+            target[string.lower(trimmed)] = true
+        end
+    elseif typeof(value) == "Instance" then
+        local name = value.Name
+        if name and name ~= "" then
+            target[string.lower(name)] = true
+        end
+    elseif typeof(value) == "table" then
+        for _, entry in pairs(value) do
+            addPlacementPartName(target, entry)
+        end
+    end
+end
+
+local PlacementPartCache = {}
+
+local function getPlacementPartSet(towerType)
+    local cached = PlacementPartCache[towerType]
+    if cached ~= nil then
+        if cached == false then
+            return nil
+        end
+        return cached
+    end
+
+    local config = towerType and TowerConfigs[towerType]
+    if not config then
+        PlacementPartCache[towerType] = false
+        return nil
+    end
+
+    local partNames = {}
+    addPlacementPartName(partNames, config.PlacementSurfacePart)
+    addPlacementPartName(partNames, config.PlacementSurfacePartName)
+    addPlacementPartName(partNames, config.PlacementSurfaceParts)
+    addPlacementPartName(partNames, config.PlacementSurfacePartNames)
+    addPlacementPartName(partNames, config.RequiredSurfacePart)
+    addPlacementPartName(partNames, config.RequiredSurfaceParts)
+    addPlacementPartName(partNames, config.AllowedSurfacePart)
+    addPlacementPartName(partNames, config.AllowedSurfaceParts)
+    addPlacementPartName(partNames, config.ValidSurfaceParts)
+    addPlacementPartName(partNames, config.ValidPlacementParts)
+
+    if next(partNames) then
+        PlacementPartCache[towerType] = partNames
+        return partNames
+    end
+
+    PlacementPartCache[towerType] = false
+    return nil
+end
+
+local function hideTowerBase(basePart)
+    if not basePart then
+        return
+    end
+
+    if basePart:IsA("Model") then
+        local primary = basePart.PrimaryPart or basePart:FindFirstChildWhichIsA("BasePart")
+        if primary then
+            hideTowerBase(primary)
+        end
+        return
+    end
+
+    if not basePart:IsA("BasePart") then
+        return
+    end
+
+    basePart.Transparency = 1
+    basePart.CastShadow = false
+    basePart.CanCollide = false
+    basePart.CanTouch = false
+    basePart.CanQuery = false
+
+    for _, descendant in ipairs(basePart:GetDescendants()) do
+        if descendant:IsA("BasePart") then
+            descendant.Transparency = 1
+            descendant.CastShadow = false
+            descendant.CanCollide = false
+            descendant.CanTouch = false
+            descendant.CanQuery = false
+        elseif descendant:IsA("Decal") or descendant:IsA("Texture") then
+            descendant.Transparency = 1
+        end
+    end
+end
+
+local function matchesAllowedPlacementPart(instance, mapModel, allowedParts)
+    if not instance or not allowedParts or not next(allowedParts) then
+        return false
+    end
+
+    local current = instance
+    while current do
+        if current == mapModel then
+            local lowered = string.lower(current.Name)
+            if allowedParts[lowered] then
+                return true
+            end
+            break
+        end
+
+        local name = current.Name
+        if name then
+            local lowered = string.lower(name)
+            if allowedParts[lowered] then
+                if not mapModel or current:IsDescendantOf(mapModel) or current == mapModel then
+                    return true
+                end
+            end
+        end
+
+        current = current.Parent
+    end
+
+    return false
+end
+
+local function isValidPlacementSurface(instance, mapModel, ground, placementSurface, allowedPlacementParts)
+    if not instance then
+        return false
+    end
+
+    if allowedPlacementParts and next(allowedPlacementParts) then
+        if matchesAllowedPlacementPart(instance, mapModel, allowedPlacementParts) then
+            return true
+        end
+
+        return false
+    end
+
+    if placementSurface == CLIFF_PLACEMENT_SURFACE then
+        if ground and (instance == ground or instance:IsDescendantOf(ground)) then
+            return false
+        end
+
+        if instance == workspace.Terrain then
+            return false
+        end
+
+        if not instance:IsA("BasePart") then
+            return false
+        end
+
+        if mapModel and not instance:IsDescendantOf(mapModel) then
+            return false
+        end
+
+        if instance.Transparency and instance.Transparency >= 0.95 then
+            return false
+        end
+
+        if instance.CanCollide == false then
+            return false
+        end
+
+        return true
+    end
+
+    if ground and (instance == ground or instance:IsDescendantOf(ground)) then
+        return true
+    end
+
+    if instance == workspace.Terrain then
+        return true
+    end
+
+    return false
+end
 local TowerFootprints = {}
 local TowerLimits = {}
 local OverallPlacementLimitCache
@@ -190,6 +416,17 @@ local function getTowerPrimaryPart(model)
     return model:FindFirstChildWhichIsA("BasePart")
 end
 
+local function hideTowerBaseForModel(model)
+    if not model then
+        return
+    end
+
+    local base = getTowerPrimaryPart(model)
+    if base then
+        hideTowerBase(base)
+    end
+end
+
 local function stopAndDestroySound(sound)
     if not sound then
         return
@@ -284,6 +521,11 @@ local function updateTowerAttributes(towerModel, towerData)
     towerModel:SetAttribute("Level", towerData.Level)
     towerModel:SetAttribute("Range", towerData.Config.Range or 0)
     towerModel:SetAttribute("OwnerUserId", towerData.Player and towerData.Player.UserId or 0)
+
+    if towerData.PlacementPosition then
+        towerModel:SetAttribute("PlacementPosition", towerData.PlacementPosition)
+    end
+
     local invested = towerData.Invested or 0
     towerModel:SetAttribute("SellValue", math.floor(math.max(0, invested * 0.5)))
 end
@@ -342,10 +584,15 @@ function TowerService.new(mapModel, waveService, remotes)
         waveService:SetTowerService(self)
     end
 
-    if not workspace:FindFirstChild("Towers") then
-        local towersFolder = Instance.new("Folder")
+    local towersFolder = workspace:FindFirstChild("Towers")
+    if not towersFolder then
+        towersFolder = Instance.new("Folder")
         towersFolder.Name = "Towers"
         towersFolder.Parent = workspace
+    end
+
+    for _, existingTower in ipairs(towersFolder:GetChildren()) do
+        hideTowerBaseForModel(existingTower)
     end
 
     self:BroadcastTowerCounts()
@@ -475,9 +722,14 @@ local function buildTowerModel(towerType, overrideConfig)
         head.Color = Color3.fromRGB(20, 20, 20)
     elseif towerType == "FrostMage" then
         head.Color = Color3.fromRGB(160, 220, 255)
+    elseif towerType == "CliffSniper" then
+        head.Size = Vector3.new(1.6, 2.4, 1.6)
+        head.Color = Color3.fromRGB(235, 235, 215)
+        barrel.Size = Vector3.new(0.25, 0.25, 3.4)
+        barrel.Color = Color3.fromRGB(210, 210, 210)
     end
 
-    head.CFrame = base.CFrame * CFrame.new(0, (base.Size.Y + head.Size.Y) / 2, 0)
+    head.CFrame = base.CFrame * CFrame.new(0, (head.Size.Y - base.Size.Y) / 2, 0)
 
     local barrel = Instance.new("Part")
     barrel.Name = "Barrel"
@@ -658,54 +910,89 @@ function TowerService:IsPlacementValid(position, towerType)
         return false
     end
 
-    local candidateSize = getTowerBaseSize(towerType)
-    local candidateRadius = math.max(candidateSize.X, candidateSize.Z) / 2
-    if candidateRadius <= 0 then
-        candidateRadius = TOWER_BASE_HALF_SIZE
+    local map = workspace:FindFirstChild("Map")
+    if not map then
+        return false
     end
 
-    local map = workspace:FindFirstChild("Map")
-    local ground = map and map:FindFirstChild("PathGround")
-    if ground then
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Blacklist
-        params.IgnoreWater = true
+    local ground = map:FindFirstChild("PathGround")
+    local placementSurface = getPlacementSurface(towerType)
+    local allowedPlacementParts = getPlacementPartSet(towerType)
+    if (not allowedPlacementParts or not next(allowedPlacementParts)) and placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
+        return false
+    end
 
-        local ignoreList = {}
-        local towersFolderInstance = workspace:FindFirstChild("Towers")
-        if towersFolderInstance then
-            table.insert(ignoreList, towersFolderInstance)
-        end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.IgnoreWater = true
 
-        params.FilterDescendantsInstances = ignoreList
+    local ignoreList = {}
+    local towersFolderInstance = workspace:FindFirstChild("Towers")
+    if towersFolderInstance then
+        table.insert(ignoreList, towersFolderInstance)
+    end
 
-        local rayOrigin = Vector3.new(position.X, position.Y + 50, position.Z)
-        local rayDirection = Vector3.new(0, -200, 0)
-        local result = workspace:Raycast(rayOrigin, rayDirection, params)
-        if not result or (result.Instance ~= ground and not result.Instance:IsDescendantOf(ground)) then
+    params.FilterDescendantsInstances = ignoreList
+
+    local rayOrigin = Vector3.new(position.X, position.Y + 200, position.Z)
+    local rayDirection = Vector3.new(0, -400, 0)
+    local result
+
+    for _ = 1, 10 do
+        result = workspace:Raycast(rayOrigin, rayDirection, params)
+        if not result then
             return false
         end
+
+        local instance = result.Instance
+        if instance and instance:IsA("BasePart") then
+            if instance.CanCollide ~= false and (not instance.Transparency or instance.Transparency < 0.95) then
+                break
+            end
+        end
+
+        if instance then
+            table.insert(ignoreList, instance)
+            params.FilterDescendantsInstances = ignoreList
+        end
+        rayOrigin = result.Position - Vector3.new(0, 0.05, 0)
     end
+
+    if not result or not result.Instance then
+        return false
+    end
+
+    if not isValidPlacementSurface(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
+        return false
+    end
+
+    local resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
+
+    local candidateSize = getTowerBaseSize(towerType)
+    local candidateHalfX = math.max(0.05, candidateSize.X / 2)
+    local candidateHalfZ = math.max(0.05, candidateSize.Z / 2)
 
     local towersFolder = workspace:FindFirstChild("Towers")
-    if not towersFolder then
-        return true
-    end
-
-    for _, tower in ipairs(towersFolder:GetChildren()) do
-        local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
-        if primary then
-            local otherPos = primary.Position
-            local horizontalDistance = (Vector3.new(otherPos.X, 0, otherPos.Z) - Vector3.new(position.X, 0, position.Z)).Magnitude
-            local otherRadius = math.max(primary.Size.X, primary.Size.Z) / 2
-            local spacing = otherRadius + candidateRadius
-            if horizontalDistance < spacing then
-                return false
+    if towersFolder then
+        for _, tower in ipairs(towersFolder:GetChildren()) do
+            local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
+            if primary then
+                local otherPos = primary.Position
+                local otherSize = sanitizeBaseSize(primary.Size)
+                local otherHalfX = math.max(0.05, otherSize.X / 2)
+                local otherHalfZ = math.max(0.05, otherSize.Z / 2)
+                local deltaX = math.abs(otherPos.X - resolvedPosition.X)
+                local deltaZ = math.abs(otherPos.Z - resolvedPosition.Z)
+                local limitX = otherHalfX + candidateHalfX + PLACEMENT_EDGE_EPSILON
+                local limitZ = otherHalfZ + candidateHalfZ + PLACEMENT_EDGE_EPSILON
+                if deltaX <= limitX and deltaZ <= limitZ then
+                    return false
+                end
             end
         end
     end
 
-    return true
+    return true, resolvedPosition
 end
 
 function TowerService:AddTower(player, towerType, position)
@@ -718,9 +1005,12 @@ function TowerService:AddTower(player, towerType, position)
         return
     end
 
-    if not self:IsPlacementValid(position, towerType) then
+    local placementValid, resolvedPosition = self:IsPlacementValid(position, towerType)
+    if not placementValid then
         return
     end
+
+    position = resolvedPosition or position
 
     local towerModel, head, barrel = buildTowerModel(towerType)
     if not towerModel then
@@ -738,14 +1028,17 @@ function TowerService:AddTower(player, towerType, position)
         towerModel.PrimaryPart = primary
     end
 
+    hideTowerBaseForModel(towerModel)
+
     TowerFootprints[towerType] = TowerFootprints[towerType] or sanitizeBaseSize(primary.Size)
 
     local heightOffset = primary.Size.Y / 2
     towerModel:PivotTo(CFrame.new(position.X, position.Y + heightOffset, position.Z))
+    towerModel:SetAttribute("PlacementPosition", position)
 
     if not towerModel:GetAttribute("TemplateModel") then
         if head and head:IsA("BasePart") then
-            head.CFrame = primary.CFrame * CFrame.new(0, (primary.Size.Y + head.Size.Y) / 2, 0)
+            head.CFrame = primary.CFrame * CFrame.new(0, (head.Size.Y - primary.Size.Y) / 2, 0)
         end
         if head and barrel and head:IsA("BasePart") and barrel:IsA("BasePart") then
             barrel.CFrame = head.CFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
@@ -761,7 +1054,8 @@ function TowerService:AddTower(player, towerType, position)
         Barrel = barrel,
         Cooldown = 0,
         Level = 1,
-        Invested = towerConfig.Cost
+        Invested = towerConfig.Cost,
+        PlacementPosition = position
     }
 
     self.Towers[towerModel] = towerData
@@ -1168,6 +1462,22 @@ function TowerService:RebuildTowerModel(towerModel, towerData)
         return towerModel
     end
 
+    if not towerData.PlacementPosition then
+        local storedPlacement = towerModel:GetAttribute("PlacementPosition")
+        if typeof(storedPlacement) == "Vector3" then
+            towerData.PlacementPosition = storedPlacement
+        else
+            local currentPrimary = getTowerPrimaryPart(towerModel)
+            if currentPrimary then
+                towerData.PlacementPosition = Vector3.new(
+                    currentPrimary.Position.X,
+                    currentPrimary.Position.Y - currentPrimary.Size.Y / 2,
+                    currentPrimary.Position.Z
+                )
+            end
+        end
+    end
+
     local config = towerData.Config
     local newModel, head, barrel = buildTowerModel(towerData.Type, config)
     if not newModel then
@@ -1196,6 +1506,8 @@ function TowerService:RebuildTowerModel(towerModel, towerData)
     elseif oldCFrame then
         newModel:PivotTo(oldCFrame)
     end
+
+    hideTowerBaseForModel(newModel)
 
     self.Towers[towerModel] = nil
     towerData.Model = newModel
