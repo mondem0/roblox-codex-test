@@ -1276,7 +1276,7 @@ function WaveService:KillEnemy(enemyModel, enemyData)
     end
 end
 
-local function isSpawnStateActive(self, waveNumber, state)
+local function isSpawnStateActive(self, state)
     if self.GameEnded then
         return false
     end
@@ -1285,16 +1285,11 @@ local function isSpawnStateActive(self, waveNumber, state)
         return false
     end
 
-    if state.Finalized then
-        return false
-    end
-
     if state.Cancelled then
         return false
     end
 
-    local states = self.SpawnStates
-    if states and states[waveNumber] ~= state then
+    if state.Finalized then
         return false
     end
 
@@ -1444,7 +1439,7 @@ function WaveService:SpawnWave(waveNumber, spawnState)
     spawnState = spawnState or self:GetSpawnState(waveNumber)
 
     local function shouldAbort()
-        return not isSpawnStateActive(self, waveNumber, spawnState)
+        return not isSpawnStateActive(self, spawnState)
     end
 
     for _, group in ipairs(wave) do
@@ -1469,7 +1464,7 @@ function WaveService:SpawnGroup(group, waveNumber, spawnState)
     spawnState = spawnState or self:GetSpawnState(activeWave)
 
     local function shouldAbort()
-        return not isSpawnStateActive(self, activeWave, spawnState)
+        return not isSpawnStateActive(self, spawnState)
     end
 
     if shouldAbort() then
