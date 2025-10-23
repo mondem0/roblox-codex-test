@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 local PathfindingService = game:GetService("PathfindingService")
 
 local DEFAULT_STARTING_MONEY = 350
+local DEFAULT_FARM_INCOME_PER_WAVE = 0
 
 local WaveService = {}
 WaveService.__index = WaveService
@@ -20,6 +21,24 @@ local function sanitizeStartingMoney(value)
 
     if numeric ~= numeric then
         return DEFAULT_STARTING_MONEY
+    end
+
+    numeric = math.floor(numeric + 0.5)
+    if numeric < 0 then
+        numeric = 0
+    end
+
+    return numeric
+end
+
+local function sanitizeFarmIncome(value)
+    local numeric = tonumber(value)
+    if not numeric then
+        return DEFAULT_FARM_INCOME_PER_WAVE
+    end
+
+    if numeric ~= numeric then
+        return DEFAULT_FARM_INCOME_PER_WAVE
     end
 
     numeric = math.floor(numeric + 0.5)
@@ -874,9 +893,15 @@ function WaveService.new(mapModel, remotes, options)
     self.LastRewardedWave = 0
     self.RewardedWaves = {}
     self.HighestCompletedWave = 0
+    self.FarmIncomePerWave = DEFAULT_FARM_INCOME_PER_WAVE
+    self.LastFarmIncomeWave = 0
 
     if type(options) == "table" and options.StartingMoney ~= nil then
         self:SetStartingMoney(options.StartingMoney)
+    end
+
+    if type(options) == "table" and options.FarmIncomePerWave ~= nil then
+        self:SetFarmIncomePerWave(options.FarmIncomePerWave)
     end
 
     local towersFolder = Instance.new("Folder")
@@ -918,6 +943,39 @@ end
 
 function WaveService:GetStartingMoney()
     return self.StartingMoney or DEFAULT_STARTING_MONEY
+end
+
+function WaveService:SetFarmIncomePerWave(amount)
+    self.FarmIncomePerWave = sanitizeFarmIncome(amount)
+end
+
+function WaveService:GetFarmIncomePerWave()
+    return self.FarmIncomePerWave or DEFAULT_FARM_INCOME_PER_WAVE
+end
+
+function WaveService:GrantFarmIncome(waveNumber)
+    local income = self:GetFarmIncomePerWave()
+    if income <= 0 then
+        return
+    end
+
+    if not self.TowerService or typeof(self.TowerService.GrantTowerIncome) ~= "function" then
+        return
+    end
+
+    local targetWave = waveNumber or self.ActiveWave or 0
+    if targetWave <= 0 then
+        return
+    end
+
+    if self.LastFarmIncomeWave and targetWave <= self.LastFarmIncomeWave then
+        if targetWave == self.LastFarmIncomeWave then
+            return
+        end
+    end
+
+    self.LastFarmIncomeWave = targetWave
+    self.TowerService:GrantTowerIncome("Farm", income)
 end
 
 function WaveService:GetActivePlayerCount()
@@ -1605,6 +1663,7 @@ function WaveService:BeginWave(waveNumber, clearReason)
 
     self.ActiveWave = waveNumber
     self.SkipWaveRequested = false
+    self:GrantFarmIncome(waveNumber)
     local spawnState = self:CreateSpawnState(waveNumber)
     self.Remotes.WaveStarted:FireAllClients(waveNumber)
     self:ScheduleSkipOffer(waveNumber)
@@ -2149,6 +2208,7 @@ function WaveService:ResetGame()
     self.RewardedWaves = {}
     self.HighestCompletedWave = 0
     self.WaveRecords = {}
+    self.LastFarmIncomeWave = 0
     local startingMoney = self:GetStartingMoney()
     for player in pairs(self.PlayerStats) do
         self.PlayerStats[player] = { Money = startingMoney, Lives = self.BaseHealth }

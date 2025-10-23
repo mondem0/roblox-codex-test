@@ -602,6 +602,43 @@ function TowerService:BroadcastTowerCounts()
     end
 end
 
+function TowerService:GrantTowerIncome(towerType, amount)
+    if not (self.WaveService and typeof(self.WaveService.AdjustMoney) == "function") then
+        return
+    end
+
+    if typeof(towerType) ~= "string" or towerType == "" then
+        return
+    end
+
+    local payout = tonumber(amount)
+    if not payout then
+        return
+    end
+
+    payout = math.floor(payout + 0.5)
+    if payout <= 0 then
+        return
+    end
+
+    local rewards = {}
+
+    for _, towerData in pairs(self.Towers) do
+        if towerData and towerData.Type == towerType then
+            local owner = towerData.Player
+            if owner then
+                rewards[owner] = (rewards[owner] or 0) + payout
+            end
+        end
+    end
+
+    for owner, reward in pairs(rewards) do
+        if reward ~= 0 then
+            self.WaveService:AdjustMoney(owner, reward)
+        end
+    end
+end
+
 local function buildTowerModel(towerType, overrideConfig)
     local towerConfig = overrideConfig or TowerConfigs[towerType]
     if not towerConfig then

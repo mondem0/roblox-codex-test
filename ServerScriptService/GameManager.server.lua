@@ -62,8 +62,18 @@ if not activeMap then
 end
 
 local waveSettings
-if GameConfig and GameConfig.StartingMoney ~= nil then
-    waveSettings = { StartingMoney = GameConfig.StartingMoney }
+if GameConfig then
+    waveSettings = {}
+    if GameConfig.StartingMoney ~= nil then
+        waveSettings.StartingMoney = GameConfig.StartingMoney
+    end
+    if GameConfig.FarmIncomePerWave ~= nil then
+        waveSettings.FarmIncomePerWave = GameConfig.FarmIncomePerWave
+    end
+
+    if not next(waveSettings) then
+        waveSettings = nil
+    end
 end
 
 local waveService = WaveService.new(activeMap, Remotes, waveSettings)

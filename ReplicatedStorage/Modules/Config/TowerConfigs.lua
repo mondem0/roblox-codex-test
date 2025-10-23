@@ -148,6 +148,17 @@ local TowerConfigs = {
                 Description = "Massive range and high-powered rounds",
             }
         }
+    },
+    Farm = {
+        Name = "Farm",
+        ModelName = "Farm",
+        Cost = 300,
+        PlacementLimit = 12,
+        BaseSize = Vector3.new(5, 1, 5),
+        Range = 0,
+        Damage = 0,
+        FireRate = 10,
+        Description = "Generates bonus cash at the start of each wave.",
     }
 }
 
