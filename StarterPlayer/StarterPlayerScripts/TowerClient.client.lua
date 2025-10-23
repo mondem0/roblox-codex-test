@@ -123,6 +123,7 @@ local DEFAULT_PREVIEW_SIZE = Vector3.new(4, 1, 4)
 local previewFootprintSize = DEFAULT_PREVIEW_SIZE
 local footprintCache = {}
 local RANGE_RING_HEIGHT = 0.05
+local MIN_SURFACE_NORMAL_Y = 0.85
 local MAX_GROUND_RAYCAST_ATTEMPTS = 8
 local PLACEMENT_EDGE_EPSILON = 0.01
 local DEFAULT_PLACEMENT_SURFACE = "ground"
@@ -2361,12 +2362,18 @@ local function showRangeIndicator(towerModel, range)
         end
 
         local towerType = resolveTowerType(towerModel)
-        local surfaceResult = findPlacementSurface(base.Position, towerType)
+        local storedPlacement = towerModel:GetAttribute("PlacementPosition")
+
         local groundPosition
-        if surfaceResult then
-                groundPosition = surfaceResult.Position
+        if typeof(storedPlacement) == "Vector3" then
+                groundPosition = storedPlacement
         else
-                groundPosition = Vector3.new(base.Position.X, base.Position.Y - (base.Size.Y / 2), base.Position.Z)
+                local surfaceResult = findPlacementSurface(base.Position, towerType)
+                if surfaceResult then
+                        groundPosition = surfaceResult.Position
+                else
+                        groundPosition = Vector3.new(base.Position.X, base.Position.Y - (base.Size.Y / 2), base.Position.Z)
+                end
         end
 
         rangeRing, rangeRingAdornment = createRangeRing("TowerRangeRing", Color3.fromRGB(80, 200, 255), 0.35)
@@ -3171,12 +3178,22 @@ local function findPlacementSurface(position, towerType)
                         return nil
                 end
 
-                if isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
-                        return result
+                local allowedHit = isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts)
+                local shouldContinue = false
+
+                if allowedHit then
+                        local normal = result.Normal
+                        if normal and normal.Y >= MIN_SURFACE_NORMAL_Y then
+                                return result
+                        else
+                                shouldContinue = true
+                        end
                 end
 
-                if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
-                        return nil
+                if not shouldContinue then
+                        if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
+                                return nil
+                        end
                 end
 
                 table.insert(ignoreList, result.Instance)
@@ -3248,21 +3265,32 @@ local function evaluatePlacement(rayResult)
                 allowedPlacementParts
         )
 
-        local normal = rayResult.Normal
-        local normalY = normal and normal.Y or 0
-        if directHitAllowed and normalY < 0.3 then
-                return false
+    local normal = rayResult.Normal
+    local normalY = normal and normal.Y or 0
+    if directHitAllowed then
+        if normalY <= 0 then
+            return false
         end
 
-        local groundResult = findPlacementSurface(hitPosition, placingTowerType)
-        if not groundResult then
-                return false
+        if normalY < MIN_SURFACE_NORMAL_Y then
+            return false
         end
+    end
 
-        if directHitAllowed then
-                local resolvedInstance = groundResult.Instance
-                if resolvedInstance and hitInstance then
-                        if resolvedInstance ~= hitInstance
+    local groundResult = findPlacementSurface(hitPosition, placingTowerType)
+    if not groundResult then
+        return false
+    end
+
+    local surfaceNormal = groundResult.Normal
+    if surfaceNormal and surfaceNormal.Y < MIN_SURFACE_NORMAL_Y then
+        return false
+    end
+
+    if directHitAllowed then
+        local resolvedInstance = groundResult.Instance
+        if resolvedInstance and hitInstance then
+            if resolvedInstance ~= hitInstance
                                 and not hitInstance:IsDescendantOf(resolvedInstance)
                                 and not resolvedInstance:IsDescendantOf(hitInstance)
                         then

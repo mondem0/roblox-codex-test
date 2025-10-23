@@ -10,6 +10,7 @@ TowerService.__index = TowerService
 local TOWER_BASE_HALF_SIZE = 2
 local DEFAULT_BASE_SIZE = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
 local PLACEMENT_EDGE_EPSILON = 0.01
+local MIN_SURFACE_NORMAL_Y = 0.85
 local DEFAULT_PLACEMENT_SURFACE = "ground"
 local CLIFF_PLACEMENT_SURFACE = "cliff"
 
@@ -552,6 +553,11 @@ local function updateTowerAttributes(towerModel, towerData)
     towerModel:SetAttribute("Level", towerData.Level)
     towerModel:SetAttribute("Range", towerData.Config.Range or 0)
     towerModel:SetAttribute("OwnerUserId", towerData.Player and towerData.Player.UserId or 0)
+
+    if towerData.PlacementPosition then
+        towerModel:SetAttribute("PlacementPosition", towerData.PlacementPosition)
+    end
+
     local invested = towerData.Invested or 0
     towerModel:SetAttribute("SellValue", math.floor(math.max(0, invested * 0.5)))
 end
@@ -972,14 +978,24 @@ function TowerService:IsPlacementValid(position, towerType)
                         return false
                 end
 
-                if isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
-                        resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
-                        finalResult = result
-                        break
+                local allowedHit = isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts)
+                local shouldContinue = false
+
+                if allowedHit then
+                        local normal = result.Normal
+                        if normal and normal.Y >= MIN_SURFACE_NORMAL_Y then
+                                resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
+                                finalResult = result
+                                break
+                        else
+                                shouldContinue = true
+                        end
                 end
 
-                if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
-                        return false
+                if not shouldContinue then
+                        if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
+                                return false
+                        end
                 end
 
                 table.insert(ignoreList, result.Instance)
@@ -987,13 +1003,17 @@ function TowerService:IsPlacementValid(position, towerType)
                 rayOrigin = result.Position - Vector3.new(0, 0.05, 0)
         end
 
-        if not finalResult then
-                return false
-        end
+    if not finalResult then
+        return false
+    end
 
-        local towersFolder = workspace:FindFirstChild("Towers")
-        if towersFolder then
-                for _, tower in ipairs(towersFolder:GetChildren()) do
+    if finalResult.Normal and (finalResult.Normal.Y <= 0 or finalResult.Normal.Y < MIN_SURFACE_NORMAL_Y) then
+        return false
+    end
+
+    local towersFolder = workspace:FindFirstChild("Towers")
+    if towersFolder then
+        for _, tower in ipairs(towersFolder:GetChildren()) do
                         local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
                         if primary then
                                 local otherPos = primary.Position
@@ -1051,6 +1071,7 @@ function TowerService:AddTower(player, towerType, position)
 
     local heightOffset = primary.Size.Y / 2
     towerModel:PivotTo(CFrame.new(position.X, position.Y + heightOffset, position.Z))
+    towerModel:SetAttribute("PlacementPosition", position)
 
     if not towerModel:GetAttribute("TemplateModel") then
         if head and head:IsA("BasePart") then
@@ -1070,7 +1091,8 @@ function TowerService:AddTower(player, towerType, position)
         Barrel = barrel,
         Cooldown = 0,
         Level = 1,
-        Invested = towerConfig.Cost
+        Invested = towerConfig.Cost,
+        PlacementPosition = position
     }
 
     self.Towers[towerModel] = towerData
@@ -1475,6 +1497,22 @@ end
 function TowerService:RebuildTowerModel(towerModel, towerData)
     if not towerModel or not towerData then
         return towerModel
+    end
+
+    if not towerData.PlacementPosition then
+        local storedPlacement = towerModel:GetAttribute("PlacementPosition")
+        if typeof(storedPlacement) == "Vector3" then
+            towerData.PlacementPosition = storedPlacement
+        else
+            local currentPrimary = getTowerPrimaryPart(towerModel)
+            if currentPrimary then
+                towerData.PlacementPosition = Vector3.new(
+                    currentPrimary.Position.X,
+                    currentPrimary.Position.Y - currentPrimary.Size.Y / 2,
+                    currentPrimary.Position.Z
+                )
+            end
+        end
     end
 
     local config = towerData.Config
