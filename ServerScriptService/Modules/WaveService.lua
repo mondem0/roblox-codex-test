@@ -7,8 +7,28 @@ local SoundEffects = require(script.Parent.SoundEffects)
 local RunService = game:GetService("RunService")
 local PathfindingService = game:GetService("PathfindingService")
 
+local DEFAULT_STARTING_MONEY = 350
+
 local WaveService = {}
 WaveService.__index = WaveService
+
+local function sanitizeStartingMoney(value)
+    local numeric = tonumber(value)
+    if not numeric then
+        return DEFAULT_STARTING_MONEY
+    end
+
+    if numeric ~= numeric then
+        return DEFAULT_STARTING_MONEY
+    end
+
+    numeric = math.floor(numeric + 0.5)
+    if numeric < 0 then
+        numeric = 0
+    end
+
+    return numeric
+end
 
 function WaveService:BuildOverridePath(enemyModel, enemyData, targetProgress, abilityConfig)
     if not (enemyModel and enemyData) then
@@ -828,7 +848,7 @@ local function buildEnemyModel(enemyType, config)
     return enemyModel, primary, head, true
 end
 
-function WaveService.new(mapModel, remotes)
+function WaveService.new(mapModel, remotes, options)
     local self = setmetatable({}, WaveService)
     self.MapModel = mapModel
     self.Remotes = remotes
@@ -841,6 +861,7 @@ function WaveService.new(mapModel, remotes)
     self.WaveRecords = {}
     self.BaseHealth = 30
     self.PlayerStats = {}
+    self.StartingMoney = DEFAULT_STARTING_MONEY
     self.LastTick = tick()
     self.GameEnded = false
     self.TowerService = nil
@@ -853,6 +874,10 @@ function WaveService.new(mapModel, remotes)
     self.LastRewardedWave = 0
     self.RewardedWaves = {}
     self.HighestCompletedWave = 0
+
+    if type(options) == "table" and options.StartingMoney ~= nil then
+        self:SetStartingMoney(options.StartingMoney)
+    end
 
     local towersFolder = Instance.new("Folder")
     towersFolder.Name = "Towers"
@@ -885,6 +910,14 @@ function WaveService:SetActivePlayerCount(count)
     local numeric = tonumber(count) or 1
     numeric = math.max(1, math.floor(numeric + 0.5))
     self.ActivePlayerCount = numeric
+end
+
+function WaveService:SetStartingMoney(amount)
+    self.StartingMoney = sanitizeStartingMoney(amount)
+end
+
+function WaveService:GetStartingMoney()
+    return self.StartingMoney or DEFAULT_STARTING_MONEY
 end
 
 function WaveService:GetActivePlayerCount()
@@ -1034,7 +1067,8 @@ function WaveService:SetRoundFinishedCallback(callback)
 end
 
 function WaveService:SetupPlayer(player)
-    self.PlayerStats[player] = { Money = 350, Lives = self.BaseHealth }
+    local startingMoney = self:GetStartingMoney()
+    self.PlayerStats[player] = { Money = startingMoney, Lives = self.BaseHealth }
     self.Remotes.MoneyChanged:FireClient(player, self.PlayerStats[player].Money)
     self.Remotes.LivesChanged:FireClient(player, self.BaseHealth)
     if self.TowerService and self.TowerService.SendTowerCounts then
@@ -2115,9 +2149,10 @@ function WaveService:ResetGame()
     self.RewardedWaves = {}
     self.HighestCompletedWave = 0
     self.WaveRecords = {}
+    local startingMoney = self:GetStartingMoney()
     for player in pairs(self.PlayerStats) do
-        self.PlayerStats[player] = { Money = 350, Lives = self.BaseHealth }
-        self.Remotes.MoneyChanged:FireClient(player, 350)
+        self.PlayerStats[player] = { Money = startingMoney, Lives = self.BaseHealth }
+        self.Remotes.MoneyChanged:FireClient(player, startingMoney)
         self.Remotes.LivesChanged:FireClient(player, self.BaseHealth)
     end
 end

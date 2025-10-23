@@ -3,6 +3,7 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local towerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
+local GameConfig = require(ReplicatedStorage.Modules.Config.GameConfig)
 local PathService = require(ReplicatedStorage.Modules.PathService)
 
 local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes") or Instance.new("Folder")
@@ -60,7 +61,12 @@ if not activeMap then
     activeMap.Parent = workspace
 end
 
-local waveService = WaveService.new(activeMap, Remotes)
+local waveSettings
+if GameConfig and GameConfig.StartingMoney ~= nil then
+    waveSettings = { StartingMoney = GameConfig.StartingMoney }
+end
+
+local waveService = WaveService.new(activeMap, Remotes, waveSettings)
 local towerService = TowerService.new(activeMap, waveService, Remotes)
 local lobbyService = LobbyService.new(Remotes)
 
