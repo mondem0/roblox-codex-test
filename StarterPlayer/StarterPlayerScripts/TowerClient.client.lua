@@ -32,6 +32,9 @@ local rangeRing
 local rangeRingAdornment
 local previewRangeRing
 local previewRangeAdornment
+local previewBaseModel
+local previewHighlight
+local previewBaseTemplateCache = {}
 local selectedTowerConnections = {}
 local currentMoney = 0
 local gameEnded = false
@@ -570,11 +573,27 @@ local function destroyRangeIndicator()
 end
 
 local function destroyPreviewRangeIndicator()
-	if previewRangeRing then
-		previewRangeRing:Destroy()
-		previewRangeRing = nil
-		previewRangeAdornment = nil
-	end
+        if previewRangeRing then
+                previewRangeRing:Destroy()
+                previewRangeRing = nil
+                previewRangeAdornment = nil
+        end
+end
+
+local function destroyPreviewBaseDisplay()
+        if previewHighlight then
+                pcall(function()
+                        previewHighlight:Destroy()
+                end)
+                previewHighlight = nil
+        end
+
+        if previewBaseModel then
+                pcall(function()
+                        previewBaseModel:Destroy()
+                end)
+                previewBaseModel = nil
+        end
 end
 
 local function normalizeBaseSize(value)
@@ -605,9 +624,9 @@ local function sanitizeFootprint(size)
 end
 
 local function getTowerFootprint(towerType)
-	if not towerType then
-		return DEFAULT_PREVIEW_SIZE
-	end
+        if not towerType then
+                return DEFAULT_PREVIEW_SIZE
+        end
 
 	if footprintCache[towerType] then
 		return footprintCache[towerType]
@@ -634,9 +653,136 @@ local function getTowerFootprint(towerType)
 		end
 	end
 
-	local sanitized = sanitizeFootprint(baseSize)
-	footprintCache[towerType] = sanitized
-	return sanitized
+        local sanitized = sanitizeFootprint(baseSize)
+        footprintCache[towerType] = sanitized
+        return sanitized
+end
+
+local function getPreviewBaseTemplate(towerType)
+        if not towerType then
+                return nil
+        end
+
+        if previewBaseTemplateCache[towerType] ~= nil then
+                local cached = previewBaseTemplateCache[towerType]
+                if cached == false then
+                        return nil
+                end
+                return cached
+        end
+
+        local config = towerConfigs[towerType]
+        local assetsFolder = ReplicatedStorage:FindFirstChild("Assets")
+        local towersFolder = assetsFolder and assetsFolder:FindFirstChild("Towers")
+        local modelName = config and (config.ModelName or config.Name or towerType)
+
+        if towersFolder and modelName then
+                local template = towersFolder:FindFirstChild(modelName)
+                if template then
+                        if template:IsA("BasePart") then
+                                previewBaseTemplateCache[towerType] = template
+                                return template
+                        elseif template:IsA("Model") then
+                                local base = template:FindFirstChild("Base")
+                                if base then
+                                        previewBaseTemplateCache[towerType] = base
+                                        return base
+                                end
+
+                                local primary = template.PrimaryPart
+                                if primary then
+                                        previewBaseTemplateCache[towerType] = primary
+                                        return primary
+                                end
+
+                                local fallback = template:FindFirstChildWhichIsA("BasePart")
+                                if fallback then
+                                        previewBaseTemplateCache[towerType] = fallback
+                                        return fallback
+                                end
+                        end
+                end
+        end
+
+        previewBaseTemplateCache[towerType] = false
+        return nil
+end
+
+local function forEachBasePart(instance, callback)
+        if not (instance and callback) then
+                return
+        end
+
+        if instance:IsA("Model") then
+                for _, descendant in ipairs(instance:GetDescendants()) do
+                        if descendant:IsA("BasePart") then
+                                callback(descendant)
+                        end
+                end
+        elseif instance:IsA("BasePart") then
+                callback(instance)
+        end
+end
+
+local function createPreviewBase(towerType)
+        local template = getPreviewBaseTemplate(towerType)
+        if not template then
+                return nil
+        end
+
+        local clone = template:Clone()
+        clone.Name = "PlacementBasePreview"
+
+        if clone:IsA("Model") then
+                if not clone.PrimaryPart then
+                        local primary = clone:FindFirstChildWhichIsA("BasePart")
+                        if primary then
+                                clone.PrimaryPart = primary
+                        end
+                end
+        end
+
+        forEachBasePart(clone, function(part)
+                part.Anchored = true
+                part.CanCollide = false
+                part.CanTouch = false
+                part.CanQuery = false
+                part.CastShadow = false
+        end)
+
+        return clone
+end
+
+local function updatePreviewBaseCFrame(targetCFrame)
+        if not (previewBaseModel and targetCFrame) then
+                return
+        end
+
+        if previewBaseModel:IsA("Model") then
+                previewBaseModel:PivotTo(targetCFrame)
+        elseif previewBaseModel:IsA("BasePart") then
+                previewBaseModel.CFrame = targetCFrame
+        end
+end
+
+local function updatePreviewVisualState(isValid)
+        local targetColor = isValid and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 100, 100)
+        local targetTransparency = isValid and 0.2 or 0.45
+
+        if previewHighlight then
+                previewHighlight.Color3 = targetColor
+                previewHighlight.SurfaceColor3 = targetColor
+                previewHighlight.SurfaceTransparency = isValid and 0.78 or 0.88
+        end
+
+        forEachBasePart(previewBaseModel, function(part)
+                part.Color = targetColor
+                part.Transparency = targetTransparency
+        end)
+
+        if previewPart then
+                previewPart.Color = targetColor
+        end
 end
 
 local function createRangeRing(name, color, transparency)
@@ -719,41 +865,61 @@ local function showExplosion(position, radius, color)
 end
 
 local function cancelPlacement()
-	placingTowerType = nil
-	if previewPart then
-		previewPart:Destroy()
-		previewPart = nil
-	end
-	destroyPreviewRangeIndicator()
-	placementValid = false
-	previewFootprintSize = DEFAULT_PREVIEW_SIZE
+        placingTowerType = nil
+        if previewPart then
+                previewPart:Destroy()
+                previewPart = nil
+        end
+        destroyPreviewRangeIndicator()
+        destroyPreviewBaseDisplay()
+        placementValid = false
+        previewFootprintSize = DEFAULT_PREVIEW_SIZE
 end
 function beginPlacement(towerType)
-	if not towerType or not towerConfigs[towerType] then
-		return
-	end
+        if not towerType or not towerConfigs[towerType] then
+                return
+        end
 
-	cancelPlacement()
-	placingTowerType = towerType
+        cancelPlacement()
+        placingTowerType = towerType
 
-	previewPart = Instance.new("Part")
-	previewPart.Name = "PlacementPreview"
-	previewPart.Anchored = true
-	previewPart.CanCollide = false
-	previewPart.CanTouch = false
-	previewPart.CanQuery = false
-	previewPart.Transparency = 0.5
-	previewPart.Color = Color3.fromRGB(255, 100, 100)
-	previewPart.Parent = workspace
+        previewPart = Instance.new("Part")
+        previewPart.Name = "PlacementPreview"
+        previewPart.Anchored = true
+        previewPart.CanCollide = false
+        previewPart.CanTouch = false
+        previewPart.CanQuery = false
+        previewPart.CastShadow = false
+        previewPart.Transparency = 1
+        previewPart.Color = Color3.fromRGB(255, 100, 100)
+        previewPart.Parent = workspace
 
-	local footprint = getTowerFootprint(placingTowerType)
-	previewFootprintSize = Vector3.new(footprint.X, math.max(0.2, footprint.Y), footprint.Z)
-	previewPart.Size = previewFootprintSize
+        local footprint = getTowerFootprint(placingTowerType)
+        previewFootprintSize = Vector3.new(footprint.X, math.max(0.2, footprint.Y), footprint.Z)
+        previewPart.Size = previewFootprintSize
 
-	local config = towerConfigs[placingTowerType]
-	if config and config.Range then
-		if not previewRangeRing then
-			previewRangeRing, previewRangeAdornment = createRangeRing("PlacementRange", Color3.fromRGB(120, 220, 255), 0.55)
+        previewHighlight = Instance.new("SelectionBox")
+        previewHighlight.Name = "PlacementPreviewHighlight"
+        previewHighlight.LineThickness = 0.05
+        previewHighlight.Color3 = Color3.fromRGB(255, 100, 100)
+        previewHighlight.SurfaceColor3 = previewHighlight.Color3
+        previewHighlight.SurfaceTransparency = 0.88
+        previewHighlight.Adornee = previewPart
+        previewHighlight.Parent = previewPart
+
+        previewBaseModel = createPreviewBase(placingTowerType)
+        if previewBaseModel then
+                previewBaseModel.Parent = workspace
+        else
+                previewPart.Transparency = 0.5
+        end
+
+        updatePreviewVisualState(false)
+
+        local config = towerConfigs[placingTowerType]
+        if config and config.Range then
+                if not previewRangeRing then
+                        previewRangeRing, previewRangeAdornment = createRangeRing("PlacementRange", Color3.fromRGB(120, 220, 255), 0.55)
 		end
 		if previewRangeAdornment then
 			previewRangeAdornment.Color3 = Color3.fromRGB(120, 220, 255)
@@ -3257,6 +3423,7 @@ local function updatePreview()
                                         targetPosition.Z
                                 )
                         )
+                        updatePreviewBaseCFrame(previewPart.CFrame)
                 end
 
                 local config = towerConfigs[placingTowerType]
@@ -3303,6 +3470,8 @@ local function updatePreview()
                         previewRangeAdornment.Transparency = 0.6
                 end
         end
+
+        updatePreviewVisualState(placementValid)
 end
 local function updateEnemyHover()
         local target = mouse.Target
