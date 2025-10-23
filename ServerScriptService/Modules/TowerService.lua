@@ -982,10 +982,6 @@ function TowerService:IsPlacementValid(position, towerType)
                 local normalY = normal and normal.Y or 0
 
                 if allowedHit then
-                        if normalY <= 0 then
-                                return false
-                        end
-
                         resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
                         finalResult = result
                         break

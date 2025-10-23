@@ -2349,6 +2349,35 @@ local function resolveTowerType(towerModel)
 	return nil
 end
 
+local function resolveRangeRingPosition(sourcePosition)
+        if not sourcePosition then
+                return nil
+        end
+
+        local map = workspace:FindFirstChild("Map")
+        if not map then
+                return sourcePosition
+        end
+
+        local pathGround = map:FindFirstChild("PathGround")
+        if not pathGround then
+                return sourcePosition
+        end
+
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Include
+        params.FilterDescendantsInstances = { pathGround }
+        params.IgnoreWater = true
+
+        local origin = sourcePosition + Vector3.new(0, 500, 0)
+        local result = workspace:Raycast(origin, Vector3.new(0, -1000, 0), params)
+        if result then
+                return result.Position
+        end
+
+        return sourcePosition
+end
+
 local function showRangeIndicator(towerModel, range)
         destroyRangeIndicator()
         if not range then
@@ -2374,6 +2403,8 @@ local function showRangeIndicator(towerModel, range)
                         groundPosition = Vector3.new(base.Position.X, base.Position.Y - (base.Size.Y / 2), base.Position.Z)
                 end
         end
+
+        groundPosition = resolveRangeRingPosition(groundPosition)
 
         rangeRing, rangeRingAdornment = createRangeRing("TowerRangeRing", Color3.fromRGB(80, 200, 255), 0.35)
         updateRangeRing(
@@ -3182,10 +3213,6 @@ local function findPlacementSurface(position, towerType)
                 local normalY = normal and normal.Y or 0
 
                 if allowedHit then
-                        if normalY <= 0 then
-                                return nil
-                        end
-
                         return result
                 end
 
@@ -3338,6 +3365,7 @@ local function updatePreview()
                         end
 
                         if ringBase then
+                                ringBase = resolveRangeRingPosition(ringBase)
                                 updateRangeRing(
                                         previewRangeRing,
                                         previewRangeAdornment,
