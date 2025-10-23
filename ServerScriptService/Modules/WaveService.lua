@@ -838,6 +838,7 @@ function WaveService.new(mapModel, remotes)
     self.ActiveSpawnCount = 0
     self.IsSpawning = false
     self.SpawnStates = {}
+    self.WaveRecords = {}
     self.BaseHealth = 30
     self.PlayerStats = {}
     self.LastTick = tick()
@@ -850,6 +851,8 @@ function WaveService.new(mapModel, remotes)
     self.ActiveSkipOffer = nil
     self.SkipWaveRequested = false
     self.LastRewardedWave = 0
+    self.RewardedWaves = {}
+    self.HighestCompletedWave = 0
 
     local towersFolder = Instance.new("Folder")
     towersFolder.Name = "Towers"
@@ -1001,7 +1004,6 @@ function WaveService:RequestWaveSkip(player)
     }
 
     self:ClearSkipOffer("skipped", extra, true)
-    self:GrantWaveReward(currentWave)
     local targetWave = (nextWave or (currentWave + 1))
     self:BeginWave(targetWave, false)
 end
@@ -1077,13 +1079,18 @@ function WaveService:GrantWaveReward(waveNumber)
         return
     end
 
-    if self.LastRewardedWave == completedWave then
+    self.RewardedWaves = self.RewardedWaves or {}
+
+    if self.RewardedWaves[completedWave] then
         return
     end
 
-    local reward = getWaveReward(completedWave)
-    self.LastRewardedWave = completedWave
+    self.RewardedWaves[completedWave] = true
+    if not self.LastRewardedWave or completedWave > self.LastRewardedWave then
+        self.LastRewardedWave = completedWave
+    end
 
+    local reward = getWaveReward(completedWave)
     if not reward or reward == 0 then
         return
     end
@@ -1268,12 +1275,7 @@ function WaveService:KillEnemy(enemyModel, enemyData)
 
         enemyModel:Destroy()
     end
-    self.Enemies[enemyModel] = nil
-    if not self.GameEnded and self:IsWaveComplete() then
-        self:GrantWaveReward(self.ActiveWave)
-        self:ClearSkipOffer("completed")
-        self:BeginNextWave()
-    end
+    self:HandleEnemyRemoved(enemyModel, enemyData)
 end
 
 local function isSpawnStateActive(self, state)
@@ -1294,6 +1296,105 @@ local function isSpawnStateActive(self, state)
     end
 
     return true
+end
+
+local function getWaveRecord(self, waveNumber, createIfMissing)
+    if not (waveNumber and waveNumber > 0) then
+        return nil
+    end
+
+    local records = self.WaveRecords
+    if not records then
+        if not createIfMissing then
+            return nil
+        end
+
+        records = {}
+        self.WaveRecords = records
+    end
+
+    local record = records[waveNumber]
+    if record then
+        return record
+    end
+
+    if not createIfMissing then
+        return nil
+    end
+
+    record = {
+        Wave = waveNumber,
+        EnemiesAlive = 0,
+        Spawning = false,
+        Completed = false,
+    }
+    records[waveNumber] = record
+
+    return record
+end
+
+local function handleWaveCompletion(self, record)
+    if not record or record.Completed then
+        return
+    end
+
+    if record.Spawning then
+        return
+    end
+
+    if (record.EnemiesAlive or 0) > 0 then
+        return
+    end
+
+    record.Completed = true
+    self.HighestCompletedWave = math.max(self.HighestCompletedWave or 0, record.Wave or 0)
+    self:OnWaveCompleted(record.Wave)
+    if self.WaveRecords then
+        self.WaveRecords[record.Wave] = nil
+    end
+end
+
+local function markWaveEnemyAdded(self, waveNumber)
+    local record = getWaveRecord(self, waveNumber, true)
+    if record then
+        record.EnemiesAlive = (record.EnemiesAlive or 0) + 1
+    end
+end
+
+local function markWaveEnemyRemoved(self, waveNumber)
+    local record = getWaveRecord(self, waveNumber, false)
+    if not record then
+        return
+    end
+
+    if record.EnemiesAlive and record.EnemiesAlive > 0 then
+        record.EnemiesAlive -= 1
+    else
+        record.EnemiesAlive = 0
+    end
+
+    handleWaveCompletion(self, record)
+end
+
+local function markWaveSpawningStarted(self, waveNumber, state)
+    local record = getWaveRecord(self, waveNumber, true)
+    if record then
+        record.Spawning = true
+        record.SpawnState = state
+        record.Completed = false
+        record.EnemiesAlive = record.EnemiesAlive or 0
+    end
+end
+
+local function markWaveSpawningFinished(self, waveNumber)
+    local record = getWaveRecord(self, waveNumber, false)
+    if not record then
+        return
+    end
+
+    record.Spawning = false
+    record.SpawnState = nil
+    handleWaveCompletion(self, record)
 end
 
 function WaveService:GetSpawnState(waveNumber)
@@ -1323,6 +1424,8 @@ function WaveService:CreateSpawnState(waveNumber)
     self.ActiveSpawnCount = count
     self.IsSpawning = count > 0
 
+    markWaveSpawningStarted(self, waveNumber, state)
+
     return state
 end
 
@@ -1345,6 +1448,8 @@ function WaveService:FinalizeSpawnState(state)
 
     self.ActiveSpawnCount = count
     self.IsSpawning = count > 0
+
+    markWaveSpawningFinished(self, state.Wave)
 end
 
 function WaveService:CancelAllSpawnStates()
@@ -1358,11 +1463,62 @@ function WaveService:CancelAllSpawnStates()
     end
 end
 
+function WaveService:HandleEnemyRemoved(enemyModel, enemyData)
+    if not enemyData then
+        return
+    end
+
+    local waveNumber = enemyData.Wave
+    if waveNumber then
+        markWaveEnemyRemoved(self, waveNumber)
+    end
+
+    if enemyModel then
+        self.Enemies[enemyModel] = nil
+    end
+end
+
+function WaveService:OnWaveCompleted(waveNumber)
+    if self.GameEnded or not waveNumber then
+        return
+    end
+
+    self:GrantWaveReward(waveNumber)
+
+    if self.ActiveSkipOffer and self.ActiveSkipOffer.Wave == waveNumber then
+        self:ClearSkipOffer("completed")
+    end
+
+    self:CheckForAutoAdvance()
+end
+
+function WaveService:CheckForAutoAdvance()
+    if self.GameEnded then
+        return
+    end
+
+    if (self.ActiveWave or 0) <= 0 then
+        return
+    end
+
+    if not self:IsWaveComplete() then
+        return
+    end
+
+    if (self.HighestCompletedWave or 0) < (self.ActiveWave or 0) then
+        return
+    end
+
+    self:BeginNextWave()
+end
+
 function WaveService:ClearSpawnStates()
     self:CancelAllSpawnStates()
     self.SpawnStates = {}
     self.ActiveSpawnCount = 0
     self.IsSpawning = false
+    self.WaveRecords = {}
+    self.HighestCompletedWave = 0
 end
 
 function WaveService:IsWaveComplete()
@@ -1416,12 +1572,6 @@ function WaveService:BeginWave(waveNumber, clearReason)
         end
 
         self:FinalizeSpawnState(spawnState)
-
-        if not self.GameEnded and self:IsWaveComplete() then
-            self:GrantWaveReward(activeWave)
-            self:ClearSkipOffer("completed")
-            self:BeginNextWave()
-        end
     end)
 end
 
@@ -1527,7 +1677,7 @@ function WaveService:SpawnGroup(group, waveNumber, spawnState)
                             break
                         end
 
-                        self:SpawnEnemy(spawnType, config)
+                        self:SpawnEnemy(spawnType, config, { Wave = activeWave })
 
                         if index < count and interval > 0 then
                             task.wait(interval)
@@ -1571,7 +1721,7 @@ function WaveService:SpawnGroup(group, waveNumber, spawnState)
         if shouldAbort() then
             return
         end
-        self:SpawnEnemy(enemyType, config)
+        self:SpawnEnemy(enemyType, config, { Wave = activeWave })
         if index < count and delay > 0 then
             task.wait(delay)
             if shouldAbort() then
@@ -1764,6 +1914,8 @@ function WaveService:SpawnSplitChildren(enemyConfig, enemyData, enemyModel)
                     SkipSpawnSound = not playSpawnSound,
                 }
 
+                spawnOptions.Wave = (enemyData and enemyData.Wave) or self.ActiveWave
+
                 if baseCFrame and not hasPathWaypoints then
                     spawnOptions.CFrame = baseCFrame
                 end
@@ -1786,9 +1938,28 @@ function WaveService:SpawnEnemy(enemyType, config, options)
         return
     end
 
+    local waveNumber
+    if options and options.Wave ~= nil then
+        waveNumber = tonumber(options.Wave)
+        if waveNumber then
+            waveNumber = math.floor(waveNumber)
+            if waveNumber <= 0 then
+                waveNumber = nil
+            end
+        end
+    end
+
     local enemyModel, primary, head, isDefault = buildEnemyModel(enemyType, config)
     if not enemyModel or not primary then
         return
+    end
+
+    if not waveNumber or waveNumber <= 0 then
+        waveNumber = self.ActiveWave
+    end
+
+    if waveNumber and waveNumber > 0 then
+        markWaveEnemyAdded(self, waveNumber)
     end
 
     enemyModel.Parent = workspace.Enemies
@@ -1861,6 +2032,7 @@ function WaveService:SpawnEnemy(enemyType, config, options)
 
     self.Enemies[enemyModel] = {
         Type = enemyType,
+        Wave = waveNumber,
         Health = scaledHealth,
         MaxHealth = scaledHealth,
         Speed = config.Speed,
@@ -1926,6 +2098,9 @@ function WaveService:ResetGame()
     self.ActiveWave = 0
     self.BaseHealth = 30
     self.LastRewardedWave = 0
+    self.RewardedWaves = {}
+    self.HighestCompletedWave = 0
+    self.WaveRecords = {}
     for player in pairs(self.PlayerStats) do
         self.PlayerStats[player] = { Money = 350, Lives = self.BaseHealth }
         self.Remotes.MoneyChanged:FireClient(player, 350)
@@ -2048,12 +2223,7 @@ function WaveService:EnemyReachedGoal(enemyModel)
         end
         self:DamageBase(1)
         enemyModel:Destroy()
-        self.Enemies[enemyModel] = nil
-        if self:IsWaveComplete() then
-            self:GrantWaveReward(self.ActiveWave)
-            self:ClearSkipOffer("completed")
-            self:BeginNextWave()
-        end
+        self:HandleEnemyRemoved(enemyModel, enemyData)
     end
 end
 
