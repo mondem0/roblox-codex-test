@@ -32,6 +32,11 @@ local rangeRing
 local rangeRingAdornment
 local previewRangeRing
 local previewRangeAdornment
+local towerBaseVisibilityEnabled = false
+local towerBaseStates = {}
+local trackedTowersFolder
+local towersFolderConnections = {}
+local workspaceTowerFolderConnection
 local selectedTowerConnections = {}
 local currentMoney = 0
 local gameEnded = false
@@ -639,6 +644,162 @@ local function getTowerFootprint(towerType)
 	return sanitized
 end
 
+local function disconnectTowerFolderConnections()
+        for index, connection in ipairs(towersFolderConnections) do
+                if connection and connection.Disconnect then
+                        connection:Disconnect()
+                end
+                towersFolderConnections[index] = nil
+        end
+end
+
+local function cleanupTowerBaseState(basePart)
+        local state = towerBaseStates[basePart]
+        if not state then
+                return
+        end
+
+        if state.Connection then
+                state.Connection:Disconnect()
+        end
+
+        towerBaseStates[basePart] = nil
+end
+
+local function getTowerBasePart(towerModel)
+        if not (towerModel and towerModel:IsA("Model")) then
+                return nil
+        end
+
+        local basePart = towerModel.PrimaryPart
+        if basePart and basePart:IsA("BasePart") then
+                return basePart
+        end
+
+        basePart = towerModel:FindFirstChild("Base")
+        if basePart and basePart:IsA("BasePart") then
+                return basePart
+        end
+
+        return towerModel:FindFirstChildWhichIsA("BasePart")
+end
+
+local function ensureBaseState(basePart)
+        if not (basePart and basePart:IsA("BasePart")) then
+                return nil
+        end
+
+        local state = towerBaseStates[basePart]
+        if state then
+                return state
+        end
+
+        state = {
+                OriginalLocalTransparency = basePart.LocalTransparencyModifier,
+        }
+
+        state.Connection = basePart.AncestryChanged:Connect(function(_, parent)
+                if parent then
+                        return
+                end
+
+                cleanupTowerBaseState(basePart)
+        end)
+
+        towerBaseStates[basePart] = state
+        return state
+end
+
+local function applyBaseVisibilityToPart(basePart)
+        local state = ensureBaseState(basePart)
+        if not state then
+                return
+        end
+
+        if towerBaseVisibilityEnabled then
+                basePart.LocalTransparencyModifier = state.OriginalLocalTransparency or 0
+        else
+                basePart.LocalTransparencyModifier = 1
+        end
+end
+
+local function updateTowerBaseVisibilityForModel(towerModel)
+        local basePart = getTowerBasePart(towerModel)
+        if basePart then
+                applyBaseVisibilityToPart(basePart)
+        end
+end
+
+local function updateAllTowerBaseVisibility()
+        local towersFolder = trackedTowersFolder or workspace:FindFirstChild("Towers")
+        if not towersFolder then
+                return
+        end
+
+        for _, child in ipairs(towersFolder:GetChildren()) do
+                if child:IsA("Model") then
+                        updateTowerBaseVisibilityForModel(child)
+                end
+        end
+end
+
+local function setTowerBaseVisibility(visible)
+        towerBaseVisibilityEnabled = visible and true or false
+        updateAllTowerBaseVisibility()
+end
+
+local function onTowerChildAdded(child)
+        if not (child and child:IsA("Model")) then
+                return
+        end
+
+        task.defer(function()
+                if child.Parent then
+                        updateTowerBaseVisibilityForModel(child)
+                end
+        end)
+end
+
+local function attachToTowersFolder(folder)
+        if trackedTowersFolder == folder then
+                return
+        end
+
+        disconnectTowerFolderConnections()
+        trackedTowersFolder = folder
+
+        if not folder then
+                return
+        end
+
+        for _, child in ipairs(folder:GetChildren()) do
+                onTowerChildAdded(child)
+        end
+
+        table.insert(towersFolderConnections, folder.ChildAdded:Connect(onTowerChildAdded))
+        table.insert(towersFolderConnections, folder.AncestryChanged:Connect(function(_, parent)
+                if parent then
+                        return
+                end
+
+                attachToTowersFolder(nil)
+        end))
+
+        updateAllTowerBaseVisibility()
+end
+
+local function initializeTowerBaseTracking()
+        attachToTowersFolder(workspace:FindFirstChild("Towers"))
+
+        if not workspaceTowerFolderConnection then
+                workspaceTowerFolderConnection = workspace.ChildAdded:Connect(function(child)
+                        if child and child:IsA("Folder") and child.Name == "Towers" then
+                                attachToTowersFolder(child)
+                        end
+                end)
+        end
+end
+
 local function createRangeRing(name, color, transparency)
 	local anchor = Instance.new("Part")
 	anchor.Name = name .. "Anchor"
@@ -718,7 +879,7 @@ local function showExplosion(position, radius, color)
 	end)
 end
 
-local function cancelPlacement()
+local function cancelPlacement(skipBaseVisibilityReset)
 	placingTowerType = nil
 	if previewPart then
 		previewPart:Destroy()
@@ -727,13 +888,17 @@ local function cancelPlacement()
 	destroyPreviewRangeIndicator()
 	placementValid = false
 	previewFootprintSize = DEFAULT_PREVIEW_SIZE
+
+	if not skipBaseVisibilityReset then
+		setTowerBaseVisibility(false)
+	end
 end
 function beginPlacement(towerType)
 	if not towerType or not towerConfigs[towerType] then
 		return
 	end
 
-	cancelPlacement()
+	cancelPlacement(true)
 	placingTowerType = towerType
 
 	previewPart = Instance.new("Part")
@@ -773,6 +938,8 @@ function beginPlacement(towerType)
 	if upgradeDescriptionLabel then
 		upgradeDescriptionLabel.Text = ""
 	end
+
+	setTowerBaseVisibility(true)
 end
 
 local function createRaycastParams()
@@ -1532,6 +1699,11 @@ local function updateInterfaceVisibility()
                 screenGui.Enabled = inRound
                 if not inRound then
                         resetWaveSkipButton()
+                        if placingTowerType then
+                                cancelPlacement()
+                        else
+                                setTowerBaseVisibility(false)
+                        end
                 end
         end
 end
@@ -3436,6 +3608,7 @@ if remotes:FindFirstChild("GameEnded") then
         remotes.GameEnded.OnClientEvent:Connect(function(victory)
                 gameEnded = true
                 lastVictoryState = victory
+                cancelPlacement()
                 if preRoundCountdownLabel then
                         preRoundCountdownLabel.Visible = false
                         preRoundCountdownLabel.Text = ""
@@ -3484,6 +3657,9 @@ if remotes:FindFirstChild("MapSelectionFinalized") then
                 finalizeMapSelection(payload and payload.SelectedIndex, payload and payload.Option)
         end)
 end
+
+initializeTowerBaseTracking()
+setTowerBaseVisibility(false)
 
 if remotes:FindFirstChild("RoundSetupComplete") then
         remotes.RoundSetupComplete.OnClientEvent:Connect(function(payload)
