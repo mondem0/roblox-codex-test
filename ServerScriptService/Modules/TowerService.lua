@@ -117,6 +117,16 @@ local function getPlacementPartSet(towerType)
     return nil
 end
 
+local function hideTowerBase(basePart)
+    if not (basePart and basePart:IsA("BasePart")) then
+        return
+    end
+
+    basePart.Transparency = 1
+    basePart.CastShadow = false
+    basePart.CanCollide = false
+end
+
 local function matchesAllowedPlacementPart(instance, mapModel, allowedParts)
     if not instance or not allowedParts or not next(allowedParts) then
         return false
@@ -509,6 +519,7 @@ local function prepareTowerModelFromTemplate(template, towerConfig, towerType)
 
     if base then
         base.CanCollide = false
+        hideTowerBase(base)
         TowerFootprints[towerType] = TowerFootprints[towerType] or sanitizeBaseSize(base.Size)
     end
     if head and head:IsA("BasePart") then
@@ -655,6 +666,7 @@ local function buildTowerModel(towerType, overrideConfig)
     base.Color = Color3.fromRGB(40, 40, 40)
     base.CanCollide = false
     base.Parent = model
+    hideTowerBase(base)
 
     local head = Instance.new("Part")
     head.Name = "Head"
@@ -677,7 +689,7 @@ local function buildTowerModel(towerType, overrideConfig)
         barrel.Color = Color3.fromRGB(210, 210, 210)
     end
 
-    head.CFrame = base.CFrame * CFrame.new(0, (base.Size.Y + head.Size.Y) / 2, 0)
+    head.CFrame = base.CFrame * CFrame.new(0, (head.Size.Y - base.Size.Y) / 2, 0)
 
     local barrel = Instance.new("Part")
     barrel.Name = "Barrel"
@@ -984,7 +996,7 @@ function TowerService:AddTower(player, towerType, position)
 
     if not towerModel:GetAttribute("TemplateModel") then
         if head and head:IsA("BasePart") then
-            head.CFrame = primary.CFrame * CFrame.new(0, (primary.Size.Y + head.Size.Y) / 2, 0)
+            head.CFrame = primary.CFrame * CFrame.new(0, (head.Size.Y - primary.Size.Y) / 2, 0)
         end
         if head and barrel and head:IsA("BasePart") and barrel:IsA("BasePart") then
             barrel.CFrame = head.CFrame * CFrame.new(0, 0, -(head.Size.Z / 2 + barrel.Size.Z / 2))
