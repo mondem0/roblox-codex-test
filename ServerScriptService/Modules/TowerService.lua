@@ -978,14 +978,22 @@ function TowerService:IsPlacementValid(position, towerType)
                 end
 
                 local allowedHit = isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts)
+                local normal = result.Normal
+                local normalY = normal and normal.Y or 0
 
                 if allowedHit then
+                        if normalY <= 0 then
+                                return false
+                        end
+
                         resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
                         finalResult = result
                         break
                 end
 
-                if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
+                local skipUnderside = normalY < 0
+
+                if not skipUnderside and not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
                         return false
                 end
 
