@@ -39,6 +39,8 @@ local towerBaseTracker = {
         folderConnections = {},
         workspaceConnection = nil,
 }
+
+local TOWER_BASE_PLACEMENT_TRANSPARENCY = 0.7
 local selectedTowerConnections = {}
 local currentMoney = 0
 local gameEnded = false
@@ -721,7 +723,7 @@ local function applyBaseVisibilityToPart(basePart)
         end
 
         if towerBaseTracker.enabled then
-                basePart.LocalTransparencyModifier = state.OriginalLocalTransparency or 0
+                basePart.LocalTransparencyModifier = TOWER_BASE_PLACEMENT_TRANSPARENCY
         else
                 basePart.LocalTransparencyModifier = 1
         end
