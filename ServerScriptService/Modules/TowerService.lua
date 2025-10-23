@@ -13,6 +13,34 @@ local PLACEMENT_EDGE_EPSILON = 0.01
 local DEFAULT_PLACEMENT_SURFACE = "ground"
 local CLIFF_PLACEMENT_SURFACE = "cliff"
 
+local FARM_INCOME_DISPLAY_NAME = "FarmIncomeDisplay"
+local FARM_INCOME_LABEL_NAME = "FarmIncomeText"
+local FARM_INCOME_OFFSET = Vector3.new(0, 6, 0)
+local FARM_INCOME_TEXT_COLOR = Color3.fromRGB(80, 255, 110)
+local FARM_INCOME_TEXT_TEMPLATE = "Earned: %s"
+
+local function formatCurrency(amount)
+    local numeric = tonumber(amount)
+    if not numeric then
+        numeric = 0
+    end
+
+    local rounded = math.floor(numeric + 0.5)
+    local sign = ""
+    if rounded < 0 then
+        sign = "-"
+        rounded = math.abs(rounded)
+    end
+
+    local formatted = tostring(rounded)
+    local k
+    repeat
+        formatted, k = formatted:gsub("^(%d+)(%d%d%d)", "%1,%2")
+    until k == 0
+
+    return string.format("%s$%s", sign, formatted)
+end
+
 local function normalizePlacementSurfaceValue(value)
     if typeof(value) == "string" then
         local lowered = string.lower(value)
@@ -380,6 +408,95 @@ local function getTowerPrimaryPart(model)
     return model:FindFirstChildWhichIsA("BasePart")
 end
 
+function TowerService:EnsureFarmIncomeDisplay(towerModel, towerData)
+    if not towerData or towerData.Type ~= "Farm" then
+        return nil
+    end
+
+    towerData.FarmIncomeEarned = towerData.FarmIncomeEarned or 0
+
+    local model = towerModel or towerData.Model
+    if not model or not model.Parent then
+        return nil
+    end
+
+    local billboard = towerData.FarmIncomeBillboard
+    if billboard and billboard.Parent == nil then
+        billboard:Destroy()
+        billboard = nil
+        towerData.FarmIncomeBillboard = nil
+        towerData.FarmIncomeLabel = nil
+    end
+
+    if not billboard then
+        local primary = getTowerPrimaryPart(model)
+        if not primary then
+            return nil
+        end
+
+        billboard = Instance.new("BillboardGui")
+        billboard.Name = FARM_INCOME_DISPLAY_NAME
+        billboard.Size = UDim2.new(0, 160, 0, 40)
+        billboard.AlwaysOnTop = true
+        billboard.LightInfluence = 0
+        billboard.MaxDistance = 200
+        billboard.StudsOffsetWorldSpace = FARM_INCOME_OFFSET
+        billboard.Adornee = primary
+        billboard.Parent = model
+
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Name = FARM_INCOME_LABEL_NAME
+        textLabel.BackgroundTransparency = 1
+        textLabel.Font = Enum.Font.GothamBold
+        textLabel.TextScaled = true
+        textLabel.TextColor3 = FARM_INCOME_TEXT_COLOR
+        textLabel.TextStrokeTransparency = 0.5
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.Parent = billboard
+
+        towerData.FarmIncomeBillboard = billboard
+        towerData.FarmIncomeLabel = textLabel
+    else
+        if billboard.Parent ~= model then
+            billboard.Parent = model
+        end
+
+        local primary = getTowerPrimaryPart(model)
+        if primary then
+            billboard.Adornee = primary
+        end
+    end
+
+    return towerData.FarmIncomeLabel
+end
+
+function TowerService:UpdateFarmIncomeDisplay(towerModel, towerData)
+    if not towerData or towerData.Type ~= "Farm" then
+        return
+    end
+
+    local label = self:EnsureFarmIncomeDisplay(towerModel, towerData)
+    if not label then
+        return
+    end
+
+    local earned = towerData.FarmIncomeEarned or 0
+    label.Text = string.format(FARM_INCOME_TEXT_TEMPLATE, formatCurrency(earned))
+end
+
+function TowerService:DestroyFarmIncomeDisplay(towerData)
+    if not towerData then
+        return
+    end
+
+    if towerData.FarmIncomeBillboard then
+        towerData.FarmIncomeBillboard:Destroy()
+        towerData.FarmIncomeBillboard = nil
+    end
+
+    towerData.FarmIncomeLabel = nil
+end
+
 local function stopAndDestroySound(sound)
     if not sound then
         return
@@ -628,6 +745,15 @@ function TowerService:GrantTowerIncome(towerType, amount)
             local owner = towerData.Player
             if owner then
                 rewards[owner] = (rewards[owner] or 0) + payout
+            end
+
+            if towerType == "Farm" then
+                towerData.FarmIncomeEarned = (towerData.FarmIncomeEarned or 0) + payout
+                if towerData.Model then
+                    self:UpdateFarmIncomeDisplay(towerData.Model, towerData)
+                else
+                    self:UpdateFarmIncomeDisplay(nil, towerData)
+                end
             end
         end
     end
@@ -1044,6 +1170,10 @@ function TowerService:AddTower(player, towerType, position)
     self.Towers[towerModel] = towerData
     ensureHeadGeometry(towerData)
     updateTowerAttributes(towerModel, towerData)
+    if towerType == "Farm" then
+        towerData.FarmIncomeEarned = towerData.FarmIncomeEarned or 0
+        self:UpdateFarmIncomeDisplay(towerModel, towerData)
+    end
     self:BroadcastTowerCounts()
     return towerModel
 end
@@ -1290,6 +1420,7 @@ function TowerService:Tick(dt)
     for towerModel, towerData in pairs(self.Towers) do
         if not towerModel.Parent then
             self:ClearTowerStun(towerModel, towerData, true)
+            self:DestroyFarmIncomeDisplay(towerData)
             self.Towers[towerModel] = nil
             countsDirty = true
         else
@@ -1499,6 +1630,9 @@ function TowerService:RebuildTowerModel(towerModel, towerData)
 
     updateTowerAttributes(newModel, towerData)
     ensureHeadGeometry(towerData)
+    if towerData.Type == "Farm" then
+        self:UpdateFarmIncomeDisplay(newModel, towerData)
+    end
 
     if towerModel then
         towerModel:Destroy()
@@ -1563,6 +1697,7 @@ function TowerService:SellTower(player, towerModel)
     local refund = math.floor(math.max(0, (towerData.Invested or 0) * 0.5))
 
     self:ClearTowerStun(towerModel, towerData, true)
+    self:DestroyFarmIncomeDisplay(towerData)
     self.Towers[towerModel] = nil
 
     if towerModel and towerModel.Parent then
@@ -1582,6 +1717,7 @@ function TowerService:Reset()
     local towersFolder = workspace:FindFirstChild("Towers")
     for towerModel, towerData in pairs(self.Towers) do
         self:ClearTowerStun(towerModel, towerData, true)
+        self:DestroyFarmIncomeDisplay(towerData)
         if towerModel and towerModel.Parent then
             towerModel:Destroy()
         end
