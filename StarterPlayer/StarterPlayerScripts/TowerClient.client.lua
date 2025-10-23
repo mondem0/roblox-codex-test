@@ -32,11 +32,13 @@ local rangeRing
 local rangeRingAdornment
 local previewRangeRing
 local previewRangeAdornment
-local towerBaseVisibilityEnabled = false
-local towerBaseStates = {}
-local trackedTowersFolder
-local towersFolderConnections = {}
-local workspaceTowerFolderConnection
+local towerBaseTracker = {
+        enabled = false,
+        states = {},
+        trackedFolder = nil,
+        folderConnections = {},
+        workspaceConnection = nil,
+}
 local selectedTowerConnections = {}
 local currentMoney = 0
 local gameEnded = false
@@ -645,16 +647,16 @@ local function getTowerFootprint(towerType)
 end
 
 local function disconnectTowerFolderConnections()
-        for index, connection in ipairs(towersFolderConnections) do
+        for index, connection in ipairs(towerBaseTracker.folderConnections) do
                 if connection and connection.Disconnect then
                         connection:Disconnect()
                 end
-                towersFolderConnections[index] = nil
+                towerBaseTracker.folderConnections[index] = nil
         end
 end
 
 local function cleanupTowerBaseState(basePart)
-        local state = towerBaseStates[basePart]
+        local state = towerBaseTracker.states[basePart]
         if not state then
                 return
         end
@@ -663,7 +665,7 @@ local function cleanupTowerBaseState(basePart)
                 state.Connection:Disconnect()
         end
 
-        towerBaseStates[basePart] = nil
+        towerBaseTracker.states[basePart] = nil
 end
 
 local function getTowerBasePart(towerModel)
@@ -689,7 +691,7 @@ local function ensureBaseState(basePart)
                 return nil
         end
 
-        local state = towerBaseStates[basePart]
+        local state = towerBaseTracker.states[basePart]
         if state then
                 return state
         end
@@ -706,7 +708,7 @@ local function ensureBaseState(basePart)
                 cleanupTowerBaseState(basePart)
         end)
 
-        towerBaseStates[basePart] = state
+        towerBaseTracker.states[basePart] = state
         return state
 end
 
@@ -716,7 +718,7 @@ local function applyBaseVisibilityToPart(basePart)
                 return
         end
 
-        if towerBaseVisibilityEnabled then
+        if towerBaseTracker.enabled then
                 basePart.LocalTransparencyModifier = state.OriginalLocalTransparency or 0
         else
                 basePart.LocalTransparencyModifier = 1
@@ -731,7 +733,7 @@ local function updateTowerBaseVisibilityForModel(towerModel)
 end
 
 local function updateAllTowerBaseVisibility()
-        local towersFolder = trackedTowersFolder or workspace:FindFirstChild("Towers")
+        local towersFolder = towerBaseTracker.trackedFolder or workspace:FindFirstChild("Towers")
         if not towersFolder then
                 return
         end
@@ -744,7 +746,7 @@ local function updateAllTowerBaseVisibility()
 end
 
 local function setTowerBaseVisibility(visible)
-        towerBaseVisibilityEnabled = visible and true or false
+        towerBaseTracker.enabled = visible and true or false
         updateAllTowerBaseVisibility()
 end
 
@@ -761,12 +763,12 @@ local function onTowerChildAdded(child)
 end
 
 local function attachToTowersFolder(folder)
-        if trackedTowersFolder == folder then
+        if towerBaseTracker.trackedFolder == folder then
                 return
         end
 
         disconnectTowerFolderConnections()
-        trackedTowersFolder = folder
+        towerBaseTracker.trackedFolder = folder
 
         if not folder then
                 return
@@ -776,8 +778,8 @@ local function attachToTowersFolder(folder)
                 onTowerChildAdded(child)
         end
 
-        table.insert(towersFolderConnections, folder.ChildAdded:Connect(onTowerChildAdded))
-        table.insert(towersFolderConnections, folder.AncestryChanged:Connect(function(_, parent)
+        table.insert(towerBaseTracker.folderConnections, folder.ChildAdded:Connect(onTowerChildAdded))
+        table.insert(towerBaseTracker.folderConnections, folder.AncestryChanged:Connect(function(_, parent)
                 if parent then
                         return
                 end
@@ -791,8 +793,8 @@ end
 local function initializeTowerBaseTracking()
         attachToTowersFolder(workspace:FindFirstChild("Towers"))
 
-        if not workspaceTowerFolderConnection then
-                workspaceTowerFolderConnection = workspace.ChildAdded:Connect(function(child)
+        if not towerBaseTracker.workspaceConnection then
+                towerBaseTracker.workspaceConnection = workspace.ChildAdded:Connect(function(child)
                         if child and child:IsA("Folder") and child.Name == "Towers" then
                                 attachToTowersFolder(child)
                         end
