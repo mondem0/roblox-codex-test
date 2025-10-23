@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local TowerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
 local SoundEffects = require(script.Parent.SoundEffects)
@@ -15,9 +16,13 @@ local CLIFF_PLACEMENT_SURFACE = "cliff"
 
 local FARM_INCOME_DISPLAY_NAME = "FarmIncomeDisplay"
 local FARM_INCOME_LABEL_NAME = "FarmIncomeText"
-local FARM_INCOME_OFFSET = Vector3.new(0, 6, 0)
+local FARM_INCOME_BASE_OFFSET = Vector3.new(0, 6, 0)
+local FARM_INCOME_FLOAT_OFFSET = Vector3.new(0, 2.5, 0)
 local FARM_INCOME_TEXT_COLOR = Color3.fromRGB(80, 255, 110)
-local FARM_INCOME_TEXT_TEMPLATE = "Earned: %s"
+local FARM_INCOME_APPEAR_TIME = 0.12
+local FARM_INCOME_FLOAT_TIME = 0.85
+local FARM_INCOME_FADE_DELAY = 0.1
+local FARM_INCOME_FADE_TIME = 0.55
 
 local function formatCurrency(amount)
     local numeric = tonumber(amount)
@@ -408,12 +413,89 @@ local function getTowerPrimaryPart(model)
     return model:FindFirstChildWhichIsA("BasePart")
 end
 
+local function cancelTween(tween)
+    if tween and tween.PlaybackState ~= Enum.PlaybackState.Completed then
+        tween:Cancel()
+    end
+end
+
+local function resetFarmIncomeVisual(towerData)
+    local billboard = towerData and towerData.FarmIncomeBillboard
+    local label = towerData and towerData.FarmIncomeLabel
+    if billboard then
+        billboard.Enabled = false
+        if towerData.FarmIncomeBaseOffset then
+            billboard.StudsOffsetWorldSpace = towerData.FarmIncomeBaseOffset
+        end
+    end
+    if label then
+        label.TextTransparency = 1
+        label.TextStrokeTransparency = 1
+    end
+end
+
+local function cleanupFarmIncomeTweens(towerData)
+    if not towerData or not towerData.FarmIncomeTweens then
+        return
+    end
+
+    for _, tween in ipairs(towerData.FarmIncomeTweens) do
+        cancelTween(tween)
+    end
+    towerData.FarmIncomeTweens = nil
+end
+
+local function sanitizeIncomeAmount(value)
+    local numeric = tonumber(value)
+    if not numeric then
+        return nil
+    end
+
+    numeric = math.floor(numeric + 0.5)
+    if numeric < 0 then
+        numeric = 0
+    end
+
+    return numeric
+end
+
+local function resolveFarmIncomeAmount(towerData, fallbackAmount)
+    local configIncome
+    if towerData and towerData.Config then
+        configIncome = sanitizeIncomeAmount(towerData.Config.IncomePerWave)
+    end
+
+    if configIncome and configIncome > 0 then
+        return configIncome
+    end
+
+    local baseConfig
+    if towerData and towerData.Type then
+        baseConfig = TowerConfigs[towerData.Type]
+    end
+
+    if baseConfig then
+        local baseIncome = sanitizeIncomeAmount(baseConfig.IncomePerWave)
+        if baseIncome and baseIncome > 0 then
+            return baseIncome
+        end
+    end
+
+    local fallback = sanitizeIncomeAmount(fallbackAmount)
+    if fallback and fallback > 0 then
+        return fallback
+    end
+
+    return 0
+end
+
 function TowerService:EnsureFarmIncomeDisplay(towerModel, towerData)
     if not towerData or towerData.Type ~= "Farm" then
         return nil
     end
 
     towerData.FarmIncomeEarned = towerData.FarmIncomeEarned or 0
+    towerData.FarmIncomeBaseOffset = towerData.FarmIncomeBaseOffset or FARM_INCOME_BASE_OFFSET
 
     local model = towerModel or towerData.Model
     if not model or not model.Parent then
@@ -436,12 +518,13 @@ function TowerService:EnsureFarmIncomeDisplay(towerModel, towerData)
 
         billboard = Instance.new("BillboardGui")
         billboard.Name = FARM_INCOME_DISPLAY_NAME
-        billboard.Size = UDim2.new(0, 160, 0, 40)
+        billboard.Size = UDim2.new(0, 180, 0, 60)
         billboard.AlwaysOnTop = true
         billboard.LightInfluence = 0
         billboard.MaxDistance = 200
-        billboard.StudsOffsetWorldSpace = FARM_INCOME_OFFSET
+        billboard.StudsOffsetWorldSpace = towerData.FarmIncomeBaseOffset
         billboard.Adornee = primary
+        billboard.Enabled = false
         billboard.Parent = model
 
         local textLabel = Instance.new("TextLabel")
@@ -450,8 +533,13 @@ function TowerService:EnsureFarmIncomeDisplay(towerModel, towerData)
         textLabel.Font = Enum.Font.GothamBold
         textLabel.TextScaled = true
         textLabel.TextColor3 = FARM_INCOME_TEXT_COLOR
-        textLabel.TextStrokeTransparency = 0.5
+        textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+        textLabel.TextStrokeTransparency = 1
+        textLabel.TextTransparency = 1
+        textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+        textLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
         textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.Text = ""
         textLabel.Parent = billboard
 
         towerData.FarmIncomeBillboard = billboard
@@ -465,23 +553,107 @@ function TowerService:EnsureFarmIncomeDisplay(towerModel, towerData)
         if primary then
             billboard.Adornee = primary
         end
+
+        if towerData.FarmIncomeBaseOffset then
+            billboard.StudsOffsetWorldSpace = towerData.FarmIncomeBaseOffset
+        end
     end
+
+    resetFarmIncomeVisual(towerData)
 
     return towerData.FarmIncomeLabel
 end
 
-function TowerService:UpdateFarmIncomeDisplay(towerModel, towerData)
+local function formatFarmIncomeBurst(amount, total)
+    local pieces = {}
+    if amount and amount > 0 then
+        table.insert(pieces, string.format("+%s", formatCurrency(amount)))
+    end
+    if total and total > 0 then
+        table.insert(pieces, string.format("Total %s", formatCurrency(total)))
+    end
+    return table.concat(pieces, "  •  ")
+end
+
+function TowerService:UpdateFarmIncomeDisplay(towerModel, towerData, gainedAmount)
     if not towerData or towerData.Type ~= "Farm" then
         return
     end
 
     local label = self:EnsureFarmIncomeDisplay(towerModel, towerData)
-    if not label then
+    local billboard = towerData and towerData.FarmIncomeBillboard
+    if not label or not billboard then
         return
     end
 
+    cleanupFarmIncomeTweens(towerData)
+
     local earned = towerData.FarmIncomeEarned or 0
-    label.Text = string.format(FARM_INCOME_TEXT_TEMPLATE, formatCurrency(earned))
+    local gain = sanitizeIncomeAmount(gainedAmount) or 0
+
+    if gain <= 0 then
+        resetFarmIncomeVisual(towerData)
+        label.Text = ""
+        return
+    end
+
+    local baseOffset = towerData.FarmIncomeBaseOffset or FARM_INCOME_BASE_OFFSET
+    local floatOffset = baseOffset + FARM_INCOME_FLOAT_OFFSET
+
+    label.Text = formatFarmIncomeBurst(gain, earned)
+    label.TextTransparency = 1
+    label.TextStrokeTransparency = 1
+    billboard.Enabled = true
+    billboard.StudsOffsetWorldSpace = baseOffset
+
+    local appearTween = TweenService:Create(
+        label,
+        TweenInfo.new(FARM_INCOME_APPEAR_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            TextTransparency = 0,
+            TextStrokeTransparency = 0.35,
+        }
+    )
+
+    local floatTween = TweenService:Create(
+        billboard,
+        TweenInfo.new(FARM_INCOME_FLOAT_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            StudsOffsetWorldSpace = floatOffset,
+        }
+    )
+
+    local fadeTween = TweenService:Create(
+        label,
+        TweenInfo.new(FARM_INCOME_FADE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {
+            TextTransparency = 1,
+            TextStrokeTransparency = 1,
+        }
+    )
+
+    towerData.FarmIncomeTweens = { appearTween, floatTween, fadeTween }
+
+    appearTween:Play()
+    floatTween:Play()
+    task.delay(FARM_INCOME_FADE_DELAY, function()
+        if towerData.FarmIncomeTweens == nil then
+            return
+        end
+        fadeTween:Play()
+    end)
+
+    fadeTween.Completed:Connect(function(state)
+        if state ~= Enum.PlaybackState.Completed then
+            return
+        end
+
+        if towerData.FarmIncomeTweens ~= nil and towerData.FarmIncomeTweens[3] == fadeTween then
+            resetFarmIncomeVisual(towerData)
+            label.Text = ""
+            towerData.FarmIncomeTweens = nil
+        end
+    end)
 end
 
 function TowerService:DestroyFarmIncomeDisplay(towerData)
@@ -489,12 +661,15 @@ function TowerService:DestroyFarmIncomeDisplay(towerData)
         return
     end
 
+    cleanupFarmIncomeTweens(towerData)
+
     if towerData.FarmIncomeBillboard then
         towerData.FarmIncomeBillboard:Destroy()
         towerData.FarmIncomeBillboard = nil
     end
 
     towerData.FarmIncomeLabel = nil
+    towerData.FarmIncomeBaseOffset = nil
 end
 
 local function stopAndDestroySound(sound)
@@ -728,32 +903,35 @@ function TowerService:GrantTowerIncome(towerType, amount)
         return
     end
 
-    local payout = tonumber(amount)
-    if not payout then
-        return
-    end
-
-    payout = math.floor(payout + 0.5)
-    if payout <= 0 then
-        return
+    local defaultPayout = sanitizeIncomeAmount(amount)
+    if towerType ~= "Farm" then
+        if not defaultPayout or defaultPayout <= 0 then
+            return
+        end
     end
 
     local rewards = {}
 
     for _, towerData in pairs(self.Towers) do
         if towerData and towerData.Type == towerType then
-            local owner = towerData.Player
-            if owner then
-                rewards[owner] = (rewards[owner] or 0) + payout
-            end
+            local payout = defaultPayout or 0
 
             if towerType == "Farm" then
-                towerData.FarmIncomeEarned = (towerData.FarmIncomeEarned or 0) + payout
-                if towerData.Model then
-                    self:UpdateFarmIncomeDisplay(towerData.Model, towerData)
-                else
-                    self:UpdateFarmIncomeDisplay(nil, towerData)
+                payout = resolveFarmIncomeAmount(towerData, defaultPayout)
+            end
+
+            if payout and payout > 0 then
+                local owner = towerData.Player
+                if owner then
+                    rewards[owner] = (rewards[owner] or 0) + payout
                 end
+
+                if towerType == "Farm" then
+                    towerData.FarmIncomeEarned = (towerData.FarmIncomeEarned or 0) + payout
+                    self:UpdateFarmIncomeDisplay(towerData.Model, towerData, payout)
+                end
+            elseif towerType == "Farm" then
+                self:UpdateFarmIncomeDisplay(towerData.Model, towerData, 0)
             end
         end
     end
@@ -1172,7 +1350,7 @@ function TowerService:AddTower(player, towerType, position)
     updateTowerAttributes(towerModel, towerData)
     if towerType == "Farm" then
         towerData.FarmIncomeEarned = towerData.FarmIncomeEarned or 0
-        self:UpdateFarmIncomeDisplay(towerModel, towerData)
+        self:UpdateFarmIncomeDisplay(towerModel, towerData, 0)
     end
     self:BroadcastTowerCounts()
     return towerModel
@@ -1631,7 +1809,7 @@ function TowerService:RebuildTowerModel(towerModel, towerData)
     updateTowerAttributes(newModel, towerData)
     ensureHeadGeometry(towerData)
     if towerData.Type == "Farm" then
-        self:UpdateFarmIncomeDisplay(newModel, towerData)
+        self:UpdateFarmIncomeDisplay(newModel, towerData, 0)
     end
 
     if towerModel then

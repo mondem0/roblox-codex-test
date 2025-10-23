@@ -975,9 +975,6 @@ end
 
 function WaveService:GrantFarmIncome(waveNumber)
     local income = self:GetFarmIncomePerWave()
-    if income <= 0 then
-        return
-    end
 
     if not self.TowerService or typeof(self.TowerService.GrantTowerIncome) ~= "function" then
         return

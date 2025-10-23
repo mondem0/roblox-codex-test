@@ -2419,20 +2419,38 @@ local function ensureHoverGui()
 end
 
 local function cloneStats(config)
-	local stats = {}
-	for key, value in pairs(config) do
-		if key ~= "Upgrades" then
-			stats[key] = value
-		end
-	end
-	return stats
+        local stats = {}
+        for key, value in pairs(config) do
+                if key ~= "Upgrades" then
+                        stats[key] = value
+                end
+        end
+        return stats
+end
+
+local function formatCurrency(amount)
+        local numeric = tonumber(amount) or 0
+        local rounded = math.floor(numeric + 0.5)
+        local sign = ""
+        if rounded < 0 then
+                sign = "-"
+                rounded = math.abs(rounded)
+        end
+
+        local formatted = tostring(rounded)
+        local k
+        repeat
+                formatted, k = formatted:gsub("^(%d+)(%d%d%d)", "%1,%2")
+        until k == 0
+
+        return string.format("%s$%s", sign, formatted)
 end
 
 local function applyUpgrade(stats, upgrade)
-	if not upgrade then
-		return
-	end
-	for key, value in pairs(upgrade) do
+        if not upgrade then
+                return
+        end
+        for key, value in pairs(upgrade) do
 		if key ~= "Cost" and key ~= "Description" then
 			stats[key] = value
 		end
@@ -2710,14 +2728,17 @@ local function updateTowerDetails(towerModel)
 		if stats.Damage then
 			table.insert(lines, string.format("Damage: %d", stats.Damage))
 		end
-		if stats.FireRate then
-			table.insert(lines, string.format("Fire Rate: %.2fs", stats.FireRate))
-		end
-		if stats.SplashRadius then
-			table.insert(lines, string.format("Splash Radius: %.1f", stats.SplashRadius))
-		end
+                if stats.FireRate then
+                        table.insert(lines, string.format("Fire Rate: %.2fs", stats.FireRate))
+                end
+                if stats.SplashRadius then
+                        table.insert(lines, string.format("Splash Radius: %.1f", stats.SplashRadius))
+                end
                 if stats.SlowPercent then
                         table.insert(lines, string.format("Slow: %d%% for %.1fs", math.floor(stats.SlowPercent * 100 + 0.5), stats.SlowDuration or 0))
+                end
+                if stats.IncomePerWave and stats.IncomePerWave > 0 then
+                        table.insert(lines, string.format("Income: %s per wave", formatCurrency(stats.IncomePerWave)))
                 end
                 towerStatsLabel.Text = table.concat(lines, "\n")
         elseif towerStatsLabel then
