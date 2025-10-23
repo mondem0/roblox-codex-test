@@ -118,13 +118,39 @@ local function getPlacementPartSet(towerType)
 end
 
 local function hideTowerBase(basePart)
-    if not (basePart and basePart:IsA("BasePart")) then
+    if not basePart then
+        return
+    end
+
+    if basePart:IsA("Model") then
+        local primary = basePart.PrimaryPart or basePart:FindFirstChildWhichIsA("BasePart")
+        if primary then
+            hideTowerBase(primary)
+        end
+        return
+    end
+
+    if not basePart:IsA("BasePart") then
         return
     end
 
     basePart.Transparency = 1
     basePart.CastShadow = false
     basePart.CanCollide = false
+    basePart.CanTouch = false
+    basePart.CanQuery = false
+
+    for _, descendant in ipairs(basePart:GetDescendants()) do
+        if descendant:IsA("BasePart") then
+            descendant.Transparency = 1
+            descendant.CastShadow = false
+            descendant.CanCollide = false
+            descendant.CanTouch = false
+            descendant.CanQuery = false
+        elseif descendant:IsA("Decal") or descendant:IsA("Texture") then
+            descendant.Transparency = 1
+        end
+    end
 end
 
 local function matchesAllowedPlacementPart(instance, mapModel, allowedParts)
@@ -390,6 +416,17 @@ local function getTowerPrimaryPart(model)
     return model:FindFirstChildWhichIsA("BasePart")
 end
 
+local function hideTowerBaseForModel(model)
+    if not model then
+        return
+    end
+
+    local base = getTowerPrimaryPart(model)
+    if base then
+        hideTowerBase(base)
+    end
+end
+
 local function stopAndDestroySound(sound)
     if not sound then
         return
@@ -519,7 +556,6 @@ local function prepareTowerModelFromTemplate(template, towerConfig, towerType)
 
     if base then
         base.CanCollide = false
-        hideTowerBase(base)
         TowerFootprints[towerType] = TowerFootprints[towerType] or sanitizeBaseSize(base.Size)
     end
     if head and head:IsA("BasePart") then
@@ -548,10 +584,15 @@ function TowerService.new(mapModel, waveService, remotes)
         waveService:SetTowerService(self)
     end
 
-    if not workspace:FindFirstChild("Towers") then
-        local towersFolder = Instance.new("Folder")
+    local towersFolder = workspace:FindFirstChild("Towers")
+    if not towersFolder then
+        towersFolder = Instance.new("Folder")
         towersFolder.Name = "Towers"
         towersFolder.Parent = workspace
+    end
+
+    for _, existingTower in ipairs(towersFolder:GetChildren()) do
+        hideTowerBaseForModel(existingTower)
     end
 
     self:BroadcastTowerCounts()
@@ -666,7 +707,6 @@ local function buildTowerModel(towerType, overrideConfig)
     base.Color = Color3.fromRGB(40, 40, 40)
     base.CanCollide = false
     base.Parent = model
-    hideTowerBase(base)
 
     local head = Instance.new("Part")
     head.Name = "Head"
@@ -987,6 +1027,8 @@ function TowerService:AddTower(player, towerType, position)
     if towerModel.PrimaryPart ~= primary then
         towerModel.PrimaryPart = primary
     end
+
+    hideTowerBaseForModel(towerModel)
 
     TowerFootprints[towerType] = TowerFootprints[towerType] or sanitizeBaseSize(primary.Size)
 
@@ -1464,6 +1506,8 @@ function TowerService:RebuildTowerModel(towerModel, towerData)
     elseif oldCFrame then
         newModel:PivotTo(oldCFrame)
     end
+
+    hideTowerBaseForModel(newModel)
 
     self.Towers[towerModel] = nil
     towerData.Model = newModel
