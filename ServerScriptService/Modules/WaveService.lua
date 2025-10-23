@@ -2,6 +2,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EnemyConfigs = require(ReplicatedStorage.Modules.Config.EnemyConfigs)
 local WaveConfigs = require(ReplicatedStorage.Modules.Config.WaveConfigs)
+local TowerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
 local PathService = require(ReplicatedStorage.Modules.PathService)
 local SoundEffects = require(script.Parent.SoundEffects)
 local RunService = game:GetService("RunService")
@@ -48,6 +49,25 @@ local function sanitizeFarmIncome(value)
 
     return numeric
 end
+
+local function getConfiguredFarmIncome()
+    if type(TowerConfigs) ~= "table" then
+        return 0
+    end
+
+    local farmConfig = TowerConfigs.Farm
+    if type(farmConfig) ~= "table" then
+        return 0
+    end
+
+    if farmConfig.IncomePerWave == nil then
+        return 0
+    end
+
+    return sanitizeFarmIncome(farmConfig.IncomePerWave)
+end
+
+DEFAULT_FARM_INCOME_PER_WAVE = getConfiguredFarmIncome()
 
 function WaveService:BuildOverridePath(enemyModel, enemyData, targetProgress, abilityConfig)
     if not (enemyModel and enemyData) then

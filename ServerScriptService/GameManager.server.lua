@@ -67,10 +67,6 @@ if GameConfig then
     if GameConfig.StartingMoney ~= nil then
         waveSettings.StartingMoney = GameConfig.StartingMoney
     end
-    if GameConfig.FarmIncomePerWave ~= nil then
-        waveSettings.FarmIncomePerWave = GameConfig.FarmIncomePerWave
-    end
-
     if not next(waveSettings) then
         waveSettings = nil
     end

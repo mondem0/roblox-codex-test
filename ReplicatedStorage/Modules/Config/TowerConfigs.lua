@@ -158,6 +158,7 @@ local TowerConfigs = {
         Range = 0,
         Damage = 0,
         FireRate = 10,
+        IncomePerWave = 125,
         Description = "Generates bonus cash at the start of each wave.",
     }
 }
