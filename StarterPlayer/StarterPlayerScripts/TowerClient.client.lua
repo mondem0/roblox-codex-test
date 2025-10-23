@@ -106,13 +106,15 @@ local lobbyReadyState = false
 local lobbyRoundList
 local loadoutLocked = false
 
-local mapSelectionGui
-local mapSelectionFrame
-local mapOptionButtons = {}
-local mapVoteLabels = {}
-local mapVoteTotalPlayers = 0
-local mapSelectionStatusLabel
-local mapOptionsContainer
+local mapSelectionState = {
+        gui = nil,
+        frame = nil,
+        optionButtons = {},
+        voteLabels = {},
+        totalPlayers = 0,
+        statusLabel = nil,
+        optionsContainer = nil,
+}
 
 local preRoundCountdownLabel
 
@@ -1692,8 +1694,8 @@ local function updateInterfaceVisibility()
                 selectionScreenGui.Enabled = lobbyPhase == "lobby"
         end
 
-        if mapSelectionGui then
-                mapSelectionGui.Enabled = lobbyPhase == "mapSelection"
+        if mapSelectionState.gui then
+                mapSelectionState.gui.Enabled = lobbyPhase == "mapSelection"
         end
 
         if screenGui then
@@ -2097,40 +2099,40 @@ local function applyLobbyState(state)
 end
 
 local function createMapSelectionGui()
-        if mapSelectionGui then
-                return mapSelectionGui
+        if mapSelectionState.gui then
+                return mapSelectionState.gui
         end
 
-        mapSelectionGui = Instance.new("ScreenGui")
-        mapSelectionGui.Name = "MapSelectionUI"
-        mapSelectionGui.ResetOnSpawn = false
-        mapSelectionGui.IgnoreGuiInset = true
-        mapSelectionGui.DisplayOrder = 6
-        mapSelectionGui.Enabled = false
-        mapSelectionGui.Parent = playerGui
+        mapSelectionState.gui = Instance.new("ScreenGui")
+        mapSelectionState.gui.Name = "MapSelectionUI"
+        mapSelectionState.gui.ResetOnSpawn = false
+        mapSelectionState.gui.IgnoreGuiInset = true
+        mapSelectionState.gui.DisplayOrder = 6
+        mapSelectionState.gui.Enabled = false
+        mapSelectionState.gui.Parent = playerGui
 
-        mapSelectionFrame = Instance.new("Frame")
-        mapSelectionFrame.Name = "MapSelectionFrame"
-        mapSelectionFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-        mapSelectionFrame.Size = UDim2.fromScale(0.8, 0.7)
-        mapSelectionFrame.Position = UDim2.fromScale(0.5, 0.5)
-        mapSelectionFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-        mapSelectionFrame.BackgroundTransparency = 0.1
-        mapSelectionFrame.BorderSizePixel = 0
-        mapSelectionFrame.Parent = mapSelectionGui
+        mapSelectionState.frame = Instance.new("Frame")
+        mapSelectionState.frame.Name = "MapSelectionFrame"
+        mapSelectionState.frame.AnchorPoint = Vector2.new(0.5, 0.5)
+        mapSelectionState.frame.Size = UDim2.fromScale(0.8, 0.7)
+        mapSelectionState.frame.Position = UDim2.fromScale(0.5, 0.5)
+        mapSelectionState.frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        mapSelectionState.frame.BackgroundTransparency = 0.1
+        mapSelectionState.frame.BorderSizePixel = 0
+        mapSelectionState.frame.Parent = mapSelectionState.gui
 
         local frameCorner = Instance.new("UICorner")
         frameCorner.CornerRadius = UDim.new(0.03, 0)
-        frameCorner.Parent = mapSelectionFrame
+        frameCorner.Parent = mapSelectionState.frame
 
         local mapFrameConstraint = Instance.new("UIAspectRatioConstraint")
         mapFrameConstraint.AspectRatio = 720 / 420
         mapFrameConstraint.DominantAxis = Enum.DominantAxis.Width
-        mapFrameConstraint.Parent = mapSelectionFrame
+        mapFrameConstraint.Parent = mapSelectionState.frame
 
         local mapSizeConstraint = Instance.new("UISizeConstraint")
         mapSizeConstraint.MinSize = Vector2.new(600, 360)
-        mapSizeConstraint.Parent = mapSelectionFrame
+        mapSizeConstraint.Parent = mapSelectionState.frame
 
         local title = Instance.new("TextLabel")
         title.Name = "MapSelectionTitle"
@@ -2143,55 +2145,55 @@ local function createMapSelectionGui()
         title.TextColor3 = Color3.new(1, 1, 1)
         title.TextXAlignment = Enum.TextXAlignment.Left
         title.Text = "Vote for a Map"
-        title.Parent = mapSelectionFrame
+        title.Parent = mapSelectionState.frame
         applyScaledText(title, 18, 42)
 
-        mapSelectionStatusLabel = Instance.new("TextLabel")
-        mapSelectionStatusLabel.Name = "StatusLabel"
-        mapSelectionStatusLabel.AnchorPoint = Vector2.new(0, 0)
-        mapSelectionStatusLabel.Size = UDim2.new(0.94, 0, 0.1, 0)
-        mapSelectionStatusLabel.Position = UDim2.new(0.03, 0, 0.22, 0)
-        mapSelectionStatusLabel.BackgroundTransparency = 1
-        mapSelectionStatusLabel.Font = Enum.Font.Gotham
-        mapSelectionStatusLabel.TextSize = 18
-        mapSelectionStatusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-        mapSelectionStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-        mapSelectionStatusLabel.Text = "Choose one of the available battlegrounds."
-        mapSelectionStatusLabel.Parent = mapSelectionFrame
-        applyScaledText(mapSelectionStatusLabel, 14, 30)
+        mapSelectionState.statusLabel = Instance.new("TextLabel")
+        mapSelectionState.statusLabel.Name = "StatusLabel"
+        mapSelectionState.statusLabel.AnchorPoint = Vector2.new(0, 0)
+        mapSelectionState.statusLabel.Size = UDim2.new(0.94, 0, 0.1, 0)
+        mapSelectionState.statusLabel.Position = UDim2.new(0.03, 0, 0.22, 0)
+        mapSelectionState.statusLabel.BackgroundTransparency = 1
+        mapSelectionState.statusLabel.Font = Enum.Font.Gotham
+        mapSelectionState.statusLabel.TextSize = 18
+        mapSelectionState.statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        mapSelectionState.statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+        mapSelectionState.statusLabel.Text = "Choose one of the available battlegrounds."
+        mapSelectionState.statusLabel.Parent = mapSelectionState.frame
+        applyScaledText(mapSelectionState.statusLabel, 14, 30)
 
-        mapOptionsContainer = Instance.new("Frame")
-        mapOptionsContainer.Name = "OptionsContainer"
-        mapOptionsContainer.AnchorPoint = Vector2.new(0, 0)
-        mapOptionsContainer.Size = UDim2.new(0.94, 0, 0.68, 0)
-        mapOptionsContainer.Position = UDim2.new(0.03, 0, 0.32, 0)
-        mapOptionsContainer.BackgroundTransparency = 1
-        mapOptionsContainer.Parent = mapSelectionFrame
+        mapSelectionState.optionsContainer = Instance.new("Frame")
+        mapSelectionState.optionsContainer.Name = "OptionsContainer"
+        mapSelectionState.optionsContainer.AnchorPoint = Vector2.new(0, 0)
+        mapSelectionState.optionsContainer.Size = UDim2.new(0.94, 0, 0.68, 0)
+        mapSelectionState.optionsContainer.Position = UDim2.new(0.03, 0, 0.32, 0)
+        mapSelectionState.optionsContainer.BackgroundTransparency = 1
+        mapSelectionState.optionsContainer.Parent = mapSelectionState.frame
 
         local layout = Instance.new("UIListLayout")
         layout.FillDirection = Enum.FillDirection.Horizontal
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         layout.Padding = UDim.new(0.04, 0)
-        layout.Parent = mapOptionsContainer
+        layout.Parent = mapSelectionState.optionsContainer
 
-        return mapSelectionGui
+        return mapSelectionState.gui
 end
 
 local function clearMapOptions()
-        for _, button in ipairs(mapOptionButtons) do
+        for _, button in ipairs(mapSelectionState.optionButtons) do
                 if button then
                         button:Destroy()
                 end
         end
-        mapOptionButtons = {}
-        mapVoteLabels = {}
+        mapSelectionState.optionButtons = {}
+        mapSelectionState.voteLabels = {}
 end
 
 local function showMapSelection(options, totalPlayers)
         createMapSelectionGui()
         clearMapOptions()
 
-        mapVoteTotalPlayers = totalPlayers or 0
+        mapSelectionState.totalPlayers = totalPlayers or 0
 
         for index, option in ipairs(options or {}) do
                 local container = Instance.new("Frame")
@@ -2200,7 +2202,7 @@ local function showMapSelection(options, totalPlayers)
                 container.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
                 container.BackgroundTransparency = 0.05
                 container.BorderSizePixel = 0
-                container.Parent = mapOptionsContainer
+                container.Parent = mapSelectionState.optionsContainer
 
                 local corner = Instance.new("UICorner")
                 corner.CornerRadius = UDim.new(0.05, 0)
@@ -2258,8 +2260,8 @@ local function showMapSelection(options, totalPlayers)
                 voteLabel.Font = Enum.Font.Gotham
                 voteLabel.TextSize = 16
                 voteLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-                if mapVoteTotalPlayers > 0 then
-                        voteLabel.Text = string.format("0 / %d votes", mapVoteTotalPlayers)
+                if mapSelectionState.totalPlayers > 0 then
+                        voteLabel.Text = string.format("0 / %d votes", mapSelectionState.totalPlayers)
                 else
                         voteLabel.Text = "0 votes"
                 end
@@ -2272,33 +2274,33 @@ local function showMapSelection(options, totalPlayers)
                         end
                 end)
 
-                mapOptionButtons[index] = {
+                mapSelectionState.optionButtons[index] = {
                         Container = container,
                         Button = voteButton,
                         Option = option,
                 }
-                mapVoteLabels[index] = voteLabel
+                mapSelectionState.voteLabels[index] = voteLabel
         end
 
-        if mapSelectionStatusLabel then
+        if mapSelectionState.statusLabel then
                 if totalPlayers and totalPlayers > 0 then
-                        mapSelectionStatusLabel.Text = string.format("Vote for a map (%d players)", totalPlayers)
+                        mapSelectionState.statusLabel.Text = string.format("Vote for a map (%d players)", totalPlayers)
                 else
-                        mapSelectionStatusLabel.Text = "Vote for a map"
+                        mapSelectionState.statusLabel.Text = "Vote for a map"
                 end
         end
 
-        mapSelectionGui.Enabled = true
+        mapSelectionState.gui.Enabled = true
 end
 
 local function updateMapVoteCounts(counts, totalPlayers)
         if totalPlayers then
-                mapVoteTotalPlayers = totalPlayers
+                mapSelectionState.totalPlayers = totalPlayers
         end
 
-        local displayTotal = mapVoteTotalPlayers or 0
+        local displayTotal = mapSelectionState.totalPlayers or 0
 
-        for index, label in pairs(mapVoteLabels) do
+        for index, label in pairs(mapSelectionState.voteLabels) do
                 local votes = counts and counts[index] or 0
                 if label then
                         if displayTotal > 0 then
@@ -2311,7 +2313,7 @@ local function updateMapVoteCounts(counts, totalPlayers)
 end
 
 local function finalizeMapSelection(selectedIndex, option)
-        for index, entry in ipairs(mapOptionButtons) do
+        for index, entry in ipairs(mapSelectionState.optionButtons) do
                 if entry.Button then
                         entry.Button.Active = false
                         entry.Button.AutoButtonColor = false
@@ -2324,11 +2326,11 @@ local function finalizeMapSelection(selectedIndex, option)
                 end
         end
 
-        if mapSelectionStatusLabel then
+        if mapSelectionState.statusLabel then
                 if option and option.Name then
-                        mapSelectionStatusLabel.Text = string.format("%s will be loaded.", option.Name)
+                        mapSelectionState.statusLabel.Text = string.format("%s will be loaded.", option.Name)
                 else
-                        mapSelectionStatusLabel.Text = "Map selected."
+                        mapSelectionState.statusLabel.Text = "Map selected."
                 end
         end
 end
@@ -3667,8 +3669,8 @@ if remotes:FindFirstChild("RoundSetupComplete") then
         remotes.RoundSetupComplete.OnClientEvent:Connect(function(payload)
                 lobbyPhase = "inRound"
                 updateInterfaceVisibility()
-                if mapSelectionGui then
-                        mapSelectionGui.Enabled = false
+                if mapSelectionState.gui then
+                        mapSelectionState.gui.Enabled = false
                 end
                 createGui()
                 applyLoadoutToShop()
