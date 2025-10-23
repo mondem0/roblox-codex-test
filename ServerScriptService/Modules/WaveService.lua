@@ -966,7 +966,7 @@ function WaveService:ScheduleSkipOffer(waveNumber)
         if self.SkipWaveRequested then
             return
         end
-        if self:IsWaveComplete() then
+        if self:IsWaveComplete(waveNumber) then
             return
         end
 
@@ -1504,7 +1504,7 @@ function WaveService:CheckForAutoAdvance()
         return
     end
 
-    if not self:IsWaveComplete() then
+    if not self:IsWaveComplete(self.ActiveWave) then
         return
     end
 
@@ -1524,15 +1524,26 @@ function WaveService:ClearSpawnStates()
     self.HighestCompletedWave = 0
 end
 
-function WaveService:IsWaveComplete()
+function WaveService:IsWaveComplete(waveNumber)
     if self.GameEnded then
         return false
     end
-    if (self.ActiveSpawnCount or 0) > 0 then
+
+    local activeWave = waveNumber or self.ActiveWave
+    if not activeWave or activeWave <= 0 then
         return false
     end
 
-    for _ in pairs(self.Enemies) do
+    local record = getWaveRecord(self, activeWave, false)
+    if not record then
+        return (self.HighestCompletedWave or 0) >= activeWave
+    end
+
+    if record.Spawning then
+        return false
+    end
+
+    if (record.EnemiesAlive or 0) > 0 then
         return false
     end
 
