@@ -665,6 +665,16 @@ local function cleanupTowerBaseState(basePart)
                 return
         end
 
+        if basePart and basePart.Parent then
+                if state.OriginalTransparency ~= nil then
+                        basePart.Transparency = state.OriginalTransparency
+                end
+
+                if state.OriginalLocalTransparency ~= nil then
+                        basePart.LocalTransparencyModifier = state.OriginalLocalTransparency
+                end
+        end
+
         if state.Connection then
                 state.Connection:Disconnect()
         end
@@ -700,8 +710,13 @@ local function ensureBaseState(basePart)
                 return state
         end
 
+        local originalTransparency = basePart.Transparency or 0
+        local originalLocalTransparency = basePart.LocalTransparencyModifier or 0
+
         state = {
-                OriginalLocalTransparency = basePart.LocalTransparencyModifier,
+                OriginalTransparency = originalTransparency,
+                OriginalLocalTransparency = originalLocalTransparency,
+                HiddenLocalTransparency = math.clamp(1 - originalTransparency, 0, 1),
         }
 
         state.Connection = basePart.AncestryChanged:Connect(function(_, parent)
@@ -716,29 +731,6 @@ local function ensureBaseState(basePart)
         return state
 end
 
-local function getPlacementTransparencyModifier(basePart)
-        if not basePart then
-                return TOWER_BASE_PLACEMENT_TRANSPARENCY
-        end
-
-        local desiredTransparency = TOWER_BASE_PLACEMENT_TRANSPARENCY
-        local baseTransparency = basePart.Transparency or 0
-        local modifier = desiredTransparency - baseTransparency
-
-        return math.clamp(modifier, -1, 1)
-end
-
-local function getHiddenTransparencyModifier(basePart)
-        if not basePart then
-                return 1
-        end
-
-        local baseTransparency = basePart.Transparency or 0
-        local modifier = 1 - baseTransparency
-
-        return math.clamp(modifier, -1, 1)
-end
-
 local function applyBaseVisibilityToPart(basePart)
         local state = ensureBaseState(basePart)
         if not state then
@@ -746,9 +738,15 @@ local function applyBaseVisibilityToPart(basePart)
         end
 
         if towerBaseTracker.enabled then
-                basePart.LocalTransparencyModifier = getPlacementTransparencyModifier(basePart)
+                basePart.Transparency = TOWER_BASE_PLACEMENT_TRANSPARENCY
+                basePart.LocalTransparencyModifier = 0
         else
-                basePart.LocalTransparencyModifier = getHiddenTransparencyModifier(basePart)
+                if state.OriginalTransparency ~= nil then
+                        basePart.Transparency = state.OriginalTransparency
+                end
+
+                local hiddenModifier = state.HiddenLocalTransparency or 1
+                basePart.LocalTransparencyModifier = hiddenModifier
         end
 end
 
