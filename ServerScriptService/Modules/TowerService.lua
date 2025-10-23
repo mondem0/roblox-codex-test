@@ -13,43 +13,6 @@ local PLACEMENT_EDGE_EPSILON = 0.01
 local DEFAULT_PLACEMENT_SURFACE = "ground"
 local CLIFF_PLACEMENT_SURFACE = "cliff"
 
-local function shouldIgnoreForGround(instance, ground)
-    if not instance then
-        return true
-    end
-
-    if instance == workspace.Terrain then
-        return false
-    end
-
-    if ground then
-        if instance == ground or instance:IsDescendantOf(ground) then
-            return false
-        end
-
-        -- When a dedicated ground container exists, treat every other
-        -- collision as scenery so the ray can keep searching for a valid
-        -- PathGround hit beneath overhangs or cliff parts.
-        return true
-    end
-
-    if instance:IsA("BasePart") then
-        if instance.CanCollide then
-            return false
-        end
-
-        if instance.Transparency and instance.Transparency >= 0.95 then
-            return true
-        end
-
-        if not instance.CanCollide then
-            return true
-        end
-    end
-
-    return not instance:IsA("BasePart")
-end
-
 local function normalizePlacementSurfaceValue(value)
     if typeof(value) == "string" then
         local lowered = string.lower(value)
@@ -185,7 +148,7 @@ local function matchesAllowedPlacementPart(instance, mapModel, allowedParts)
     return false
 end
 
-local function isAllowedPlacementHit(instance, mapModel, ground, placementSurface, allowedPlacementParts)
+local function isValidPlacementSurface(instance, mapModel, ground, placementSurface, allowedPlacementParts)
     if not instance then
         return false
     end
@@ -235,54 +198,6 @@ local function isAllowedPlacementHit(instance, mapModel, ground, placementSurfac
     end
 
     return false
-end
-
-local function shouldIgnorePlacementHit(instance, mapModel, ground, placementSurface, allowedPlacementParts)
-    if not instance then
-        return true
-    end
-
-    if allowedPlacementParts and next(allowedPlacementParts) then
-        if matchesAllowedPlacementPart(instance, mapModel, allowedPlacementParts) then
-            return false
-        end
-
-        if instance == workspace.Terrain then
-            return false
-        end
-
-        if instance:IsA("BasePart") then
-            if instance.CanCollide and (not instance.Transparency or instance.Transparency < 0.95) then
-                return false
-            end
-
-            return true
-        end
-
-        return true
-    end
-
-    if placementSurface == CLIFF_PLACEMENT_SURFACE then
-        if ground and (instance == ground or instance:IsDescendantOf(ground)) then
-            return true
-        end
-
-        if instance == workspace.Terrain then
-            return false
-        end
-
-        if instance:IsA("BasePart") then
-            if instance.CanCollide and (not instance.Transparency or instance.Transparency < 0.95) then
-                return false
-            end
-
-            return true
-        end
-
-        return true
-    end
-
-    return shouldIgnoreForGround(instance, ground)
 end
 local TowerFootprints = {}
 local TowerLimits = {}
@@ -939,104 +854,93 @@ function TowerService:HasReachedTowerLimit(player, towerType)
 end
 
 function TowerService:IsPlacementValid(position, towerType)
-        if not position then
-                return false
-        end
+    if not position then
+        return false
+    end
 
-        local map = workspace:FindFirstChild("Map")
-        if not map then
-                return false
-        end
+    local map = workspace:FindFirstChild("Map")
+    if not map then
+        return false
+    end
 
-        local ground = map:FindFirstChild("PathGround")
-        local placementSurface = getPlacementSurface(towerType)
-        local allowedPlacementParts = getPlacementPartSet(towerType)
-        if (not allowedPlacementParts or not next(allowedPlacementParts)) and placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
+    local ground = map:FindFirstChild("PathGround")
+    local placementSurface = getPlacementSurface(towerType)
+    local allowedPlacementParts = getPlacementPartSet(towerType)
+    if (not allowedPlacementParts or not next(allowedPlacementParts)) and placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
+        return false
+    end
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.IgnoreWater = true
+
+    local ignoreList = {}
+    local towersFolderInstance = workspace:FindFirstChild("Towers")
+    if towersFolderInstance then
+        table.insert(ignoreList, towersFolderInstance)
+    end
+
+    params.FilterDescendantsInstances = ignoreList
+
+    local rayOrigin = Vector3.new(position.X, position.Y + 200, position.Z)
+    local rayDirection = Vector3.new(0, -400, 0)
+    local result
+
+    for _ = 1, 10 do
+        result = workspace:Raycast(rayOrigin, rayDirection, params)
+        if not result then
             return false
         end
 
-        local candidateSize = getTowerBaseSize(towerType)
-        local candidateHalfX = math.max(0.05, candidateSize.X / 2)
-        local candidateHalfZ = math.max(0.05, candidateSize.Z / 2)
-
-        local resolvedPosition = Vector3.new(position.X, position.Y, position.Z)
-
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Blacklist
-        params.IgnoreWater = true
-
-        local ignoreList = {}
-        local towersFolderInstance = workspace:FindFirstChild("Towers")
-        if towersFolderInstance then
-                table.insert(ignoreList, towersFolderInstance)
+        local instance = result.Instance
+        if instance and instance:IsA("BasePart") then
+            if instance.CanCollide ~= false and (not instance.Transparency or instance.Transparency < 0.95) then
+                break
+            end
         end
 
-        params.FilterDescendantsInstances = ignoreList
-
-        local rayOrigin = Vector3.new(position.X, position.Y + 200, position.Z)
-        local rayDirection = Vector3.new(0, -400, 0)
-        local result
-        local finalResult
-
-        for _ = 1, 10 do
-                result = workspace:Raycast(rayOrigin, rayDirection, params)
-                if not result then
-                        return false
-                end
-
-                local allowedHit = isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts)
-                local normal = result.Normal
-                local normalY = normal and normal.Y or 0
-
-                if allowedHit then
-                        resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
-                        finalResult = result
-                        break
-                end
-
-                if normalY > 0.05 then
-                        local instance = result.Instance
-                        if instance and instance:IsA("BasePart") and instance.CanCollide then
-                                return false
-                        end
-                end
-
-                local skipUnderside = normalY < 0
-
-                if not skipUnderside and not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
-                        return false
-                end
-
-                table.insert(ignoreList, result.Instance)
-                params.FilterDescendantsInstances = ignoreList
-                rayOrigin = result.Position - Vector3.new(0, 0.05, 0)
+        if instance then
+            table.insert(ignoreList, instance)
+            params.FilterDescendantsInstances = ignoreList
         end
+        rayOrigin = result.Position - Vector3.new(0, 0.05, 0)
+    end
 
-    if not finalResult then
+    if not result or not result.Instance then
         return false
     end
+
+    if not isValidPlacementSurface(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
+        return false
+    end
+
+    local resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
+
+    local candidateSize = getTowerBaseSize(towerType)
+    local candidateHalfX = math.max(0.05, candidateSize.X / 2)
+    local candidateHalfZ = math.max(0.05, candidateSize.Z / 2)
 
     local towersFolder = workspace:FindFirstChild("Towers")
     if towersFolder then
         for _, tower in ipairs(towersFolder:GetChildren()) do
-                        local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
-                        if primary then
-                                local otherPos = primary.Position
-                                local otherSize = sanitizeBaseSize(primary.Size)
-                                local otherHalfX = math.max(0.05, otherSize.X / 2)
-                                local otherHalfZ = math.max(0.05, otherSize.Z / 2)
-                                local deltaX = math.abs(otherPos.X - resolvedPosition.X)
-                                local deltaZ = math.abs(otherPos.Z - resolvedPosition.Z)
-                                local limitX = otherHalfX + candidateHalfX + PLACEMENT_EDGE_EPSILON
-                                local limitZ = otherHalfZ + candidateHalfZ + PLACEMENT_EDGE_EPSILON
-                                if deltaX <= limitX and deltaZ <= limitZ then
-                                        return false
-                                end
-                        end
+            local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
+            if primary then
+                local otherPos = primary.Position
+                local otherSize = sanitizeBaseSize(primary.Size)
+                local otherHalfX = math.max(0.05, otherSize.X / 2)
+                local otherHalfZ = math.max(0.05, otherSize.Z / 2)
+                local deltaX = math.abs(otherPos.X - resolvedPosition.X)
+                local deltaZ = math.abs(otherPos.Z - resolvedPosition.Z)
+                local limitX = otherHalfX + candidateHalfX + PLACEMENT_EDGE_EPSILON
+                local limitZ = otherHalfZ + candidateHalfZ + PLACEMENT_EDGE_EPSILON
+                if deltaX <= limitX and deltaZ <= limitZ then
+                    return false
                 end
+            end
         end
+    end
 
-        return true, resolvedPosition
+    return true, resolvedPosition
 end
 
 function TowerService:AddTower(player, towerType, position)

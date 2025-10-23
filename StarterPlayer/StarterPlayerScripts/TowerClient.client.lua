@@ -272,7 +272,7 @@ local function matchesAllowedPlacementPart(instance, mapModel, allowedParts)
         return false
 end
 
-local function isAllowedPlacementHit(instance, mapModel, ground, placementSurface, allowedPlacementParts)
+local function isValidPlacementSurface(instance, mapModel, ground, placementSurface, allowedPlacementParts)
         if not instance then
                 return false
         end
@@ -322,82 +322,6 @@ local function isAllowedPlacementHit(instance, mapModel, ground, placementSurfac
         end
 
         return false
-end
-
-local function shouldIgnorePlacementHit(instance, mapModel, ground, placementSurface, allowedPlacementParts)
-        if not instance then
-                return true
-        end
-
-        if allowedPlacementParts and next(allowedPlacementParts) then
-                if matchesAllowedPlacementPart(instance, mapModel, allowedPlacementParts) then
-                        return false
-                end
-
-                if instance == workspace.Terrain then
-                        return false
-                end
-
-                if instance:IsA("BasePart") then
-                        if instance.CanCollide and (not instance.Transparency or instance.Transparency < 0.95) then
-                                return false
-                        end
-
-                        return true
-                end
-
-                return true
-        end
-
-        if placementSurface == CLIFF_PLACEMENT_SURFACE then
-                if ground and (instance == ground or instance:IsDescendantOf(ground)) then
-                        return true
-                end
-
-                if instance == workspace.Terrain then
-                        return false
-                end
-
-                if instance:IsA("BasePart") then
-                        if instance.CanCollide and (not instance.Transparency or instance.Transparency < 0.95) then
-                                return false
-                        end
-
-                        return true
-                end
-
-                return true
-        end
-
-        if instance == workspace.Terrain then
-                return false
-        end
-
-        if ground then
-                if instance == ground or instance:IsDescendantOf(ground) then
-                        return false
-                end
-
-                -- Ignore any other scenery so the ray can keep searching for a
-                -- PathGround hit below overhangs.
-                return true
-        end
-
-        if instance:IsA("BasePart") then
-                if instance.CanCollide then
-                        return false
-                end
-
-                if instance.Transparency and instance.Transparency >= 0.95 then
-                        return true
-                end
-
-                if not instance.CanCollide then
-                        return true
-                end
-        end
-
-        return not instance:IsA("BasePart")
 end
 
 local function updateStartButtonVisual()
@@ -3214,34 +3138,27 @@ local function findPlacementSurface(position, towerType)
                         return nil
                 end
 
-                local allowedHit = isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts)
-                local normal = result.Normal
-                local normalY = normal and normal.Y or 0
+                local instance = result.Instance
+                if instance and instance:IsA("BasePart") then
+                        if instance.CanCollide ~= false and (not instance.Transparency or instance.Transparency < 0.95) then
+                                if isValidPlacementSurface(instance, map, ground, placementSurface, allowedPlacementParts) then
+                                        return result
+                                end
 
-                if allowedHit then
-                        return result
-                end
-
-                if normalY > 0.05 then
-                        local instance = result.Instance
-                        if instance and instance:IsA("BasePart") and instance.CanCollide then
                                 return nil
                         end
                 end
 
-                local skipUnderside = normalY < 0
-
-                if not skipUnderside and not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
-                        return nil
+                if instance then
+                        table.insert(ignoreList, instance)
+                        params.FilterDescendantsInstances = ignoreList
                 end
-
-                table.insert(ignoreList, result.Instance)
-                params.FilterDescendantsInstances = ignoreList
                 origin = result.Position - Vector3.new(0, 0.05, 0)
         end
 
         return nil
 end
+
 local function isPositionClear(position)
 	local towersFolder = workspace:FindFirstChild("Towers")
 	if not towersFolder then
@@ -3289,49 +3206,27 @@ local function evaluatePlacement(rayResult)
         local placementSurface = getPlacementSurface(placingTowerType)
         local allowedPlacementParts = getPlacementPartSet(placingTowerType)
 
-        if (not allowedPlacementParts or not next(allowedPlacementParts))
-                and placementSurface ~= CLIFF_PLACEMENT_SURFACE
-                and not ground
-        then
+        if (not allowedPlacementParts or not next(allowedPlacementParts)) and placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
                 return false
         end
 
-        local directHitAllowed = isAllowedPlacementHit(
-                hitInstance,
-                map,
-                ground,
-                placementSurface,
-                allowedPlacementParts
-        )
-
-    local normal = rayResult.Normal
-    local normalY = normal and normal.Y or 0
-    if directHitAllowed and normalY <= 0 then
-        return false
-    end
-
-    local groundResult = findPlacementSurface(hitPosition, placingTowerType)
-    if not groundResult then
-        return false
-    end
-
-    if directHitAllowed then
-        local resolvedInstance = groundResult.Instance
-        if resolvedInstance and hitInstance then
-            if resolvedInstance ~= hitInstance
-                                and not hitInstance:IsDescendantOf(resolvedInstance)
-                                and not resolvedInstance:IsDescendantOf(hitInstance)
-                        then
-                                return false
-                        end
-                end
+        if not hitInstance:IsA("BasePart") then
+                return false
         end
 
-        local placementPosition = Vector3.new(
-                groundResult.Position.X,
-                groundResult.Position.Y,
-                groundResult.Position.Z
-        )
+        if hitInstance.CanCollide == false then
+                return false
+        end
+
+        if hitInstance.Transparency and hitInstance.Transparency >= 0.95 then
+                return false
+        end
+
+        if not isValidPlacementSurface(hitInstance, map, ground, placementSurface, allowedPlacementParts) then
+                return false
+        end
+
+        local placementPosition = Vector3.new(hitPosition.X, hitPosition.Y, hitPosition.Z)
 
         if not isPositionClear(placementPosition) then
                 return false
@@ -3339,6 +3234,7 @@ local function evaluatePlacement(rayResult)
 
         return true, placementPosition
 end
+
 local function updatePreview()
 	if not placingTowerType or not previewPart then
 		placementValid = false
