@@ -20,9 +20,9 @@ local FARM_INCOME_BASE_OFFSET = Vector3.new(0, 6, 0)
 local FARM_INCOME_FLOAT_OFFSET = Vector3.new(0, 2.5, 0)
 local FARM_INCOME_TEXT_COLOR = Color3.fromRGB(80, 255, 110)
 local FARM_INCOME_APPEAR_TIME = 0.12
-local FARM_INCOME_FLOAT_TIME = 0.85
-local FARM_INCOME_FADE_DELAY = 0.1
-local FARM_INCOME_FADE_TIME = 0.55
+local FARM_INCOME_FLOAT_TIME = 1.75
+local FARM_INCOME_FADE_DELAY = 0.95
+local FARM_INCOME_FADE_TIME = 0.4
 
 local function formatCurrency(amount)
     local numeric = tonumber(amount)
@@ -564,15 +564,13 @@ function TowerService:EnsureFarmIncomeDisplay(towerModel, towerData)
     return towerData.FarmIncomeLabel
 end
 
-local function formatFarmIncomeBurst(amount, total)
-    local pieces = {}
-    if amount and amount > 0 then
-        table.insert(pieces, string.format("+%s", formatCurrency(amount)))
+local function formatFarmIncomeBurst(amount)
+    local payout = sanitizeIncomeAmount(amount)
+    if not payout or payout <= 0 then
+        return ""
     end
-    if total and total > 0 then
-        table.insert(pieces, string.format("Total %s", formatCurrency(total)))
-    end
-    return table.concat(pieces, "  •  ")
+
+    return string.format("+%s", formatCurrency(payout))
 end
 
 function TowerService:UpdateFarmIncomeDisplay(towerModel, towerData, gainedAmount)
@@ -588,7 +586,6 @@ function TowerService:UpdateFarmIncomeDisplay(towerModel, towerData, gainedAmoun
 
     cleanupFarmIncomeTweens(towerData)
 
-    local earned = towerData.FarmIncomeEarned or 0
     local gain = sanitizeIncomeAmount(gainedAmount) or 0
 
     if gain <= 0 then
@@ -600,7 +597,7 @@ function TowerService:UpdateFarmIncomeDisplay(towerModel, towerData, gainedAmoun
     local baseOffset = towerData.FarmIncomeBaseOffset or FARM_INCOME_BASE_OFFSET
     local floatOffset = baseOffset + FARM_INCOME_FLOAT_OFFSET
 
-    label.Text = formatFarmIncomeBurst(gain, earned)
+    label.Text = formatFarmIncomeBurst(gain)
     label.TextTransparency = 1
     label.TextStrokeTransparency = 1
     billboard.Enabled = true
