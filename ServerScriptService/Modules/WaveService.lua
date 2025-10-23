@@ -1003,6 +1003,9 @@ function WaveService:RequestWaveSkip(player)
         NextWave = nextWave,
     }
 
+    -- Award the skipped wave immediately so players receive the payout as soon as they skip.
+    self:GrantWaveReward(currentWave)
+
     self:ClearSkipOffer("skipped", extra, true)
     local targetWave = (nextWave or (currentWave + 1))
     self:BeginWave(targetWave, false)
