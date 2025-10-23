@@ -373,8 +373,14 @@ local function shouldIgnorePlacementHit(instance, mapModel, ground, placementSur
                 return false
         end
 
-        if instance == ground or (ground and instance:IsDescendantOf(ground)) then
-                return false
+        if ground then
+                if instance == ground or instance:IsDescendantOf(ground) then
+                        return false
+                end
+
+                -- Ignore any other scenery so the ray can keep searching for a
+                -- PathGround hit below overhangs.
+                return true
         end
 
         if instance:IsA("BasePart") then

@@ -18,12 +18,19 @@ local function shouldIgnoreForGround(instance, ground)
         return true
     end
 
-    if instance == ground or (ground and instance:IsDescendantOf(ground)) then
+    if instance == workspace.Terrain then
         return false
     end
 
-    if instance == workspace.Terrain then
-        return false
+    if ground then
+        if instance == ground or instance:IsDescendantOf(ground) then
+            return false
+        end
+
+        -- When a dedicated ground container exists, treat every other
+        -- collision as scenery so the ray can keep searching for a valid
+        -- PathGround hit beneath overhangs or cliff parts.
+        return true
     end
 
     if instance:IsA("BasePart") then
@@ -31,7 +38,7 @@ local function shouldIgnoreForGround(instance, ground)
             return false
         end
 
-        if instance.Transparency >= 0.95 then
+        if instance.Transparency and instance.Transparency >= 0.95 then
             return true
         end
 
