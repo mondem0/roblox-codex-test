@@ -123,7 +123,6 @@ local DEFAULT_PREVIEW_SIZE = Vector3.new(4, 1, 4)
 local previewFootprintSize = DEFAULT_PREVIEW_SIZE
 local footprintCache = {}
 local RANGE_RING_HEIGHT = 0.05
-local MIN_SURFACE_NORMAL_Y = 0.85
 local MAX_GROUND_RAYCAST_ATTEMPTS = 8
 local PLACEMENT_EDGE_EPSILON = 0.01
 local DEFAULT_PLACEMENT_SURFACE = "ground"
@@ -3179,21 +3178,13 @@ local function findPlacementSurface(position, towerType)
                 end
 
                 local allowedHit = isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts)
-                local shouldContinue = false
 
                 if allowedHit then
-                        local normal = result.Normal
-                        if normal and normal.Y >= MIN_SURFACE_NORMAL_Y then
-                                return result
-                        else
-                                shouldContinue = true
-                        end
+                        return result
                 end
 
-                if not shouldContinue then
-                        if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
-                                return nil
-                        end
+                if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
+                        return nil
                 end
 
                 table.insert(ignoreList, result.Instance)
@@ -3267,23 +3258,12 @@ local function evaluatePlacement(rayResult)
 
     local normal = rayResult.Normal
     local normalY = normal and normal.Y or 0
-    if directHitAllowed then
-        if normalY <= 0 then
-            return false
-        end
-
-        if normalY < MIN_SURFACE_NORMAL_Y then
-            return false
-        end
+    if directHitAllowed and normalY <= 0 then
+        return false
     end
 
     local groundResult = findPlacementSurface(hitPosition, placingTowerType)
     if not groundResult then
-        return false
-    end
-
-    local surfaceNormal = groundResult.Normal
-    if surfaceNormal and surfaceNormal.Y < MIN_SURFACE_NORMAL_Y then
         return false
     end
 

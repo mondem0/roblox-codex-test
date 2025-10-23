@@ -10,7 +10,6 @@ TowerService.__index = TowerService
 local TOWER_BASE_HALF_SIZE = 2
 local DEFAULT_BASE_SIZE = Vector3.new(TOWER_BASE_HALF_SIZE * 2, 1, TOWER_BASE_HALF_SIZE * 2)
 local PLACEMENT_EDGE_EPSILON = 0.01
-local MIN_SURFACE_NORMAL_Y = 0.85
 local DEFAULT_PLACEMENT_SURFACE = "ground"
 local CLIFF_PLACEMENT_SURFACE = "cliff"
 
@@ -979,23 +978,15 @@ function TowerService:IsPlacementValid(position, towerType)
                 end
 
                 local allowedHit = isAllowedPlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts)
-                local shouldContinue = false
 
                 if allowedHit then
-                        local normal = result.Normal
-                        if normal and normal.Y >= MIN_SURFACE_NORMAL_Y then
-                                resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
-                                finalResult = result
-                                break
-                        else
-                                shouldContinue = true
-                        end
+                        resolvedPosition = Vector3.new(result.Position.X, result.Position.Y, result.Position.Z)
+                        finalResult = result
+                        break
                 end
 
-                if not shouldContinue then
-                        if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
-                                return false
-                        end
+                if not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
+                        return false
                 end
 
                 table.insert(ignoreList, result.Instance)
@@ -1004,10 +995,6 @@ function TowerService:IsPlacementValid(position, towerType)
         end
 
     if not finalResult then
-        return false
-    end
-
-    if finalResult.Normal and (finalResult.Normal.Y <= 0 or finalResult.Normal.Y < MIN_SURFACE_NORMAL_Y) then
         return false
     end
 
