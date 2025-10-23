@@ -3222,6 +3222,13 @@ local function findPlacementSurface(position, towerType)
                         return result
                 end
 
+                if normalY > 0.05 then
+                        local instance = result.Instance
+                        if instance and instance:IsA("BasePart") and instance.CanCollide then
+                                return nil
+                        end
+                end
+
                 local skipUnderside = normalY < 0
 
                 if not skipUnderside and not shouldIgnorePlacementHit(result.Instance, map, ground, placementSurface, allowedPlacementParts) then
