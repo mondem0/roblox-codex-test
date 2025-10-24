@@ -1618,6 +1618,26 @@ function TowerService:ChargePlayer(player, amount)
     self.WaveService:AdjustMoney(player, -amount)
 end
 
+function TowerService:AccumulateTowerDamage(towerData, amount)
+    if not towerData then
+        return
+    end
+
+    local numeric = tonumber(amount)
+    if not numeric or numeric <= 0 then
+        return
+    end
+
+    local current = tonumber(towerData.DamageDealt) or 0
+    current += numeric
+    towerData.DamageDealt = current
+
+    local towerModel = towerData.Model
+    if towerModel then
+        towerModel:SetAttribute("DamageDealt", current)
+    end
+end
+
 function TowerService:GetTowerCount(towerType, player)
     if not towerType then
         return 0
@@ -1817,6 +1837,7 @@ function TowerService:AddTower(player, towerType, position)
     local heightOffset = primary.Size.Y / 2
     towerModel:PivotTo(CFrame.new(position.X, position.Y + heightOffset, position.Z))
     towerModel:SetAttribute("PlacementPosition", position)
+    towerModel:SetAttribute("DamageDealt", 0)
 
     if not towerModel:GetAttribute("TemplateModel") then
         if head and head:IsA("BasePart") then
@@ -1837,7 +1858,8 @@ function TowerService:AddTower(player, towerType, position)
         Cooldown = 0,
         Level = 1,
         Invested = towerConfig.Cost,
-        PlacementPosition = position
+        PlacementPosition = position,
+        DamageDealt = 0,
     }
 
     self.Towers[towerModel] = towerData

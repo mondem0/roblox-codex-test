@@ -2649,6 +2649,28 @@ local function formatCurrency(amount)
         return string.format("%s$%s", sign, formatted)
 end
 
+local function formatNumber(amount)
+        local numeric = tonumber(amount) or 0
+        if numeric ~= numeric then
+                return "0"
+        end
+
+        local rounded = math.floor(numeric + 0.5)
+        local sign = ""
+        if rounded < 0 then
+                sign = "-"
+                rounded = math.abs(rounded)
+        end
+
+        local formatted = tostring(rounded)
+        local k
+        repeat
+                formatted, k = formatted:gsub("^(%d+)(%d%d%d)", "%1,%2")
+        until k == 0
+
+        return sign .. formatted
+end
+
 local function applyUpgrade(stats, upgrade)
         if not upgrade then
                 return
@@ -2951,6 +2973,12 @@ local function updateTowerDetails(towerModel)
                 if stats.Damage then
                         table.insert(lines, string.format("Damage: %d", stats.Damage))
                 end
+
+                local damageDealtAttr = towerModel:GetAttribute("DamageDealt")
+                if typeof(damageDealtAttr) ~= "number" then
+                        damageDealtAttr = 0
+                end
+                table.insert(lines, string.format("Damage Dealt: %s", formatNumber(damageDealtAttr)))
 
                 local baseFireRate = stats.FireRate
                 if baseFireRate then
@@ -3584,12 +3612,17 @@ local function selectTower(towerModel)
 					updateTowerDetails(towerModel)
 				end
 			end),
-			towerModel:GetAttributeChangedSignal("SellValue"):Connect(function()
-				if selectionState.tower == towerModel then
-					updateTowerDetails(towerModel)
-				end
-			end)
-		}
+                        towerModel:GetAttributeChangedSignal("SellValue"):Connect(function()
+                                if selectionState.tower == towerModel then
+                                        updateTowerDetails(towerModel)
+                                end
+                        end),
+                        towerModel:GetAttributeChangedSignal("DamageDealt"):Connect(function()
+                                if selectionState.tower == towerModel then
+                                        updateTowerDetails(towerModel)
+                                end
+                        end)
+                }
 end
 
 local function evaluatePlacement(rayResult)

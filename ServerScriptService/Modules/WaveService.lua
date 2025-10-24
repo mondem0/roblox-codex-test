@@ -69,6 +69,33 @@ end
 
 DEFAULT_FARM_INCOME_PER_WAVE = getConfiguredFarmIncome()
 
+local function updateMoneyLeaderstat(player, amount)
+    if not player then
+        return
+    end
+
+    local statsFolder = player:FindFirstChild("leaderstats")
+    if not statsFolder then
+        statsFolder = Instance.new("Folder")
+        statsFolder.Name = "leaderstats"
+        statsFolder.Parent = player
+    end
+
+    local moneyValue = statsFolder:FindFirstChild("Money")
+    if not moneyValue then
+        moneyValue = Instance.new("IntValue")
+        moneyValue.Name = "Money"
+        moneyValue.Parent = statsFolder
+    end
+
+    local numeric = tonumber(amount) or 0
+    if numeric ~= numeric then
+        numeric = 0
+    end
+
+    moneyValue.Value = math.max(0, math.floor(numeric + 0.5))
+end
+
 function WaveService:BuildOverridePath(enemyModel, enemyData, targetProgress, abilityConfig)
     if not (enemyModel and enemyData) then
         return nil
@@ -1146,6 +1173,7 @@ function WaveService:SetupPlayer(player)
     self.PlayerStats[player] = { Money = startingMoney, Lives = self.BaseHealth }
     self.Remotes.MoneyChanged:FireClient(player, self.PlayerStats[player].Money)
     self.Remotes.LivesChanged:FireClient(player, self.BaseHealth)
+    updateMoneyLeaderstat(player, startingMoney)
     if self.TowerService and self.TowerService.SendTowerCounts then
         self.TowerService:SendTowerCounts(player)
     end
@@ -1176,12 +1204,14 @@ function WaveService:AdjustMoney(player, amount)
     end
     stats.Money = math.max(0, stats.Money + amount)
     self.Remotes.MoneyChanged:FireClient(player, stats.Money)
+    updateMoneyLeaderstat(player, stats.Money)
 end
 
 function WaveService:BroadcastMoney(amount)
     for player, stats in pairs(self.PlayerStats) do
         stats.Money = stats.Money + amount
         self.Remotes.MoneyChanged:FireClient(player, stats.Money)
+        updateMoneyLeaderstat(player, stats.Money)
     end
 end
 
@@ -1325,6 +1355,9 @@ function WaveService:DamageEnemy(enemyModel, towerData)
     end
 
     if appliedDamage > 0 then
+        if self.TowerService and self.TowerService.AccumulateTowerDamage then
+            self.TowerService:AccumulateTowerDamage(towerData, appliedDamage)
+        end
         for player in pairs(self.PlayerStats) do
             self:AdjustMoney(player, appliedDamage)
         end
@@ -2231,6 +2264,7 @@ function WaveService:ResetGame()
         self.PlayerStats[player] = { Money = startingMoney, Lives = self.BaseHealth }
         self.Remotes.MoneyChanged:FireClient(player, startingMoney)
         self.Remotes.LivesChanged:FireClient(player, self.BaseHealth)
+        updateMoneyLeaderstat(player, startingMoney)
     end
 end
 
