@@ -313,10 +313,6 @@ local function isValidPlacementSurface(instance, mapModel, ground, placementSurf
                         return false
                 end
 
-                if instance.Transparency and instance.Transparency >= 0.95 then
-                        return false
-                end
-
                 if instance.CanCollide == false then
                         return false
                 end
@@ -3435,10 +3431,6 @@ local function evaluatePlacement(rayResult)
         end
 
         if hitInstance.CanCollide == false then
-                return false
-        end
-
-        if hitInstance.Transparency and hitInstance.Transparency >= 0.95 then
                 return false
         end
 

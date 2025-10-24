@@ -211,10 +211,6 @@ local function isValidPlacementSurface(instance, mapModel, ground, placementSurf
             return false
         end
 
-        if instance.Transparency and instance.Transparency >= 0.95 then
-            return false
-        end
-
         if instance.CanCollide == false then
             return false
         end
@@ -1232,7 +1228,7 @@ function TowerService:IsPlacementValid(position, towerType)
 
         local instance = result.Instance
         if instance and instance:IsA("BasePart") then
-            if instance.CanCollide ~= false and (not instance.Transparency or instance.Transparency < 0.95) then
+            if instance.CanCollide ~= false then
                 break
             end
         end
