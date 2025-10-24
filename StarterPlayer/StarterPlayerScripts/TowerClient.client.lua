@@ -20,8 +20,11 @@ local hoverGui
 local hoverNameLabel
 local hoverHealthLabel
 local hoverCombinedLabel
-local selectedTower
-local lastRemovedSelectedTower
+local selectionState = {
+        tower = nil,
+        lastRemoved = nil,
+        connections = {},
+}
 local screenGui
 local shopFrame
 local statusFrame
@@ -49,7 +52,6 @@ local TOWER_BASE_PLACEMENT_TRANSPARENCY = 0.7
 local BOOST_DISPLAY_NAME = "TowerBoostDisplay"
 local BOOST_SOURCE_NAME = "BoostSource"
 local BOOSTER_TOWER_TYPE = "Booster"
-local selectedTowerConnections = {}
 local currentMoney = 0
 local gameEnded = false
 local lastVictoryState
@@ -573,10 +575,10 @@ local function updateAllShopSlotCounts()
 end
 
 local function disconnectSelectedConnections()
-	for _, conn in ipairs(selectedTowerConnections) do
-		conn:Disconnect()
-	end
-	selectedTowerConnections = {}
+        for _, conn in ipairs(selectionState.connections) do
+                conn:Disconnect()
+        end
+        selectionState.connections = {}
 end
 
 local function destroyRangeIndicator()
@@ -729,6 +731,7 @@ local function applyBoostDisplayVisibility(display)
         end
 
         local boosterModel
+        local selectedTower = selectionState.tower
         if selectedTower and selectedTower.Parent then
                 local towerType = selectedTower:GetAttribute("TowerType")
                 if towerType == BOOSTER_TOWER_TYPE then
@@ -1119,9 +1122,9 @@ function beginPlacement(towerType)
 		destroyPreviewRangeIndicator()
 	end
 
-	placementValid = false
-	selectedTower = nil
-	disconnectSelectedConnections()
+        placementValid = false
+        selectionState.tower = nil
+        disconnectSelectedConnections()
 	destroyRangeIndicator()
 	if towerDetailsFrame then
 		towerDetailsFrame.Visible = false
@@ -3298,11 +3301,12 @@ local function createGui()
 	upgradeButtonOriginalTextTransparency = upgradeButton.TextTransparency
 	upgradeButtonOriginalAutoButtonColor = upgradeButton.AutoButtonColor
 
-	upgradeButton.MouseButton1Click:Connect(function()
-		if selectedTower then
-			remotes.TowerUpgradeRequested:FireServer(selectedTower)
-		end
-	end)
+        upgradeButton.MouseButton1Click:Connect(function()
+                local tower = selectionState.tower
+                if tower then
+                        remotes.TowerUpgradeRequested:FireServer(tower)
+                end
+        end)
 
         sellButton = Instance.new("TextButton")
         sellButton.Name = "SellButton"
@@ -3322,11 +3326,12 @@ local function createGui()
 
 	sellButtonOriginalAutoButtonColor = sellButton.AutoButtonColor
 
-	sellButton.MouseButton1Click:Connect(function()
-		if selectedTower then
-			remotes.TowerSellRequested:FireServer(selectedTower)
-		end
-	end)
+        sellButton.MouseButton1Click:Connect(function()
+                local tower = selectionState.tower
+                if tower then
+                        remotes.TowerSellRequested:FireServer(tower)
+                end
+        end)
 
         local function applyHudConstraints()
                 if not screenGui then
@@ -3420,17 +3425,18 @@ local function showTowerSelection()
 end
 
 local function clearSelection(reason)
-        if selectedTower then
+        local current = selectionState.tower
+        if current then
                 if reason == "destroyed" then
-                        lastRemovedSelectedTower = selectedTower
+                        selectionState.lastRemoved = current
                 else
-                        lastRemovedSelectedTower = nil
+                        selectionState.lastRemoved = nil
                 end
         else
-                lastRemovedSelectedTower = nil
+                selectionState.lastRemoved = nil
         end
 
-        selectedTower = nil
+        selectionState.tower = nil
         disconnectSelectedConnections()
         destroyRangeIndicator()
         if towerDetailsFrame then
@@ -3452,45 +3458,45 @@ local function selectTower(towerModel)
                 return
         end
 
-        if selectedTower == towerModel then
+        if selectionState.tower == towerModel then
                 updateTowerDetails(towerModel)
                 refreshBoostDisplayVisibility()
                 return
         end
 
         clearSelection()
-        selectedTower = towerModel
-        lastRemovedSelectedTower = nil
+        selectionState.tower = towerModel
+        selectionState.lastRemoved = nil
         updateTowerDetails(towerModel)
         refreshBoostDisplayVisibility()
 
-        selectedTowerConnections = {
+        selectionState.connections = {
                 towerModel.AncestryChanged:Connect(function(_, parent)
                         if not parent then
                                 clearSelection("destroyed")
                         end
                 end),
-		towerModel:GetAttributeChangedSignal("Level"):Connect(function()
-			if selectedTower == towerModel then
-				updateTowerDetails(towerModel)
-			end
-		end),
-		towerModel:GetAttributeChangedSignal("Range"):Connect(function()
-			if selectedTower == towerModel then
-				updateTowerDetails(towerModel)
-			end
-		end),
-		towerModel:GetAttributeChangedSignal("OwnerUserId"):Connect(function()
-			if selectedTower == towerModel then
-				updateTowerDetails(towerModel)
-			end
-		end),
-		towerModel:GetAttributeChangedSignal("SellValue"):Connect(function()
-			if selectedTower == towerModel then
-				updateTowerDetails(towerModel)
-			end
-		end)
-	}
+                towerModel:GetAttributeChangedSignal("Level"):Connect(function()
+                        if selectionState.tower == towerModel then
+                                updateTowerDetails(towerModel)
+                        end
+                end),
+                towerModel:GetAttributeChangedSignal("Range"):Connect(function()
+                        if selectionState.tower == towerModel then
+                                updateTowerDetails(towerModel)
+                        end
+                end),
+                towerModel:GetAttributeChangedSignal("OwnerUserId"):Connect(function()
+                        if selectionState.tower == towerModel then
+                                updateTowerDetails(towerModel)
+                        end
+                end),
+                towerModel:GetAttributeChangedSignal("SellValue"):Connect(function()
+                        if selectionState.tower == towerModel then
+                                updateTowerDetails(towerModel)
+                        end
+                end)
+        }
 end
 
 local function createPlacementValidationParams()
@@ -3781,12 +3787,13 @@ if remotes:FindFirstChild("MoneyChanged") then
                 currentMoney = math.max(0, math.floor((amount or 0) + 0.5))
                 if moneyLabel then
                         moneyLabel.Text = string.format("$%d", currentMoney)
-		end
-		if selectedTower then
-			updateTowerDetails(selectedTower)
-		end
-		updateStartButtonVisual()
-	end)
+                end
+                local tower = selectionState.tower
+                if tower then
+                        updateTowerDetails(tower)
+                end
+                updateStartButtonVisual()
+        end)
 end
 
 if remotes:FindFirstChild("LivesChanged") then
@@ -3975,23 +3982,29 @@ UserInputService.InputBegan:Connect(function(input, processed)
                 end
                 if placingTowerType then
                         cancelPlacement()
-                elseif selectedTower and not placingTowerType then
-			local ownerId = selectedTower:GetAttribute("OwnerUserId")
-			if ownerId == player.UserId and not gameEnded then
-				remotes.TowerSellRequested:FireServer(selectedTower)
-			end
-		end
+                else
+                        local tower = selectionState.tower
+                        if tower and not placingTowerType then
+                                local ownerId = tower:GetAttribute("OwnerUserId")
+                                if ownerId == player.UserId and not gameEnded then
+                                        remotes.TowerSellRequested:FireServer(tower)
+                                end
+                        end
+                end
         elseif input.KeyCode == Enum.KeyCode.E then
                 if lobbyPhase ~= "inRound" then
                         return
                 end
-                if not placingTowerType and selectedTower then
-                        local ownerId = selectedTower:GetAttribute("OwnerUserId")
-                        if ownerId == player.UserId and not gameEnded then
-				remotes.TowerUpgradeRequested:FireServer(selectedTower)
-			end
-		end
-	end
+                if not placingTowerType then
+                        local tower = selectionState.tower
+                        if tower then
+                                local ownerId = tower:GetAttribute("OwnerUserId")
+                                if ownerId == player.UserId and not gameEnded then
+                                        remotes.TowerUpgradeRequested:FireServer(tower)
+                                end
+                        end
+                end
+        end
 end)
 
 remotes.TowerUpgraded.OnClientEvent:Connect(function(towerModel, _, previousModel)
@@ -3999,12 +4012,14 @@ remotes.TowerUpgraded.OnClientEvent:Connect(function(towerModel, _, previousMode
                 return
         end
 
-        if selectedTower == towerModel or selectedTower == previousModel then
+        local currentTower = selectionState.tower
+        if currentTower == towerModel or currentTower == previousModel then
                 selectTower(towerModel)
                 return
         end
 
-        if lastRemovedSelectedTower and (lastRemovedSelectedTower == previousModel or lastRemovedSelectedTower == towerModel) then
+        local lastRemoved = selectionState.lastRemoved
+        if lastRemoved and (lastRemoved == previousModel or lastRemoved == towerModel) then
                 selectTower(towerModel)
         end
 end)
@@ -4024,7 +4039,8 @@ end
 RunService.RenderStepped:Connect(function()
         updatePreview()
         updateEnemyHover()
-        if selectedTower and (not selectedTower.Parent) then
+        local tower = selectionState.tower
+        if tower and (not tower.Parent) then
                 clearSelection("destroyed")
         end
 end)
