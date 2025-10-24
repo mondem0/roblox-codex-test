@@ -155,7 +155,7 @@ local TowerConfigs = {
         Cost = 650,
         PlacementLimit = 6,
         BaseSize = Vector3.new(4.5, 1, 4.5),
-        Range = 0,
+        Range = 18,
         Damage = 0,
         FireRate = 0,
         BoostRadius = 18,
@@ -167,6 +167,7 @@ local TowerConfigs = {
         Upgrades = {
             {
                 Cost = 450,
+                Range = 20,
                 BoostRadius = 20,
                 Buffs = {
                     RangeMultiplier = 1.25,
@@ -176,6 +177,7 @@ local TowerConfigs = {
             },
             {
                 Cost = 650,
+                Range = 22,
                 BoostRadius = 22,
                 Buffs = {
                     RangeMultiplier = 1.35,

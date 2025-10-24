@@ -26,6 +26,7 @@ local FARM_INCOME_FADE_TIME = 0.4
 
 local BOOST_DISPLAY_NAME = "TowerBoostDisplay"
 local BOOST_LABEL_NAME = "TowerBoostLabel"
+local BOOST_SOURCE_NAME = "BoostSource"
 local BOOST_TEXT_COLOR = Color3.fromRGB(120, 255, 170)
 local BOOST_TEXT_STROKE = Color3.new(0, 0, 0)
 local BOOST_OFFSET = Vector3.new(0, 6, 0)
@@ -52,6 +53,24 @@ local function formatCurrency(amount)
     until k == 0
 
     return string.format("%s$%s", sign, formatted)
+end
+
+local function calculateBoostScore(boost)
+    if not boost then
+        return 1
+    end
+
+    local rangeMultiplier = tonumber(boost.RangeMultiplier) or 1
+    if rangeMultiplier <= 0 then
+        rangeMultiplier = 1
+    end
+
+    local fireRateMultiplier = tonumber(boost.FireRateMultiplier) or 1
+    if fireRateMultiplier <= 0 then
+        fireRateMultiplier = 1
+    end
+
+    return rangeMultiplier / fireRateMultiplier
 end
 
 local function normalizePlacementSurfaceValue(value)
@@ -922,13 +941,22 @@ function TowerService:UpdateTowerBoostDisplay(towerData)
 
     local rangeMultiplier = 1
     local fireRateMultiplier = 1
-    for _, boost in pairs(boosts) do
+    local primaryBooster
+    for boosterModel, boost in pairs(boosts) do
+        if not primaryBooster then
+            primaryBooster = boosterModel
+        end
         if boost.RangeMultiplier then
             rangeMultiplier *= boost.RangeMultiplier
         end
         if boost.FireRateMultiplier then
             fireRateMultiplier *= boost.FireRateMultiplier
         end
+    end
+
+    if not primaryBooster then
+        self:DestroyTowerBoostDisplay(towerData)
+        return
     end
 
     local infoLines = {}
@@ -980,8 +1008,16 @@ function TowerService:UpdateTowerBoostDisplay(towerData)
         end
     end
 
+    local boostSourceValue = display:FindFirstChild(BOOST_SOURCE_NAME)
+    if not boostSourceValue then
+        boostSourceValue = Instance.new("ObjectValue")
+        boostSourceValue.Name = BOOST_SOURCE_NAME
+        boostSourceValue.Parent = display
+    end
+    boostSourceValue.Value = primaryBooster
+
     display.Adornee = primary
-    display.Enabled = true
+    display.Enabled = false
     label.Text = table.concat(infoLines, "\n")
 end
 
@@ -1052,6 +1088,22 @@ function TowerService:SetTowerBoost(towerData, boosterModel, boostConfig)
         fireRateMultiplier = 1
     end
 
+    local conflictingBoosters
+    if towerData.ActiveBoosts then
+        for otherModel in pairs(towerData.ActiveBoosts) do
+            if otherModel ~= boosterModel then
+                conflictingBoosters = conflictingBoosters or {}
+                table.insert(conflictingBoosters, otherModel)
+            end
+        end
+    end
+
+    if conflictingBoosters then
+        for _, otherModel in ipairs(conflictingBoosters) do
+            self:RemoveBoostFromTower(towerData, otherModel)
+        end
+    end
+
     towerData.ActiveBoosts = towerData.ActiveBoosts or {}
     local existing = towerData.ActiveBoosts[boosterModel]
     if existing
@@ -1074,12 +1126,22 @@ function TowerService:RemoveBoostFromTower(towerData, boosterModel)
         return
     end
 
-    if towerData.ActiveBoosts[boosterModel] then
-        towerData.ActiveBoosts[boosterModel] = nil
-        if not next(towerData.ActiveBoosts) then
+    local activeBoosts = towerData.ActiveBoosts
+    if activeBoosts[boosterModel] then
+        activeBoosts[boosterModel] = nil
+        local hasRemaining = next(activeBoosts) ~= nil
+        if not hasRemaining then
             towerData.ActiveBoosts = nil
         end
         self:RecalculateTowerStats(towerData)
+
+        if not hasRemaining and towerData.Model and towerData.Model.Parent then
+            task.defer(function()
+                if self and self.RefreshBoostersForTower then
+                    self:RefreshBoostersForTower(towerData.Model, towerData)
+                end
+            end)
+        end
     end
 end
 
@@ -1128,9 +1190,18 @@ function TowerService:EvaluateBoosterTargets(boosterModel, boosterData, targetMo
     end
 
     local boosts = config.Buffs or {}
+    local newBoostScore = calculateBoostScore(boosts)
 
     local function evaluate(model, data)
         if not data or model == boosterModel then
+            return
+        end
+
+        if data.Type == "Booster" then
+            if boosterData.BoostedTowers[model] then
+                boosterData.BoostedTowers[model] = nil
+                self:RemoveBoostFromTower(data, boosterModel)
+            end
             return
         end
 
@@ -1143,6 +1214,38 @@ function TowerService:EvaluateBoosterTargets(boosterModel, boosterData, targetMo
                 local distance = (targetPrimary.Position - primary.Position).Magnitude
                 if distance <= radius then
                     shouldBoost = true
+                end
+            end
+        end
+
+        if shouldBoost then
+            local existingBoosterModel
+            local existingBoostEntry
+
+            if data.ActiveBoosts then
+                local currentEntry = data.ActiveBoosts[boosterModel]
+                if currentEntry then
+                    existingBoosterModel = boosterModel
+                    existingBoostEntry = currentEntry
+                else
+                    for otherModel, boostEntry in pairs(data.ActiveBoosts) do
+                        existingBoosterModel = otherModel
+                        existingBoostEntry = boostEntry
+                        break
+                    end
+                end
+            end
+
+            if existingBoosterModel and existingBoosterModel ~= boosterModel then
+                local existingScore = calculateBoostScore(existingBoostEntry)
+                if newBoostScore > existingScore + 0.0001 then
+                    local otherBoosterData = self.Towers[existingBoosterModel]
+                    if otherBoosterData and otherBoosterData.BoostedTowers then
+                        otherBoosterData.BoostedTowers[model] = nil
+                    end
+                    self:RemoveBoostFromTower(data, existingBoosterModel)
+                else
+                    shouldBoost = false
                 end
             end
         end
@@ -2032,8 +2135,13 @@ function TowerService:Tick(dt)
                     self:ClearTowerStun(towerModel, towerData)
                 end
 
-                towerData.Cooldown = math.max(0, (towerData.Cooldown or 0) - dt)
-                if towerData.Cooldown <= 0 then
+                if towerData.Type == "Booster" then
+                    towerData.Cooldown = 0
+                else
+                    towerData.Cooldown = math.max(0, (towerData.Cooldown or 0) - dt)
+                end
+
+                if towerData.Type ~= "Booster" and towerData.Cooldown <= 0 then
                     local headInfo = ensureHeadGeometry(towerData)
                     local headPivot = headInfo and headInfo.HeadPivot
                     if headPivot then

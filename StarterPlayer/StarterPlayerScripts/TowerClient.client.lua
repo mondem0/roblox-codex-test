@@ -40,7 +40,15 @@ local towerBaseTracker = {
         workspaceConnection = nil,
 }
 
+local boostDisplayTracker = {
+        displays = {},
+        modelConnections = {},
+}
+
 local TOWER_BASE_PLACEMENT_TRANSPARENCY = 0.7
+local BOOST_DISPLAY_NAME = "TowerBoostDisplay"
+local BOOST_SOURCE_NAME = "BoostSource"
+local BOOSTER_TOWER_TYPE = "Booster"
 local selectedTowerConnections = {}
 local currentMoney = 0
 local gameEnded = false
@@ -119,6 +127,9 @@ local mapSelectionState = {
 }
 
 local preRoundCountdownLabel
+
+local refreshBoostDisplayVisibility
+local clearBoostDisplayTracking
 
 local waveSkipButton
 local waveSkipTween
@@ -653,6 +664,8 @@ local function disconnectTowerFolderConnections()
                 end
                 towerBaseTracker.folderConnections[index] = nil
         end
+
+        clearBoostDisplayTracking()
 end
 
 local function cleanupTowerBaseState(basePart)
@@ -676,6 +689,157 @@ local function cleanupTowerBaseState(basePart)
         end
 
         towerBaseTracker.states[basePart] = nil
+end
+
+local function disconnectBoostDisplay(display)
+        local connections = boostDisplayTracker.displays[display]
+        if not connections then
+                return
+        end
+
+        for index, connection in ipairs(connections) do
+                if connection and connection.Disconnect then
+                        connection:Disconnect()
+                end
+                connections[index] = nil
+        end
+
+        boostDisplayTracker.displays[display] = nil
+end
+
+local function disconnectModelBoostConnections(model)
+        local connections = boostDisplayTracker.modelConnections[model]
+        if not connections then
+                return
+        end
+
+        for index, connection in ipairs(connections) do
+                if connection and connection.Disconnect then
+                        connection:Disconnect()
+                end
+                connections[index] = nil
+        end
+
+        boostDisplayTracker.modelConnections[model] = nil
+end
+
+local function applyBoostDisplayVisibility(display)
+        if not (display and display:IsA("BillboardGui")) then
+                return
+        end
+
+        local boosterModel
+        if selectedTower and selectedTower.Parent then
+                local towerType = selectedTower:GetAttribute("TowerType")
+                if towerType == BOOSTER_TOWER_TYPE then
+                        boosterModel = selectedTower
+                end
+        end
+
+        local shouldShow = false
+        if boosterModel then
+                local sourceValue = display:FindFirstChild(BOOST_SOURCE_NAME)
+                if sourceValue and sourceValue:IsA("ObjectValue") and sourceValue.Value == boosterModel then
+                        shouldShow = true
+                end
+        end
+
+        display.Enabled = shouldShow
+end
+
+refreshBoostDisplayVisibility = function()
+        for display in pairs(boostDisplayTracker.displays) do
+                if display and display.Parent then
+                        applyBoostDisplayVisibility(display)
+                end
+        end
+end
+
+clearBoostDisplayTracking = function()
+        local trackedDisplays = {}
+        for display in pairs(boostDisplayTracker.displays) do
+                table.insert(trackedDisplays, display)
+        end
+
+        for _, display in ipairs(trackedDisplays) do
+                disconnectBoostDisplay(display)
+        end
+
+        for model in pairs(boostDisplayTracker.modelConnections) do
+                disconnectModelBoostConnections(model)
+        end
+end
+
+local function trackBoostDisplay(display)
+        if not (display and display:IsA("BillboardGui") and display.Name == BOOST_DISPLAY_NAME) then
+                return
+        end
+
+        if boostDisplayTracker.displays[display] then
+                applyBoostDisplayVisibility(display)
+                return
+        end
+
+        local connections = {}
+
+        local function updateVisibility()
+                applyBoostDisplayVisibility(display)
+        end
+
+        table.insert(connections, display.AncestryChanged:Connect(function(_, parent)
+                if not parent then
+                        disconnectBoostDisplay(display)
+                        return
+                end
+
+                updateVisibility()
+        end))
+
+        table.insert(connections, display.ChildAdded:Connect(function(child)
+                if child and child:IsA("ObjectValue") and child.Name == BOOST_SOURCE_NAME then
+                        table.insert(connections, child:GetPropertyChangedSignal("Value"):Connect(updateVisibility))
+                        updateVisibility()
+                end
+        end))
+
+        local sourceValue = display:FindFirstChild(BOOST_SOURCE_NAME)
+        if sourceValue and sourceValue:IsA("ObjectValue") then
+                table.insert(connections, sourceValue:GetPropertyChangedSignal("Value"):Connect(updateVisibility))
+        end
+
+        boostDisplayTracker.displays[display] = connections
+        updateVisibility()
+end
+
+local function monitorTowerModelForBoostDisplays(model)
+        if not (model and model:IsA("Model")) then
+                return
+        end
+
+        if boostDisplayTracker.modelConnections[model] then
+                return
+        end
+
+        local connections = {}
+
+        local function onChildAdded(child)
+                if child and child:IsA("BillboardGui") and child.Name == BOOST_DISPLAY_NAME then
+                        trackBoostDisplay(child)
+                end
+        end
+
+        table.insert(connections, model.ChildAdded:Connect(onChildAdded))
+        table.insert(connections, model.AncestryChanged:Connect(function(_, parent)
+                if not parent then
+                        disconnectModelBoostConnections(model)
+                end
+        end))
+
+        boostDisplayTracker.modelConnections[model] = connections
+
+        for _, child in ipairs(model:GetChildren()) do
+                onChildAdded(child)
+        end
 end
 
 local function getTowerBasePart(towerModel)
@@ -776,9 +940,12 @@ local function onTowerChildAdded(child)
                 return
         end
 
+        monitorTowerModelForBoostDisplays(child)
+
         task.defer(function()
                 if child.Parent then
                         updateTowerBaseVisibilityForModel(child)
+                        refreshBoostDisplayVisibility()
                 end
         end)
 end
@@ -809,6 +976,7 @@ local function attachToTowersFolder(folder)
         end))
 
         updateAllTowerBaseVisibility()
+        refreshBoostDisplayVisibility()
 end
 
 local function initializeTowerBaseTracking()
@@ -3271,26 +3439,30 @@ local function clearSelection(reason)
 	if upgradeDescriptionLabel then
 		upgradeDescriptionLabel.Text = ""
 	end
-	if sellButton then
-		sellButton.Visible = false
-	end
+        if sellButton then
+                sellButton.Visible = false
+        end
+
+        refreshBoostDisplayVisibility()
 end
 
 local function selectTower(towerModel)
-	if not towerModel then
-		clearSelection()
-		return
-	end
+        if not towerModel then
+                clearSelection()
+                return
+        end
 
-	if selectedTower == towerModel then
-		updateTowerDetails(towerModel)
-		return
-	end
+        if selectedTower == towerModel then
+                updateTowerDetails(towerModel)
+                refreshBoostDisplayVisibility()
+                return
+        end
 
         clearSelection()
         selectedTower = towerModel
         lastRemovedSelectedTower = nil
         updateTowerDetails(towerModel)
+        refreshBoostDisplayVisibility()
 
         selectedTowerConnections = {
                 towerModel.AncestryChanged:Connect(function(_, parent)
