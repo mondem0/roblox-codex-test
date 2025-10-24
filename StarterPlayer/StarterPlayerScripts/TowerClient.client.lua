@@ -2922,18 +2922,52 @@ local function updateTowerDetails(towerModel)
 		towerDetailsUi.levelLabel.Text = string.format("Level: %d", level)
 	end
 
-	local stats = getTowerStatsForLevel(towerType, level)
-	if stats and towerDetailsUi.statsLabel then
-		local lines = {}
-		if stats.Range then
-			table.insert(lines, string.format("Range: %.1f", stats.Range))
-		end
-		if stats.Damage then
-			table.insert(lines, string.format("Damage: %d", stats.Damage))
-		end
-                if stats.FireRate then
-                        table.insert(lines, string.format("Fire Rate: %.2fs", stats.FireRate))
+        local stats = getTowerStatsForLevel(towerType, level)
+        local indicatorRange
+        if stats and towerDetailsUi.statsLabel then
+                local lines = {}
+                local rangeMultiplierAttr = tonumber(towerModel:GetAttribute("RangeMultiplier")) or 1
+                local fireRateMultiplierAttr = tonumber(towerModel:GetAttribute("FireRateMultiplier")) or 1
+                local effectiveRangeAttr = towerModel:GetAttribute("Range")
+                local effectiveFireRateAttr = towerModel:GetAttribute("EffectiveFireRate")
+
+                local baseRange = stats.Range
+                local resolvedRange
+                if typeof(effectiveRangeAttr) == "number" then
+                        resolvedRange = effectiveRangeAttr
+                elseif baseRange then
+                        resolvedRange = baseRange * rangeMultiplierAttr
                 end
+                if resolvedRange or baseRange then
+                        local displayRange = resolvedRange or baseRange
+                        indicatorRange = displayRange
+                        local label = string.format("Range: %.1f", displayRange)
+                        if baseRange and math.abs(displayRange - baseRange) > 0.01 then
+                                label = string.format("Range: %.1f (Boosted)", displayRange)
+                        end
+                        table.insert(lines, label)
+                end
+
+                if stats.Damage then
+                        table.insert(lines, string.format("Damage: %d", stats.Damage))
+                end
+
+                local baseFireRate = stats.FireRate
+                if baseFireRate then
+                        local resolvedFireRate
+                        if typeof(effectiveFireRateAttr) == "number" then
+                                resolvedFireRate = effectiveFireRateAttr
+                        else
+                                resolvedFireRate = baseFireRate * fireRateMultiplierAttr
+                        end
+                        local displayRate = resolvedFireRate or baseFireRate
+                        local label = string.format("Fire Rate: %.2fs", displayRate)
+                        if baseFireRate and math.abs(displayRate - baseFireRate) > 0.01 then
+                                label = string.format("Fire Rate: %.2fs (Boosted)", displayRate)
+                        end
+                        table.insert(lines, label)
+                end
+
                 if stats.SplashRadius then
                         table.insert(lines, string.format("Splash Radius: %.1f", stats.SplashRadius))
                 end
@@ -2963,16 +2997,24 @@ local function updateTowerDetails(towerModel)
                 towerDetailsUi.statsLabel.Text = ""
         end
 
-	if towerDetailsUi.ownershipLabel then
-		if ownerUserId == player.UserId then
-			towerDetailsUi.ownershipLabel.Text = "Owner: You (E to upgrade, X to sell)"
-		else
-			towerDetailsUi.ownershipLabel.Text = string.format("Owner: %s", ownerText)
-		end
-	end
+        if towerDetailsUi.ownershipLabel then
+                if ownerUserId == player.UserId then
+                        towerDetailsUi.ownershipLabel.Text = "Owner: You (E to upgrade, X to sell)"
+                else
+                        towerDetailsUi.ownershipLabel.Text = string.format("Owner: %s", ownerText)
+                end
+        end
 
-	towerDetailsUi.frame.Visible = true
-	showRangeIndicator(towerModel, stats and stats.Range)
+        towerDetailsUi.frame.Visible = true
+        if not indicatorRange then
+                local rangeAttr = towerModel:GetAttribute("Range")
+                if typeof(rangeAttr) == "number" then
+                        indicatorRange = rangeAttr
+                elseif stats then
+                        indicatorRange = stats.Range
+                end
+        end
+        showRangeIndicator(towerModel, indicatorRange)
 	updateUpgradeButton(towerType, level, ownerUserId)
 	updateSellButton(towerModel, ownerUserId)
 end
@@ -3506,33 +3548,48 @@ local function selectTower(towerModel)
         updateTowerDetails(towerModel)
         refreshBoostDisplayVisibility()
 
-        selectionState.connections = {
-                towerModel.AncestryChanged:Connect(function(_, parent)
-                        if not parent then
-                                clearSelection("destroyed")
-                        end
-                end),
-                towerModel:GetAttributeChangedSignal("Level"):Connect(function()
-                        if selectionState.tower == towerModel then
-                                updateTowerDetails(towerModel)
-                        end
-                end),
-                towerModel:GetAttributeChangedSignal("Range"):Connect(function()
-                        if selectionState.tower == towerModel then
-                                updateTowerDetails(towerModel)
-                        end
-                end),
-                towerModel:GetAttributeChangedSignal("OwnerUserId"):Connect(function()
-                        if selectionState.tower == towerModel then
-                                updateTowerDetails(towerModel)
-                        end
-                end),
-                towerModel:GetAttributeChangedSignal("SellValue"):Connect(function()
-                        if selectionState.tower == towerModel then
-                                updateTowerDetails(towerModel)
-                        end
-                end)
-        }
+		selectionState.connections = {
+			towerModel.AncestryChanged:Connect(function(_, parent)
+				if not parent then
+					clearSelection("destroyed")
+				end
+			end),
+			towerModel:GetAttributeChangedSignal("Level"):Connect(function()
+				if selectionState.tower == towerModel then
+					updateTowerDetails(towerModel)
+				end
+			end),
+			towerModel:GetAttributeChangedSignal("Range"):Connect(function()
+				if selectionState.tower == towerModel then
+					updateTowerDetails(towerModel)
+				end
+			end),
+			towerModel:GetAttributeChangedSignal("RangeMultiplier"):Connect(function()
+				if selectionState.tower == towerModel then
+					updateTowerDetails(towerModel)
+				end
+			end),
+			towerModel:GetAttributeChangedSignal("FireRateMultiplier"):Connect(function()
+				if selectionState.tower == towerModel then
+					updateTowerDetails(towerModel)
+				end
+			end),
+			towerModel:GetAttributeChangedSignal("EffectiveFireRate"):Connect(function()
+				if selectionState.tower == towerModel then
+					updateTowerDetails(towerModel)
+				end
+			end),
+			towerModel:GetAttributeChangedSignal("OwnerUserId"):Connect(function()
+				if selectionState.tower == towerModel then
+					updateTowerDetails(towerModel)
+				end
+			end),
+			towerModel:GetAttributeChangedSignal("SellValue"):Connect(function()
+				if selectionState.tower == towerModel then
+					updateTowerDetails(towerModel)
+				end
+			end)
+		}
 end
 
 local function evaluatePlacement(rayResult)

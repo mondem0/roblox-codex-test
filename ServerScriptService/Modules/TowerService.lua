@@ -797,6 +797,9 @@ local function updateTowerAttributes(towerModel, towerData)
     towerModel:SetAttribute("TowerType", towerData.Type)
     towerModel:SetAttribute("Level", towerData.Level)
     towerModel:SetAttribute("Range", getEffectiveRangeValue(towerData))
+    towerModel:SetAttribute("RangeMultiplier", towerData.RangeMultiplier or 1)
+    towerModel:SetAttribute("FireRateMultiplier", towerData.FireRateMultiplier or 1)
+    towerModel:SetAttribute("EffectiveFireRate", towerData.EffectiveFireRate or 0)
     towerModel:SetAttribute("OwnerUserId", towerData.Player and towerData.Player.UserId or 0)
 
     if towerData.PlacementPosition then
