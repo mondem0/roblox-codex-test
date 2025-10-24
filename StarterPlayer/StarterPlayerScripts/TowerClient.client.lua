@@ -16,26 +16,31 @@ local enemiesFolder = workspace:WaitForChild("Enemies")
 local placingTowerType
 local previewPart
 local placementValid = false
-local hoverGuiContainer
-local hoverGui
-local hoverNameLabel
-local hoverHealthLabel
-local hoverCombinedLabel
+local hoverUi = {
+        container = nil,
+        frame = nil,
+        nameLabel = nil,
+        healthLabel = nil,
+        combinedLabel = nil,
+}
 local selectionState = {
         tower = nil,
         lastRemoved = nil,
         connections = {},
 }
-local screenGui
-local shopFrame
-local statusFrame
-local moneyLabel
-local livesLabel
-local waveLabel
-local rangeRing
-local rangeRingAdornment
-local previewRangeRing
-local previewRangeAdornment
+local hudRefs = {
+        screenGui = nil,
+        shopFrame = nil,
+        statusFrame = nil,
+        moneyLabel = nil,
+        livesLabel = nil,
+        waveLabel = nil,
+        rangeRing = nil,
+        rangeRingAdornment = nil,
+        previewRangeRing = nil,
+        previewRangeAdornment = nil,
+        preRoundCountdownLabel = nil,
+}
 local towerBaseTracker = {
         enabled = false,
         states = {},
@@ -63,27 +68,31 @@ local shopSlotPriceLabels = {}
 local shopSlotCountLabels = {}
 local beginPlacement
 
-local towerDetailsFrame
-local towerNameLabel
-local towerLevelLabel
-local towerStatsLabel
-local ownershipLabel
-local upgradeDescriptionLabel
-local upgradeButton
-local sellButton
-local upgradeButtonOriginalColor
-local upgradeButtonOriginalTextColor
-local upgradeButtonOriginalBackgroundTransparency
-local upgradeButtonOriginalTextTransparency
-local upgradeButtonOriginalAutoButtonColor
-local sellButtonOriginalAutoButtonColor
+local towerDetailsUi = {
+        frame = nil,
+        nameLabel = nil,
+        levelLabel = nil,
+        statsLabel = nil,
+        ownershipLabel = nil,
+        upgradeDescriptionLabel = nil,
+        upgradeButton = nil,
+        sellButton = nil,
+        upgradeButtonOriginalColor = nil,
+        upgradeButtonOriginalTextColor = nil,
+        upgradeButtonOriginalBackgroundTransparency = nil,
+        upgradeButtonOriginalTextTransparency = nil,
+        upgradeButtonOriginalAutoButtonColor = nil,
+        sellButtonOriginalAutoButtonColor = nil,
+}
 local GREY_COLOR = Color3.new(0.5, 0.5, 0.5)
 local READY_COLOR = Color3.fromRGB(120, 220, 160)
 local NOT_READY_COLOR = Color3.fromRGB(220, 140, 120)
 
-local playerTowerTotalLabel
-local teamTowerTotalLabel
-local towerCountSnapshot
+local towerTotalsUi = {
+        playerLabel = nil,
+        teamLabel = nil,
+        snapshot = nil,
+}
 
 local LOADOUT_SLOT_COUNT = 5
 local SLOT_KEY_CODES = {
@@ -99,25 +108,29 @@ local SLOT_KEY_CODES = {
         [Enum.KeyCode.KeypadFive] = 5,
 }
 
-local selectionScreenGui
-local selectionFrame
-local selectionTowerList
-local selectionSlotButtons = {}
-local selectionSlotOriginalText = {}
-local selectionActiveSlot
+local selectionUi = {
+        screenGui = nil,
+        frame = nil,
+        towerList = nil,
+        slotButtons = {},
+        slotOriginalText = {},
+        activeSlot = nil,
+}
 local loadoutSelection = {}
 local lastSyncedLoadout
 
-local lobbyCountdownLabel
-local readyButton
-local leaveButton
-local roundButtons = {}
-local lobbyStatusLabel
-local lobbyPhase = "lobby"
-local lobbyStateSnapshot
-local lobbyReadyState = false
-local lobbyRoundList
-local loadoutLocked = false
+local lobbyUi = {
+        countdownLabel = nil,
+        readyButton = nil,
+        leaveButton = nil,
+        roundButtons = {},
+        statusLabel = nil,
+        phase = "lobby",
+        stateSnapshot = nil,
+        readyState = false,
+        roundList = nil,
+        loadoutLocked = false,
+}
 
 local mapSelectionState = {
         gui = nil,
@@ -129,20 +142,20 @@ local mapSelectionState = {
         optionsContainer = nil,
 }
 
-local preRoundCountdownLabel
-
 local refreshBoostDisplayVisibility
 local clearBoostDisplayTracking
 
-local waveSkipButton
-local waveSkipTween
-local waveSkipTweenConnection
-local waveSkipOfferActive = false
-local waveSkipRequestPending = false
-local waveSkipHiddenPosition = UDim2.new(0.5, 0, -0.18, 0)
-local waveSkipVisiblePosition = UDim2.new(0.5, 0, 0.065, 0)
-local waveSkipShowTweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-local waveSkipHideTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local waveSkipUi = {
+        button = nil,
+        tween = nil,
+        tweenConnection = nil,
+        offerActive = false,
+        requestPending = false,
+        hiddenPosition = UDim2.new(0.5, 0, -0.18, 0),
+        visiblePosition = UDim2.new(0.5, 0, 0.065, 0),
+        showTweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+        hideTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+}
 
 local DEFAULT_PREVIEW_SIZE = Vector3.new(4, 1, 4)
 local previewFootprintSize = DEFAULT_PREVIEW_SIZE
@@ -351,10 +364,10 @@ local placementValidation = PlacementValidation.new({
                 return previewPart
         end,
         getPreviewRangeRing = function()
-                return previewRangeRing
+                return hudRefs.previewRangeRing
         end,
         getRangeRing = function()
-                return rangeRing
+                return hudRefs.rangeRing
         end,
         getPreviewFootprintSize = function()
                 return previewFootprintSize
@@ -413,45 +426,45 @@ local function applyScaledText(guiObject, minTextSize, maxTextSize)
 end
 
 local function cancelWaveSkipTween()
-        if waveSkipTween then
-                waveSkipTween:Cancel()
-                waveSkipTween = nil
+        if waveSkipUi.tween then
+                waveSkipUi.tween:Cancel()
+                waveSkipUi.tween = nil
         end
 
-        if waveSkipTweenConnection then
-                waveSkipTweenConnection:Disconnect()
-                waveSkipTweenConnection = nil
+        if waveSkipUi.tweenConnection then
+                waveSkipUi.tweenConnection:Disconnect()
+                waveSkipUi.tweenConnection = nil
         end
 end
 
 local function resetWaveSkipButton()
-        waveSkipOfferActive = false
-        waveSkipRequestPending = false
+        waveSkipUi.offerActive = false
+        waveSkipUi.requestPending = false
 
-        if not waveSkipButton then
+        if not waveSkipUi.button then
                 return
         end
 
         cancelWaveSkipTween()
-        waveSkipButton.Visible = false
-        waveSkipButton.Active = false
-        waveSkipButton.AutoButtonColor = true
-        waveSkipButton.Position = waveSkipHiddenPosition
-        waveSkipButton.Text = "Skip Wave"
+        waveSkipUi.button.Visible = false
+        waveSkipUi.button.Active = false
+        waveSkipUi.button.AutoButtonColor = true
+        waveSkipUi.button.Position = waveSkipUi.hiddenPosition
+        waveSkipUi.button.Text = "Skip Wave"
 end
 
 local function showWaveSkipButton(payload)
-        if not waveSkipButton then
+        if not waveSkipUi.button then
                 return
         end
 
-        if lobbyPhase ~= "inRound" then
+        if lobbyUi.phase ~= "inRound" then
                 return
         end
 
         cancelWaveSkipTween()
-        waveSkipOfferActive = true
-        waveSkipRequestPending = false
+        waveSkipUi.offerActive = true
+        waveSkipUi.requestPending = false
 
         local label = "Skip Wave"
         if payload then
@@ -466,66 +479,66 @@ local function showWaveSkipButton(payload)
                 end
         end
 
-        waveSkipButton.Text = label
-        waveSkipButton.AutoButtonColor = true
-        waveSkipButton.Active = true
-        waveSkipButton.Visible = true
-        waveSkipButton.Position = waveSkipHiddenPosition
+        waveSkipUi.button.Text = label
+        waveSkipUi.button.AutoButtonColor = true
+        waveSkipUi.button.Active = true
+        waveSkipUi.button.Visible = true
+        waveSkipUi.button.Position = waveSkipUi.hiddenPosition
 
-        waveSkipTween = TweenService:Create(waveSkipButton, waveSkipShowTweenInfo, {
-                Position = waveSkipVisiblePosition,
+        waveSkipUi.tween = TweenService:Create(waveSkipUi.button, waveSkipUi.showTweenInfo, {
+                Position = waveSkipUi.visiblePosition,
         })
-        waveSkipTween:Play()
+        waveSkipUi.tween:Play()
 end
 
 local function hideWaveSkipButton(payload)
-        waveSkipOfferActive = false
-        waveSkipRequestPending = false
+        waveSkipUi.offerActive = false
+        waveSkipUi.requestPending = false
 
-        if not waveSkipButton then
+        if not waveSkipUi.button then
                 return
         end
 
-        if not waveSkipButton.Visible then
+        if not waveSkipUi.button.Visible then
                 resetWaveSkipButton()
                 return
         end
 
         cancelWaveSkipTween()
-        waveSkipButton.Active = false
-        waveSkipButton.AutoButtonColor = false
+        waveSkipUi.button.Active = false
+        waveSkipUi.button.AutoButtonColor = false
 
         if payload and payload.Skipped then
-                waveSkipButton.Text = "Skipping..."
+                waveSkipUi.button.Text = "Skipping..."
         elseif payload and payload.Reason == "completed" then
-                waveSkipButton.Text = "Wave Cleared"
+                waveSkipUi.button.Text = "Wave Cleared"
         elseif payload and payload.Reason == "victory" then
-                waveSkipButton.Text = "Round Complete"
+                waveSkipUi.button.Text = "Round Complete"
         elseif payload and payload.Reason == "gameOver" then
-                waveSkipButton.Text = "Defeat"
+                waveSkipUi.button.Text = "Defeat"
         elseif payload and payload.Reason == "advance" then
-                waveSkipButton.Text = "Preparing..."
+                waveSkipUi.button.Text = "Preparing..."
         else
-                waveSkipButton.Text = "Skip Unavailable"
+                waveSkipUi.button.Text = "Skip Unavailable"
         end
 
-        waveSkipTween = TweenService:Create(waveSkipButton, waveSkipHideTweenInfo, {
-                Position = waveSkipHiddenPosition,
+        waveSkipUi.tween = TweenService:Create(waveSkipUi.button, waveSkipUi.hideTweenInfo, {
+                Position = waveSkipUi.hiddenPosition,
         })
 
-        waveSkipTweenConnection = waveSkipTween.Completed:Connect(function()
-                if waveSkipTweenConnection then
-                        waveSkipTweenConnection:Disconnect()
-                        waveSkipTweenConnection = nil
+        waveSkipUi.tweenConnection = waveSkipUi.tween.Completed:Connect(function()
+                if waveSkipUi.tweenConnection then
+                        waveSkipUi.tweenConnection:Disconnect()
+                        waveSkipUi.tweenConnection = nil
                 end
-                waveSkipTween = nil
-                waveSkipButton.Visible = false
-                waveSkipButton.AutoButtonColor = true
-                waveSkipButton.Text = "Skip Wave"
-                waveSkipButton.Position = waveSkipHiddenPosition
+                waveSkipUi.tween = nil
+                waveSkipUi.button.Visible = false
+                waveSkipUi.button.AutoButtonColor = true
+                waveSkipUi.button.Text = "Skip Wave"
+                waveSkipUi.button.Position = waveSkipUi.hiddenPosition
         end)
 
-        waveSkipTween:Play()
+        waveSkipUi.tween:Play()
 end
 
 local function getTowerCountEntry(towerType)
@@ -533,11 +546,11 @@ local function getTowerCountEntry(towerType)
                 return nil
         end
 
-        if not towerCountSnapshot or typeof(towerCountSnapshot) ~= "table" then
+        if not towerTotalsUi.snapshot or typeof(towerTotalsUi.snapshot) ~= "table" then
                 return nil
         end
 
-        local towers = towerCountSnapshot.Towers
+        local towers = towerTotalsUi.snapshot.Towers
         if not towers or typeof(towers) ~= "table" then
                 return nil
         end
@@ -546,20 +559,20 @@ local function getTowerCountEntry(towerType)
 end
 
 local function updateOverallTowerTotals()
-        if not (playerTowerTotalLabel or teamTowerTotalLabel) then
+        if not (towerTotalsUi.playerLabel or towerTotalsUi.teamLabel) then
                 return
         end
 
-        local totalInfo = towerCountSnapshot and towerCountSnapshot.Total
+        local totalInfo = towerTotalsUi.snapshot and towerTotalsUi.snapshot.Total
 
         local playerText = formatCountLimit(totalInfo and totalInfo.PlayerCount, totalInfo and totalInfo.PlayerLimit)
-        if playerTowerTotalLabel then
-                playerTowerTotalLabel.Text = string.format("Your Towers: %s", playerText)
+        if towerTotalsUi.playerLabel then
+                towerTotalsUi.playerLabel.Text = string.format("Your Towers: %s", playerText)
         end
 
-        if teamTowerTotalLabel then
+        if towerTotalsUi.teamLabel then
                 local teamText = formatCountLimit(totalInfo and totalInfo.GlobalCount, totalInfo and totalInfo.GlobalLimit)
-                teamTowerTotalLabel.Text = string.format("Team Towers: %s", teamText)
+                towerTotalsUi.teamLabel.Text = string.format("Team Towers: %s", teamText)
         end
 end
 
@@ -605,18 +618,18 @@ local function disconnectSelectedConnections()
 end
 
 local function destroyRangeIndicator()
-	if rangeRing then
-		rangeRing:Destroy()
-		rangeRing = nil
-		rangeRingAdornment = nil
+	if hudRefs.rangeRing then
+		hudRefs.rangeRing:Destroy()
+		hudRefs.rangeRing = nil
+		hudRefs.rangeRingAdornment = nil
 	end
 end
 
 local function destroyPreviewRangeIndicator()
-	if previewRangeRing then
-		previewRangeRing:Destroy()
-		previewRangeRing = nil
-		previewRangeAdornment = nil
+	if hudRefs.previewRangeRing then
+		hudRefs.previewRangeRing:Destroy()
+		hudRefs.previewRangeRing = nil
+		hudRefs.previewRangeAdornment = nil
 	end
 end
 
@@ -1134,12 +1147,12 @@ function beginPlacement(towerType)
 
 	local config = towerConfigs[placingTowerType]
 	if config and config.Range then
-		if not previewRangeRing then
-			previewRangeRing, previewRangeAdornment = createRangeRing("PlacementRange", Color3.fromRGB(120, 220, 255), 0.55)
+		if not hudRefs.previewRangeRing then
+			hudRefs.previewRangeRing, hudRefs.previewRangeAdornment = createRangeRing("PlacementRange", Color3.fromRGB(120, 220, 255), 0.55)
 		end
-		if previewRangeAdornment then
-			previewRangeAdornment.Color3 = Color3.fromRGB(120, 220, 255)
-			previewRangeAdornment.Transparency = 0.55
+		if hudRefs.previewRangeAdornment then
+			hudRefs.previewRangeAdornment.Color3 = Color3.fromRGB(120, 220, 255)
+			hudRefs.previewRangeAdornment.Transparency = 0.55
 		end
 	else
 		destroyPreviewRangeIndicator()
@@ -1149,11 +1162,11 @@ function beginPlacement(towerType)
         selectionState.tower = nil
         disconnectSelectedConnections()
 	destroyRangeIndicator()
-	if towerDetailsFrame then
-		towerDetailsFrame.Visible = false
+	if towerDetailsUi.frame then
+		towerDetailsUi.frame.Visible = false
 	end
-	if upgradeDescriptionLabel then
-		upgradeDescriptionLabel.Text = ""
+	if towerDetailsUi.upgradeDescriptionLabel then
+		towerDetailsUi.upgradeDescriptionLabel.Text = ""
 	end
 
 	setTowerBaseVisibility(true)
@@ -1168,11 +1181,11 @@ local function createRaycastParams()
 	if previewPart then
 		table.insert(ignoreList, previewPart)
 	end
-	if previewRangeRing then
-		table.insert(ignoreList, previewRangeRing)
+	if hudRefs.previewRangeRing then
+		table.insert(ignoreList, hudRefs.previewRangeRing)
 	end
-	if rangeRing then
-		table.insert(ignoreList, rangeRing)
+	if hudRefs.rangeRing then
+		table.insert(ignoreList, hudRefs.rangeRing)
 	end
 
 	params.FilterDescendantsInstances = ignoreList
@@ -1314,22 +1327,22 @@ local function hasAnySelectedTowers()
 end
 
 local function applyLoadoutLockState()
-        for _, button in pairs(selectionSlotButtons) do
+        for _, button in pairs(selectionUi.slotButtons) do
                 if button and button:IsA("GuiButton") then
-                        button.AutoButtonColor = not loadoutLocked
+                        button.AutoButtonColor = not lobbyUi.loadoutLocked
                 end
         end
 
-        if selectionTowerList then
-                if selectionTowerList:IsA("ScrollingFrame") then
-                        selectionTowerList.Active = not loadoutLocked
-                        selectionTowerList.ScrollingEnabled = not loadoutLocked
+        if selectionUi.towerList then
+                if selectionUi.towerList:IsA("ScrollingFrame") then
+                        selectionUi.towerList.Active = not lobbyUi.loadoutLocked
+                        selectionUi.towerList.ScrollingEnabled = not lobbyUi.loadoutLocked
                 end
 
-                for _, child in ipairs(selectionTowerList:GetChildren()) do
+                for _, child in ipairs(selectionUi.towerList:GetChildren()) do
                         if child:IsA("GuiButton") then
-                                child.Active = not loadoutLocked
-                                child.AutoButtonColor = not loadoutLocked
+                                child.Active = not lobbyUi.loadoutLocked
+                                child.AutoButtonColor = not lobbyUi.loadoutLocked
                         end
                 end
         end
@@ -1338,7 +1351,7 @@ end
 local function setLoadoutLocked(locked)
         locked = locked and true or false
 
-        loadoutLocked = locked
+        lobbyUi.loadoutLocked = locked
         applyLoadoutLockState()
 end
 
@@ -1347,25 +1360,25 @@ local function updateConfirmButtonState()
 
         local ready = hasAnySelectedTowers()
 
-        if readyButton then
-                readyButton.Active = ready
-                readyButton.AutoButtonColor = ready
-                readyButton.TextTransparency = ready and 0 or 0.35
+        if lobbyUi.readyButton then
+                lobbyUi.readyButton.Active = ready
+                lobbyUi.readyButton.AutoButtonColor = ready
+                lobbyUi.readyButton.TextTransparency = ready and 0 or 0.35
         end
 
-        if lobbyStatusLabel then
-                if loadoutLocked then
-                        lobbyStatusLabel.Text = "Loadout locked while you are joined to a round."
+        if lobbyUi.statusLabel then
+                if lobbyUi.loadoutLocked then
+                        lobbyUi.statusLabel.Text = "Loadout locked while you are joined to a round."
                 elseif ready then
-                        lobbyStatusLabel.Text = ""
+                        lobbyUi.statusLabel.Text = ""
                 else
-                        lobbyStatusLabel.Text = "Select at least one tower to join a round."
+                        lobbyUi.statusLabel.Text = "Select at least one tower to join a round."
                 end
         end
 end
 
 local function updateSelectionSlotDisplay(slotIndex)
-	local button = selectionSlotButtons[slotIndex]
+	local button = selectionUi.slotButtons[slotIndex]
 	if not button then
 		return
 	end
@@ -1380,21 +1393,21 @@ local function updateSelectionSlotDisplay(slotIndex)
 	else
 		button:SetAttribute("TowerType", nil)
 		if button:IsA("TextButton") and button:GetAttribute("AutoText") ~= false then
-			button.Text = selectionSlotOriginalText[slotIndex] or "Empty Slot"
+			button.Text = selectionUi.slotOriginalText[slotIndex] or "Empty Slot"
 		end
 	end
 
-	button:SetAttribute("ActiveSlot", selectionActiveSlot == slotIndex)
+	button:SetAttribute("ActiveSlot", selectionUi.activeSlot == slotIndex)
 end
 
 local function setActiveSelectionSlot(slotIndex)
-	if selectionActiveSlot == slotIndex then
+	if selectionUi.activeSlot == slotIndex then
 		return
 	end
 
-	selectionActiveSlot = slotIndex
+	selectionUi.activeSlot = slotIndex
 
-	for index in pairs(selectionSlotButtons) do
+	for index in pairs(selectionUi.slotButtons) do
 		updateSelectionSlotDisplay(index)
 	end
 end
@@ -1452,7 +1465,7 @@ syncLoadoutWithServer = function()
 end
 
 local function assignTowerToSlot(slotIndex, towerType)
-    if loadoutLocked then
+    if lobbyUi.loadoutLocked then
         return
     end
 
@@ -1481,7 +1494,7 @@ local function assignTowerToSlot(slotIndex, towerType)
 end
 
 local function clearSlot(slotIndex)
-    if loadoutLocked then
+    if lobbyUi.loadoutLocked then
         return
     end
 
@@ -1542,11 +1555,11 @@ local function applyLoadoutToShop()
 end
 
 local function populateTowerSelectionButtons()
-        if not selectionTowerList then
+        if not selectionUi.towerList then
                 return
         end
 
-        for _, child in ipairs(selectionTowerList:GetChildren()) do
+        for _, child in ipairs(selectionUi.towerList:GetChildren()) do
                 if child:GetAttribute("TowerClientGenerated") then
                         child:Destroy()
                 end
@@ -1586,7 +1599,7 @@ local function populateTowerSelectionButtons()
                         button.AutoButtonColor = true
                         button.TextWrapped = true
                         button.LayoutOrder = config.Cost or 0
-                        button.Parent = selectionTowerList
+                        button.Parent = selectionUi.towerList
                         button:SetAttribute("TowerType", towerType)
                         button:SetAttribute("TowerClientGenerated", true)
                         local cost = tonumber(config.Cost) or 0
@@ -1595,13 +1608,13 @@ local function populateTowerSelectionButtons()
                         applyScaledText(button, 12, 32)
 
                         button.MouseButton1Click:Connect(function()
-                                local slotIndex = selectionActiveSlot or findFirstEmptySlot() or 1
+                                local slotIndex = selectionUi.activeSlot or findFirstEmptySlot() or 1
                                 assignTowerToSlot(slotIndex, towerType)
                         end)
                 end
         end
 
-        local layout = selectionTowerList:FindFirstChildWhichIsA("UIGridLayout")
+        local layout = selectionUi.towerList:FindFirstChildWhichIsA("UIGridLayout")
         if layout then
                 layout.CellSize = UDim2.new(0.48, 0, 0.22, 0)
         end
@@ -1610,40 +1623,40 @@ local function populateTowerSelectionButtons()
 end
 
 local function createSelectionGui()
-        if selectionScreenGui then
-                return selectionScreenGui
+        if selectionUi.screenGui then
+                return selectionUi.screenGui
         end
 
-        selectionScreenGui = Instance.new("ScreenGui")
-        selectionScreenGui.Name = "TowerLobbyUI"
-        selectionScreenGui.ResetOnSpawn = false
-        selectionScreenGui.IgnoreGuiInset = true
-        selectionScreenGui.DisplayOrder = 5
-        selectionScreenGui.Enabled = true
-        selectionScreenGui.Parent = playerGui
+        selectionUi.screenGui = Instance.new("ScreenGui")
+        selectionUi.screenGui.Name = "TowerLobbyUI"
+        selectionUi.screenGui.ResetOnSpawn = false
+        selectionUi.screenGui.IgnoreGuiInset = true
+        selectionUi.screenGui.DisplayOrder = 5
+        selectionUi.screenGui.Enabled = true
+        selectionUi.screenGui.Parent = playerGui
 
-        selectionFrame = Instance.new("Frame")
-        selectionFrame.Name = "LobbyFrame"
-        selectionFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-        selectionFrame.Size = UDim2.fromScale(0.9, 0.85)
-        selectionFrame.Position = UDim2.fromScale(0.5, 0.5)
-        selectionFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-        selectionFrame.BackgroundTransparency = 0.15
-        selectionFrame.BorderSizePixel = 0
-        selectionFrame.Parent = selectionScreenGui
+        selectionUi.frame = Instance.new("Frame")
+        selectionUi.frame.Name = "LobbyFrame"
+        selectionUi.frame.AnchorPoint = Vector2.new(0.5, 0.5)
+        selectionUi.frame.Size = UDim2.fromScale(0.9, 0.85)
+        selectionUi.frame.Position = UDim2.fromScale(0.5, 0.5)
+        selectionUi.frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        selectionUi.frame.BackgroundTransparency = 0.15
+        selectionUi.frame.BorderSizePixel = 0
+        selectionUi.frame.Parent = selectionUi.screenGui
 
         local frameCorner = Instance.new("UICorner")
         frameCorner.CornerRadius = UDim.new(0.03, 0)
-        frameCorner.Parent = selectionFrame
+        frameCorner.Parent = selectionUi.frame
 
         local frameConstraint = Instance.new("UIAspectRatioConstraint")
         frameConstraint.AspectRatio = 1140 / 520
         frameConstraint.DominantAxis = Enum.DominantAxis.Width
-        frameConstraint.Parent = selectionFrame
+        frameConstraint.Parent = selectionUi.frame
 
         local frameSizeConstraint = Instance.new("UISizeConstraint")
         frameSizeConstraint.MinSize = Vector2.new(720, 420)
-        frameSizeConstraint.Parent = selectionFrame
+        frameSizeConstraint.Parent = selectionUi.frame
 
         local shopPanel = Instance.new("Frame")
         shopPanel.Name = "TowerShopPanel"
@@ -1653,7 +1666,7 @@ local function createSelectionGui()
         shopPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         shopPanel.BackgroundTransparency = 0.05
         shopPanel.BorderSizePixel = 0
-        shopPanel.Parent = selectionFrame
+        shopPanel.Parent = selectionUi.frame
 
         local shopCorner = Instance.new("UICorner")
         shopCorner.CornerRadius = UDim.new(0.03, 0)
@@ -1673,16 +1686,16 @@ local function createSelectionGui()
         shopTitle.Parent = shopPanel
         applyScaledText(shopTitle, 16, 42)
 
-        selectionTowerList = Instance.new("ScrollingFrame")
-        selectionTowerList.Name = "TowerList"
-        selectionTowerList.BackgroundTransparency = 1
-        selectionTowerList.BorderSizePixel = 0
-        selectionTowerList.AnchorPoint = Vector2.new(0, 0)
-        selectionTowerList.Size = UDim2.new(0.94, 0, 0.76, 0)
-        selectionTowerList.Position = UDim2.new(0.03, 0, 0.18, 0)
-        selectionTowerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        selectionTowerList.ScrollBarThickness = 8
-        selectionTowerList.Parent = shopPanel
+        selectionUi.towerList = Instance.new("ScrollingFrame")
+        selectionUi.towerList.Name = "TowerList"
+        selectionUi.towerList.BackgroundTransparency = 1
+        selectionUi.towerList.BorderSizePixel = 0
+        selectionUi.towerList.AnchorPoint = Vector2.new(0, 0)
+        selectionUi.towerList.Size = UDim2.new(0.94, 0, 0.76, 0)
+        selectionUi.towerList.Position = UDim2.new(0.03, 0, 0.18, 0)
+        selectionUi.towerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        selectionUi.towerList.ScrollBarThickness = 8
+        selectionUi.towerList.Parent = shopPanel
 
         local shopGrid = Instance.new("UIGridLayout")
         shopGrid.CellSize = UDim2.new(0.48, 0, 0.22, 0)
@@ -1690,21 +1703,21 @@ local function createSelectionGui()
         shopGrid.FillDirection = Enum.FillDirection.Horizontal
         shopGrid.SortOrder = Enum.SortOrder.LayoutOrder
         shopGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
-        shopGrid.Parent = selectionTowerList
+        shopGrid.Parent = selectionUi.towerList
 
-        lobbyStatusLabel = Instance.new("TextLabel")
-        lobbyStatusLabel.Name = "LobbyStatus"
-        lobbyStatusLabel.AnchorPoint = Vector2.new(0, 1)
-        lobbyStatusLabel.Size = UDim2.new(0.94, 0, 0.1, 0)
-        lobbyStatusLabel.Position = UDim2.new(0.03, 0, 0.97, 0)
-        lobbyStatusLabel.BackgroundTransparency = 1
-        lobbyStatusLabel.Font = Enum.Font.Gotham
-        lobbyStatusLabel.TextSize = 18
-        lobbyStatusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-        lobbyStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-        lobbyStatusLabel.Text = ""
-        lobbyStatusLabel.Parent = shopPanel
-        applyScaledText(lobbyStatusLabel, 14, 30)
+        lobbyUi.statusLabel = Instance.new("TextLabel")
+        lobbyUi.statusLabel.Name = "LobbyStatus"
+        lobbyUi.statusLabel.AnchorPoint = Vector2.new(0, 1)
+        lobbyUi.statusLabel.Size = UDim2.new(0.94, 0, 0.1, 0)
+        lobbyUi.statusLabel.Position = UDim2.new(0.03, 0, 0.97, 0)
+        lobbyUi.statusLabel.BackgroundTransparency = 1
+        lobbyUi.statusLabel.Font = Enum.Font.Gotham
+        lobbyUi.statusLabel.TextSize = 18
+        lobbyUi.statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        lobbyUi.statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+        lobbyUi.statusLabel.Text = ""
+        lobbyUi.statusLabel.Parent = shopPanel
+        applyScaledText(lobbyUi.statusLabel, 14, 30)
 
         local roundPanel = Instance.new("Frame")
         roundPanel.Name = "RoundPanel"
@@ -1714,7 +1727,7 @@ local function createSelectionGui()
         roundPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         roundPanel.BackgroundTransparency = 0.05
         roundPanel.BorderSizePixel = 0
-        roundPanel.Parent = selectionFrame
+        roundPanel.Parent = selectionUi.frame
 
         local roundCorner = Instance.new("UICorner")
         roundCorner.CornerRadius = UDim.new(0.04, 0)
@@ -1734,32 +1747,32 @@ local function createSelectionGui()
         roundTitle.Parent = roundPanel
         applyScaledText(roundTitle, 16, 38)
 
-        lobbyCountdownLabel = Instance.new("TextLabel")
-        lobbyCountdownLabel.Name = "CountdownLabel"
-        lobbyCountdownLabel.AnchorPoint = Vector2.new(0, 0)
-        lobbyCountdownLabel.Size = UDim2.new(0.94, 0, 0.12, 0)
-        lobbyCountdownLabel.Position = UDim2.new(0.03, 0, 0.24, 0)
-        lobbyCountdownLabel.BackgroundTransparency = 1
-        lobbyCountdownLabel.Font = Enum.Font.Gotham
-        lobbyCountdownLabel.TextSize = 18
-        lobbyCountdownLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
-        lobbyCountdownLabel.TextXAlignment = Enum.TextXAlignment.Left
-        lobbyCountdownLabel.TextYAlignment = Enum.TextYAlignment.Center
-        lobbyCountdownLabel.Text = ""
-        lobbyCountdownLabel.Parent = roundPanel
-        applyScaledText(lobbyCountdownLabel, 14, 32)
+        lobbyUi.countdownLabel = Instance.new("TextLabel")
+        lobbyUi.countdownLabel.Name = "CountdownLabel"
+        lobbyUi.countdownLabel.AnchorPoint = Vector2.new(0, 0)
+        lobbyUi.countdownLabel.Size = UDim2.new(0.94, 0, 0.12, 0)
+        lobbyUi.countdownLabel.Position = UDim2.new(0.03, 0, 0.24, 0)
+        lobbyUi.countdownLabel.BackgroundTransparency = 1
+        lobbyUi.countdownLabel.Font = Enum.Font.Gotham
+        lobbyUi.countdownLabel.TextSize = 18
+        lobbyUi.countdownLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+        lobbyUi.countdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+        lobbyUi.countdownLabel.TextYAlignment = Enum.TextYAlignment.Center
+        lobbyUi.countdownLabel.Text = ""
+        lobbyUi.countdownLabel.Parent = roundPanel
+        applyScaledText(lobbyUi.countdownLabel, 14, 32)
 
-        lobbyRoundList = Instance.new("ScrollingFrame")
-        lobbyRoundList.Name = "RoundList"
-        lobbyRoundList.AnchorPoint = Vector2.new(0, 0)
-        lobbyRoundList.Size = UDim2.new(0.94, 0, 0.6, 0)
-        lobbyRoundList.Position = UDim2.new(0.03, 0, 0.36, 0)
-        lobbyRoundList.BackgroundTransparency = 1
-        lobbyRoundList.BorderSizePixel = 0
-        lobbyRoundList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        lobbyRoundList.ScrollBarThickness = 8
-        lobbyRoundList.ScrollingDirection = Enum.ScrollingDirection.Y
-        lobbyRoundList.Parent = roundPanel
+        lobbyUi.roundList = Instance.new("ScrollingFrame")
+        lobbyUi.roundList.Name = "RoundList"
+        lobbyUi.roundList.AnchorPoint = Vector2.new(0, 0)
+        lobbyUi.roundList.Size = UDim2.new(0.94, 0, 0.6, 0)
+        lobbyUi.roundList.Position = UDim2.new(0.03, 0, 0.36, 0)
+        lobbyUi.roundList.BackgroundTransparency = 1
+        lobbyUi.roundList.BorderSizePixel = 0
+        lobbyUi.roundList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        lobbyUi.roundList.ScrollBarThickness = 8
+        lobbyUi.roundList.ScrollingDirection = Enum.ScrollingDirection.Y
+        lobbyUi.roundList.Parent = roundPanel
 
         local roundLayout = Instance.new("UIListLayout")
         roundLayout.FillDirection = Enum.FillDirection.Vertical
@@ -1767,7 +1780,7 @@ local function createSelectionGui()
         roundLayout.VerticalAlignment = Enum.VerticalAlignment.Top
         roundLayout.SortOrder = Enum.SortOrder.LayoutOrder
         roundLayout.Padding = UDim.new(0.02, 0)
-        roundLayout.Parent = lobbyRoundList
+        roundLayout.Parent = lobbyUi.roundList
 
         local loadoutPanel = Instance.new("Frame")
         loadoutPanel.Name = "LoadoutPanel"
@@ -1777,7 +1790,7 @@ local function createSelectionGui()
         loadoutPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         loadoutPanel.BackgroundTransparency = 0.05
         loadoutPanel.BorderSizePixel = 0
-        loadoutPanel.Parent = selectionFrame
+        loadoutPanel.Parent = selectionUi.frame
 
         local loadoutCorner = Instance.new("UICorner")
         loadoutCorner.CornerRadius = UDim.new(0.04, 0)
@@ -1811,8 +1824,8 @@ local function createSelectionGui()
         slotsLayout.Padding = UDim.new(0.02, 0)
         slotsLayout.Parent = slotsFrame
 
-        selectionSlotButtons = {}
-        selectionSlotOriginalText = {}
+        selectionUi.slotButtons = {}
+        selectionUi.slotOriginalText = {}
         for i = 1, LOADOUT_SLOT_COUNT do
                 local button = Instance.new("TextButton")
                 button.Name = string.format("Slot%d", i)
@@ -1827,13 +1840,13 @@ local function createSelectionGui()
                 button.Text = string.format("Slot %d", i)
                 button.Parent = slotsFrame
                 button:SetAttribute("SlotIndex", i)
-                selectionSlotButtons[i] = button
-                selectionSlotOriginalText[i] = button.Text
+                selectionUi.slotButtons[i] = button
+                selectionUi.slotOriginalText[i] = button.Text
                 applyScaledText(button, 12, 28)
 
                 button.MouseButton1Click:Connect(function()
                         if loadoutSelection[i] then
-                                if loadoutLocked then
+                                if lobbyUi.loadoutLocked then
                                         setActiveSelectionSlot(i)
                                 else
                                         clearSlot(i)
@@ -1847,73 +1860,73 @@ local function createSelectionGui()
                 end)
         end
 
-        readyButton = Instance.new("TextButton")
-        readyButton.Name = "ReadyButton"
-        readyButton.AnchorPoint = Vector2.new(0, 1)
-        readyButton.Size = UDim2.new(0.47, 0, 0.26, 0)
-        readyButton.Position = UDim2.new(0.03, 0, 0.97, 0)
-        readyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
-        readyButton.BorderSizePixel = 0
-        readyButton.Font = Enum.Font.GothamBold
-        readyButton.TextSize = 20
-        readyButton.TextColor3 = Color3.new(1, 1, 1)
-        readyButton.Text = "Ready Up"
-        readyButton.AutoButtonColor = true
-        readyButton.Parent = loadoutPanel
-        applyScaledText(readyButton, 16, 36)
+        lobbyUi.readyButton = Instance.new("TextButton")
+        lobbyUi.readyButton.Name = "ReadyButton"
+        lobbyUi.readyButton.AnchorPoint = Vector2.new(0, 1)
+        lobbyUi.readyButton.Size = UDim2.new(0.47, 0, 0.26, 0)
+        lobbyUi.readyButton.Position = UDim2.new(0.03, 0, 0.97, 0)
+        lobbyUi.readyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 90)
+        lobbyUi.readyButton.BorderSizePixel = 0
+        lobbyUi.readyButton.Font = Enum.Font.GothamBold
+        lobbyUi.readyButton.TextSize = 20
+        lobbyUi.readyButton.TextColor3 = Color3.new(1, 1, 1)
+        lobbyUi.readyButton.Text = "Ready Up"
+        lobbyUi.readyButton.AutoButtonColor = true
+        lobbyUi.readyButton.Parent = loadoutPanel
+        applyScaledText(lobbyUi.readyButton, 16, 36)
 
-        readyButton.MouseButton1Click:Connect(function()
+        lobbyUi.readyButton.MouseButton1Click:Connect(function()
                 if not remotes.RequestReadyStatus then
                         return
                 end
-                remotes.RequestReadyStatus:FireServer(not lobbyReadyState)
+                remotes.RequestReadyStatus:FireServer(not lobbyUi.readyState)
         end)
 
-        leaveButton = Instance.new("TextButton")
-        leaveButton.Name = "LeaveButton"
-        leaveButton.AnchorPoint = Vector2.new(1, 1)
-        leaveButton.Size = UDim2.new(0.47, 0, 0.26, 0)
-        leaveButton.Position = UDim2.new(0.97, 0, 0.97, 0)
-        leaveButton.BackgroundColor3 = Color3.fromRGB(150, 80, 80)
-        leaveButton.BorderSizePixel = 0
-        leaveButton.Font = Enum.Font.GothamBold
-        leaveButton.TextSize = 20
-        leaveButton.TextColor3 = Color3.new(1, 1, 1)
-        leaveButton.Text = "Leave Round"
-        leaveButton.AutoButtonColor = true
-        leaveButton.Visible = false
-        leaveButton.Parent = loadoutPanel
-        applyScaledText(leaveButton, 16, 36)
+        lobbyUi.leaveButton = Instance.new("TextButton")
+        lobbyUi.leaveButton.Name = "LeaveButton"
+        lobbyUi.leaveButton.AnchorPoint = Vector2.new(1, 1)
+        lobbyUi.leaveButton.Size = UDim2.new(0.47, 0, 0.26, 0)
+        lobbyUi.leaveButton.Position = UDim2.new(0.97, 0, 0.97, 0)
+        lobbyUi.leaveButton.BackgroundColor3 = Color3.fromRGB(150, 80, 80)
+        lobbyUi.leaveButton.BorderSizePixel = 0
+        lobbyUi.leaveButton.Font = Enum.Font.GothamBold
+        lobbyUi.leaveButton.TextSize = 20
+        lobbyUi.leaveButton.TextColor3 = Color3.new(1, 1, 1)
+        lobbyUi.leaveButton.Text = "Leave Round"
+        lobbyUi.leaveButton.AutoButtonColor = true
+        lobbyUi.leaveButton.Visible = false
+        lobbyUi.leaveButton.Parent = loadoutPanel
+        applyScaledText(lobbyUi.leaveButton, 16, 36)
 
-        leaveButton.MouseButton1Click:Connect(function()
+        lobbyUi.leaveButton.MouseButton1Click:Connect(function()
                 if remotes.RequestLeaveRound then
                         remotes.RequestLeaveRound:FireServer()
                 end
         end)
 
         populateTowerSelectionButtons()
-        for index in pairs(selectionSlotButtons) do
+        for index in pairs(selectionUi.slotButtons) do
                 updateSelectionSlotDisplay(index)
         end
         setActiveSelectionSlot(findFirstEmptySlot() or 1)
         updateConfirmButtonState()
         applyLoadoutLockState()
 
-        return selectionScreenGui
+        return selectionUi.screenGui
 end
 
 local function updateInterfaceVisibility()
-        if selectionScreenGui then
-                selectionScreenGui.Enabled = lobbyPhase == "lobby"
+        if selectionUi.screenGui then
+                selectionUi.screenGui.Enabled = lobbyUi.phase == "lobby"
         end
 
         if mapSelectionState.gui then
-                mapSelectionState.gui.Enabled = lobbyPhase == "mapSelection"
+                mapSelectionState.gui.Enabled = lobbyUi.phase == "mapSelection"
         end
 
-        if screenGui then
-                local inRound = lobbyPhase == "inRound"
-                screenGui.Enabled = inRound
+        if hudRefs.screenGui then
+                local inRound = lobbyUi.phase == "inRound"
+                hudRefs.screenGui.Enabled = inRound
                 if not inRound then
                         resetWaveSkipButton()
                         if placingTowerType then
@@ -2040,11 +2053,11 @@ local function ensurePlayerSlots(entry, slotCount)
 end
 
 local function updateRoundButtons(rounds, playerRound, hasLoadout)
-        if not selectionScreenGui then
+        if not selectionUi.screenGui then
                 createSelectionGui()
         end
 
-        if not lobbyRoundList then
+        if not lobbyUi.roundList then
                 return
         end
 
@@ -2053,7 +2066,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 local roundKey = round.Key or tostring(index)
                 existing[roundKey] = true
 
-                local entry = roundButtons[roundKey]
+                local entry = lobbyUi.roundButtons[roundKey]
                 if not entry then
                         local frame = Instance.new("Frame")
                         frame.Name = string.format("Round%sEntry", roundKey)
@@ -2062,7 +2075,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                         frame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
                         frame.BackgroundTransparency = 0.05
                         frame.BorderSizePixel = 0
-                        frame.Parent = lobbyRoundList
+                        frame.Parent = lobbyUi.roundList
 
                         local frameCorner = Instance.new("UICorner")
                         frameCorner.CornerRadius = UDim.new(0.04, 0)
@@ -2144,7 +2157,7 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                                 PlayerSlots = {},
                                 PlayerSlotCount = 0,
                         }
-                        roundButtons[roundKey] = entry
+                        lobbyUi.roundButtons[roundKey] = entry
                 end
 
                 local players = round.Players or {}
@@ -2218,20 +2231,20 @@ local function updateRoundButtons(rounds, playerRound, hasLoadout)
                 end
         end
 
-        for key, entry in pairs(roundButtons) do
+        for key, entry in pairs(lobbyUi.roundButtons) do
                 if not existing[key] then
                         if entry.Frame then
                                 entry.Frame:Destroy()
                         end
-                        roundButtons[key] = nil
+                        lobbyUi.roundButtons[key] = nil
                 end
         end
 end
 
 local function applyLobbyState(state)
-        lobbyStateSnapshot = state
-        lobbyPhase = state and state.Phase or lobbyPhase
-        lobbyReadyState = state and state.Player and state.Player.Ready or false
+        lobbyUi.stateSnapshot = state
+        lobbyUi.phase = state and state.Phase or lobbyUi.phase
+        lobbyUi.readyState = state and state.Player and state.Player.Ready or false
 
         local playerInfo = state and state.Player or {}
         local playerRound = playerInfo.CurrentRound
@@ -2257,7 +2270,7 @@ local function applyLobbyState(state)
 
         updateInterfaceVisibility()
 
-        if lobbyPhase ~= "lobby" then
+        if lobbyUi.phase ~= "lobby" then
                 return
         end
 
@@ -2265,7 +2278,7 @@ local function applyLobbyState(state)
 
         updateRoundButtons(state and state.Rounds or {}, playerRound, hasLoadout)
 
-        if lobbyCountdownLabel then
+        if lobbyUi.countdownLabel then
                 local countdownText = ""
                 if countdownActive then
                         countdownText = string.format("Countdown: %ds", countdownRemaining)
@@ -2277,36 +2290,36 @@ local function applyLobbyState(state)
                                 end
                         end
                 end
-                lobbyCountdownLabel.Text = countdownText
+                lobbyUi.countdownLabel.Text = countdownText
         end
 
-        if readyButton then
-                readyButton.Text = lobbyReadyState and "Unready" or "Ready Up"
-                readyButton.BackgroundColor3 = lobbyReadyState and Color3.fromRGB(110, 90, 160) or Color3.fromRGB(70, 130, 90)
+        if lobbyUi.readyButton then
+                lobbyUi.readyButton.Text = lobbyUi.readyState and "Unready" or "Ready Up"
+                lobbyUi.readyButton.BackgroundColor3 = lobbyUi.readyState and Color3.fromRGB(110, 90, 160) or Color3.fromRGB(70, 130, 90)
                 local inLobbyRoom = playerRound ~= nil
                 local canReady = hasLoadout and inLobbyRoom
-                readyButton.Visible = inLobbyRoom
-                readyButton.Active = canReady
-                readyButton.AutoButtonColor = canReady
-                readyButton.TextTransparency = canReady and 0 or 0.35
+                lobbyUi.readyButton.Visible = inLobbyRoom
+                lobbyUi.readyButton.Active = canReady
+                lobbyUi.readyButton.AutoButtonColor = canReady
+                lobbyUi.readyButton.TextTransparency = canReady and 0 or 0.35
         end
 
-        if leaveButton then
+        if lobbyUi.leaveButton then
                 local canLeave = playerRound ~= nil
-                leaveButton.Visible = canLeave
-                leaveButton.Active = canLeave
-                leaveButton.AutoButtonColor = canLeave
+                lobbyUi.leaveButton.Visible = canLeave
+                lobbyUi.leaveButton.Active = canLeave
+                lobbyUi.leaveButton.AutoButtonColor = canLeave
         end
 
-        if lobbyStatusLabel then
-                if loadoutLocked then
-                        lobbyStatusLabel.Text = "Loadout locked while the countdown is active."
+        if lobbyUi.statusLabel then
+                if lobbyUi.loadoutLocked then
+                        lobbyUi.statusLabel.Text = "Loadout locked while the countdown is active."
                 elseif not hasLoadout or not hasAnySelectedTowers() then
-                        lobbyStatusLabel.Text = "Select at least one tower to join a round."
+                        lobbyUi.statusLabel.Text = "Select at least one tower to join a round."
                 elseif not playerRound then
-                        lobbyStatusLabel.Text = "Choose a round to enter the waiting room."
+                        lobbyUi.statusLabel.Text = "Choose a round to enter the waiting room."
                 else
-                        lobbyStatusLabel.Text = ""
+                        lobbyUi.statusLabel.Text = ""
                 end
         end
 end
@@ -2549,63 +2562,63 @@ local function finalizeMapSelection(selectedIndex, option)
 end
 
 local function ensureHoverGui()
-        if hoverGui then
-                return hoverGui
+        if hoverUi.frame then
+                return hoverUi.frame
         end
 
-	hoverGuiContainer = Instance.new("ScreenGui")
-	hoverGuiContainer.Name = "EnemyHoverUI"
-	hoverGuiContainer.ResetOnSpawn = false
-	hoverGuiContainer.IgnoreGuiInset = true
-	hoverGuiContainer.DisplayOrder = 6
-	hoverGuiContainer.Enabled = true
-	hoverGuiContainer.Parent = playerGui
+	hoverUi.container = Instance.new("ScreenGui")
+	hoverUi.container.Name = "EnemyHoverUI"
+	hoverUi.container.ResetOnSpawn = false
+	hoverUi.container.IgnoreGuiInset = true
+	hoverUi.container.DisplayOrder = 6
+	hoverUi.container.Enabled = true
+	hoverUi.container.Parent = playerGui
 
-        hoverGui = Instance.new("Frame")
-        hoverGui.Name = "EnemyHoverFrame"
-        hoverGui.AnchorPoint = Vector2.new(0, 1)
-        hoverGui.Size = UDim2.new(0.18, 0, 0.08, 0)
-        hoverGui.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-        hoverGui.BackgroundTransparency = 0.2
-        hoverGui.BorderSizePixel = 0
-        hoverGui.Visible = false
-        hoverGui.Parent = hoverGuiContainer
+        hoverUi.frame = Instance.new("Frame")
+        hoverUi.frame.Name = "EnemyHoverFrame"
+        hoverUi.frame.AnchorPoint = Vector2.new(0, 1)
+        hoverUi.frame.Size = UDim2.new(0.18, 0, 0.08, 0)
+        hoverUi.frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        hoverUi.frame.BackgroundTransparency = 0.2
+        hoverUi.frame.BorderSizePixel = 0
+        hoverUi.frame.Visible = false
+        hoverUi.frame.Parent = hoverUi.container
 
         local hoverCorner = Instance.new("UICorner")
         hoverCorner.CornerRadius = UDim.new(0.25, 0)
-        hoverCorner.Parent = hoverGui
+        hoverCorner.Parent = hoverUi.frame
 
-        hoverNameLabel = Instance.new("TextLabel")
-        hoverNameLabel.Name = "NameLabel"
-        hoverNameLabel.BackgroundTransparency = 1
-        hoverNameLabel.AnchorPoint = Vector2.new(0, 0)
-        hoverNameLabel.Position = UDim2.new(0.04, 0, 0.12, 0)
-        hoverNameLabel.Size = UDim2.new(0.92, 0, 0.46, 0)
-        hoverNameLabel.Font = Enum.Font.GothamBold
-        hoverNameLabel.TextColor3 = Color3.new(1, 1, 1)
-        hoverNameLabel.TextSize = 18
-        hoverNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-        hoverNameLabel.Text = "Enemy"
-        hoverNameLabel.Parent = hoverGui
-        applyScaledText(hoverNameLabel, 12, 28)
+        hoverUi.nameLabel = Instance.new("TextLabel")
+        hoverUi.nameLabel.Name = "NameLabel"
+        hoverUi.nameLabel.BackgroundTransparency = 1
+        hoverUi.nameLabel.AnchorPoint = Vector2.new(0, 0)
+        hoverUi.nameLabel.Position = UDim2.new(0.04, 0, 0.12, 0)
+        hoverUi.nameLabel.Size = UDim2.new(0.92, 0, 0.46, 0)
+        hoverUi.nameLabel.Font = Enum.Font.GothamBold
+        hoverUi.nameLabel.TextColor3 = Color3.new(1, 1, 1)
+        hoverUi.nameLabel.TextSize = 18
+        hoverUi.nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        hoverUi.nameLabel.Text = "Enemy"
+        hoverUi.nameLabel.Parent = hoverUi.frame
+        applyScaledText(hoverUi.nameLabel, 12, 28)
 
-        hoverHealthLabel = Instance.new("TextLabel")
-        hoverHealthLabel.Name = "HealthLabel"
-        hoverHealthLabel.BackgroundTransparency = 1
-        hoverHealthLabel.AnchorPoint = Vector2.new(0, 0)
-        hoverHealthLabel.Position = UDim2.new(0.04, 0, 0.58, 0)
-        hoverHealthLabel.Size = UDim2.new(0.92, 0, 0.32, 0)
-	hoverHealthLabel.Font = Enum.Font.Gotham
-        hoverHealthLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        hoverHealthLabel.TextSize = 16
-        hoverHealthLabel.TextXAlignment = Enum.TextXAlignment.Left
-        hoverHealthLabel.Text = "HP: 0"
-        hoverHealthLabel.Parent = hoverGui
-        applyScaledText(hoverHealthLabel, 12, 24)
+        hoverUi.healthLabel = Instance.new("TextLabel")
+        hoverUi.healthLabel.Name = "HealthLabel"
+        hoverUi.healthLabel.BackgroundTransparency = 1
+        hoverUi.healthLabel.AnchorPoint = Vector2.new(0, 0)
+        hoverUi.healthLabel.Position = UDim2.new(0.04, 0, 0.58, 0)
+        hoverUi.healthLabel.Size = UDim2.new(0.92, 0, 0.32, 0)
+	hoverUi.healthLabel.Font = Enum.Font.Gotham
+        hoverUi.healthLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        hoverUi.healthLabel.TextSize = 16
+        hoverUi.healthLabel.TextXAlignment = Enum.TextXAlignment.Left
+        hoverUi.healthLabel.Text = "HP: 0"
+        hoverUi.healthLabel.Parent = hoverUi.frame
+        applyScaledText(hoverUi.healthLabel, 12, 24)
 
-	hoverCombinedLabel = nil
+	hoverUi.combinedLabel = nil
 
-	return hoverGui
+	return hoverUi.frame
 end
 
 local function cloneStats(config)
@@ -2743,147 +2756,147 @@ local function showRangeIndicator(towerModel, range)
 
         groundPosition = resolveRangeRingPosition(groundPosition)
 
-        rangeRing, rangeRingAdornment = createRangeRing("TowerRangeRing", Color3.fromRGB(80, 200, 255), 0.35)
+        hudRefs.rangeRing, hudRefs.rangeRingAdornment = createRangeRing("TowerRangeRing", Color3.fromRGB(80, 200, 255), 0.35)
         updateRangeRing(
-                rangeRing,
-                rangeRingAdornment,
+                hudRefs.rangeRing,
+                hudRefs.rangeRingAdornment,
                 range,
                 Vector3.new(groundPosition.X, groundPosition.Y + 0.05, groundPosition.Z)
         )
 end
 
 local function applyUpgradeButtonStyle(disabled)
-	if not upgradeButton then
+	if not towerDetailsUi.upgradeButton then
 		return
 	end
 
-	if not upgradeButtonOriginalColor then
-		upgradeButtonOriginalColor = upgradeButton.BackgroundColor3
+	if not towerDetailsUi.upgradeButtonOriginalColor then
+		towerDetailsUi.upgradeButtonOriginalColor = towerDetailsUi.upgradeButton.BackgroundColor3
 	end
-	if not upgradeButtonOriginalTextColor then
-		upgradeButtonOriginalTextColor = upgradeButton.TextColor3
+	if not towerDetailsUi.upgradeButtonOriginalTextColor then
+		towerDetailsUi.upgradeButtonOriginalTextColor = towerDetailsUi.upgradeButton.TextColor3
 	end
-	if upgradeButtonOriginalBackgroundTransparency == nil then
-		upgradeButtonOriginalBackgroundTransparency = upgradeButton.BackgroundTransparency
+	if towerDetailsUi.upgradeButtonOriginalBackgroundTransparency == nil then
+		towerDetailsUi.upgradeButtonOriginalBackgroundTransparency = towerDetailsUi.upgradeButton.BackgroundTransparency
 	end
-	if upgradeButtonOriginalTextTransparency == nil then
-		upgradeButtonOriginalTextTransparency = upgradeButton.TextTransparency
+	if towerDetailsUi.upgradeButtonOriginalTextTransparency == nil then
+		towerDetailsUi.upgradeButtonOriginalTextTransparency = towerDetailsUi.upgradeButton.TextTransparency
 	end
 
 	if disabled then
-		if upgradeButtonOriginalColor then
-			upgradeButton.BackgroundColor3 = upgradeButtonOriginalColor:Lerp(GREY_COLOR, 0.2)
+		if towerDetailsUi.upgradeButtonOriginalColor then
+			towerDetailsUi.upgradeButton.BackgroundColor3 = towerDetailsUi.upgradeButtonOriginalColor:Lerp(GREY_COLOR, 0.2)
 		end
-		if upgradeButtonOriginalTextColor then
-			upgradeButton.TextColor3 = upgradeButtonOriginalTextColor:Lerp(GREY_COLOR, 0.2)
+		if towerDetailsUi.upgradeButtonOriginalTextColor then
+			towerDetailsUi.upgradeButton.TextColor3 = towerDetailsUi.upgradeButtonOriginalTextColor:Lerp(GREY_COLOR, 0.2)
 		end
 	else
-		if upgradeButtonOriginalColor then
-			upgradeButton.BackgroundColor3 = upgradeButtonOriginalColor
+		if towerDetailsUi.upgradeButtonOriginalColor then
+			towerDetailsUi.upgradeButton.BackgroundColor3 = towerDetailsUi.upgradeButtonOriginalColor
 		end
-		if upgradeButtonOriginalTextColor then
-			upgradeButton.TextColor3 = upgradeButtonOriginalTextColor
+		if towerDetailsUi.upgradeButtonOriginalTextColor then
+			towerDetailsUi.upgradeButton.TextColor3 = towerDetailsUi.upgradeButtonOriginalTextColor
 		end
 	end
 
-	if upgradeButtonOriginalBackgroundTransparency ~= nil then
-		upgradeButton.BackgroundTransparency = upgradeButtonOriginalBackgroundTransparency
+	if towerDetailsUi.upgradeButtonOriginalBackgroundTransparency ~= nil then
+		towerDetailsUi.upgradeButton.BackgroundTransparency = towerDetailsUi.upgradeButtonOriginalBackgroundTransparency
 	end
-	if upgradeButtonOriginalTextTransparency ~= nil then
-		upgradeButton.TextTransparency = upgradeButtonOriginalTextTransparency
+	if towerDetailsUi.upgradeButtonOriginalTextTransparency ~= nil then
+		towerDetailsUi.upgradeButton.TextTransparency = towerDetailsUi.upgradeButtonOriginalTextTransparency
 	end
 end
 
 local function updateUpgradeButton(towerType, level, ownerUserId)
-	if not upgradeButton then
+	if not towerDetailsUi.upgradeButton then
 		return
 	end
 
 	local nextUpgrade = getNextUpgrade(towerType, level)
 
-	if upgradeDescriptionLabel then
+	if towerDetailsUi.upgradeDescriptionLabel then
 		if nextUpgrade and nextUpgrade.Description then
 			if ownerUserId == player.UserId then
-				upgradeDescriptionLabel.Text = string.format("%s\nPress E to upgrade.", nextUpgrade.Description)
+				towerDetailsUi.upgradeDescriptionLabel.Text = string.format("%s\nPress E to upgrade.", nextUpgrade.Description)
 			else
-				upgradeDescriptionLabel.Text = nextUpgrade.Description
+				towerDetailsUi.upgradeDescriptionLabel.Text = nextUpgrade.Description
 			end
 		else
 			if ownerUserId == player.UserId then
-				upgradeDescriptionLabel.Text = "Fully upgraded\nPress X to sell if you need the space."
+				towerDetailsUi.upgradeDescriptionLabel.Text = "Fully upgraded\nPress X to sell if you need the space."
 			else
-				upgradeDescriptionLabel.Text = "Fully upgraded"
+				towerDetailsUi.upgradeDescriptionLabel.Text = "Fully upgraded"
 			end
 		end
 	end
 
 	if not nextUpgrade then
-		upgradeButton.Text = "Max Level"
-		upgradeButton.AutoButtonColor = false
-		upgradeButton.Active = false
+		towerDetailsUi.upgradeButton.Text = "Max Level"
+		towerDetailsUi.upgradeButton.AutoButtonColor = false
+		towerDetailsUi.upgradeButton.Active = false
 		applyUpgradeButtonStyle(true)
-		upgradeButton.Visible = true
+		towerDetailsUi.upgradeButton.Visible = true
 		return
 	end
 
 	if ownerUserId ~= player.UserId then
-		upgradeButton.Text = "Not your tower"
-		upgradeButton.AutoButtonColor = false
-		upgradeButton.Active = false
+		towerDetailsUi.upgradeButton.Text = "Not your tower"
+		towerDetailsUi.upgradeButton.AutoButtonColor = false
+		towerDetailsUi.upgradeButton.Active = false
 		applyUpgradeButtonStyle(true)
-		upgradeButton.Visible = true
+		towerDetailsUi.upgradeButton.Visible = true
 		return
 	end
 
 	local affordable = currentMoney >= nextUpgrade.Cost
-	if upgradeButtonOriginalAutoButtonColor == nil then
-		upgradeButtonOriginalAutoButtonColor = upgradeButton.AutoButtonColor
+	if towerDetailsUi.upgradeButtonOriginalAutoButtonColor == nil then
+		towerDetailsUi.upgradeButtonOriginalAutoButtonColor = towerDetailsUi.upgradeButton.AutoButtonColor
 	end
-	upgradeButton.Text = string.format("Upgrade (E) - $%d", nextUpgrade.Cost)
-	upgradeButton.Active = affordable
-	upgradeButton.AutoButtonColor = affordable and upgradeButtonOriginalAutoButtonColor or false
+	towerDetailsUi.upgradeButton.Text = string.format("Upgrade (E) - $%d", nextUpgrade.Cost)
+	towerDetailsUi.upgradeButton.Active = affordable
+	towerDetailsUi.upgradeButton.AutoButtonColor = affordable and towerDetailsUi.upgradeButtonOriginalAutoButtonColor or false
 	applyUpgradeButtonStyle(not affordable)
-	upgradeButton.Visible = true
+	towerDetailsUi.upgradeButton.Visible = true
 end
 
 local function updateSellButton(towerModel, ownerUserId)
-	if not sellButton then
+	if not towerDetailsUi.sellButton then
 		return
 	end
 
 	if not towerModel then
-		sellButton.Visible = false
+		towerDetailsUi.sellButton.Visible = false
 		return
 	end
 
 	local sellValue = towerModel:GetAttribute("SellValue")
 	if typeof(sellValue) ~= "number" or sellValue <= 0 then
-		sellButton.Visible = false
+		towerDetailsUi.sellButton.Visible = false
 		return
 	end
 
 	local refund = math.floor(sellValue + 0.5)
-	sellButton.Text = string.format("Sell (X) +$%d", refund)
-	sellButton.Visible = true
+	towerDetailsUi.sellButton.Text = string.format("Sell (X) +$%d", refund)
+	towerDetailsUi.sellButton.Visible = true
 
 	local isOwner = ownerUserId == player.UserId
 	local active = isOwner and not gameEnded
-	if sellButtonOriginalAutoButtonColor == nil then
-		sellButtonOriginalAutoButtonColor = sellButton.AutoButtonColor
+	if towerDetailsUi.sellButtonOriginalAutoButtonColor == nil then
+		towerDetailsUi.sellButtonOriginalAutoButtonColor = towerDetailsUi.sellButton.AutoButtonColor
 	end
-	sellButton.AutoButtonColor = active and sellButtonOriginalAutoButtonColor or false
-	sellButton.Active = active
-	sellButton.Selectable = active
+	towerDetailsUi.sellButton.AutoButtonColor = active and towerDetailsUi.sellButtonOriginalAutoButtonColor or false
+	towerDetailsUi.sellButton.Active = active
+	towerDetailsUi.sellButton.Selectable = active
 end
 
 local function updateTowerDetails(towerModel)
-	if not towerDetailsFrame or not towerModel then
+	if not towerDetailsUi.frame or not towerModel then
 		return
 	end
 
 	local towerType = resolveTowerType(towerModel)
 	if not towerType then
-		towerDetailsFrame.Visible = false
+		towerDetailsUi.frame.Visible = false
 		destroyRangeIndicator()
 		return
 	end
@@ -2901,16 +2914,16 @@ local function updateTowerDetails(towerModel)
 	end
 
 	local config = towerConfigs[towerType]
-	if towerNameLabel then
+	if towerDetailsUi.nameLabel then
 		local displayName = config and config.Name or towerModel.Name
-		towerNameLabel.Text = displayName
+		towerDetailsUi.nameLabel.Text = displayName
 	end
-	if towerLevelLabel then
-		towerLevelLabel.Text = string.format("Level: %d", level)
+	if towerDetailsUi.levelLabel then
+		towerDetailsUi.levelLabel.Text = string.format("Level: %d", level)
 	end
 
 	local stats = getTowerStatsForLevel(towerType, level)
-	if stats and towerStatsLabel then
+	if stats and towerDetailsUi.statsLabel then
 		local lines = {}
 		if stats.Range then
 			table.insert(lines, string.format("Range: %.1f", stats.Range))
@@ -2945,50 +2958,50 @@ local function updateTowerDetails(towerModel)
                                 table.insert(lines, string.format("Buff Cooldown: -%d%%", math.floor(cooldownReduction + 0.5)))
                         end
                 end
-                towerStatsLabel.Text = table.concat(lines, "\n")
-        elseif towerStatsLabel then
-                towerStatsLabel.Text = ""
+                towerDetailsUi.statsLabel.Text = table.concat(lines, "\n")
+        elseif towerDetailsUi.statsLabel then
+                towerDetailsUi.statsLabel.Text = ""
         end
 
-	if ownershipLabel then
+	if towerDetailsUi.ownershipLabel then
 		if ownerUserId == player.UserId then
-			ownershipLabel.Text = "Owner: You (E to upgrade, X to sell)"
+			towerDetailsUi.ownershipLabel.Text = "Owner: You (E to upgrade, X to sell)"
 		else
-			ownershipLabel.Text = string.format("Owner: %s", ownerText)
+			towerDetailsUi.ownershipLabel.Text = string.format("Owner: %s", ownerText)
 		end
 	end
 
-	towerDetailsFrame.Visible = true
+	towerDetailsUi.frame.Visible = true
 	showRangeIndicator(towerModel, stats and stats.Range)
 	updateUpgradeButton(towerType, level, ownerUserId)
 	updateSellButton(towerModel, ownerUserId)
 end
 
 local function createGui()
-	if screenGui then
-		return screenGui
+	if hudRefs.screenGui then
+		return hudRefs.screenGui
 	end
 
-	screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "TowerHUD"
-	screenGui.ResetOnSpawn = false
-	screenGui.IgnoreGuiInset = true
-	screenGui.DisplayOrder = 4
-	screenGui.Parent = playerGui
+	hudRefs.screenGui = Instance.new("ScreenGui")
+	hudRefs.screenGui.Name = "TowerHUD"
+	hudRefs.screenGui.ResetOnSpawn = false
+	hudRefs.screenGui.IgnoreGuiInset = true
+	hudRefs.screenGui.DisplayOrder = 4
+	hudRefs.screenGui.Parent = playerGui
 
-        shopFrame = Instance.new("Frame")
-        shopFrame.Name = "Shop"
-        shopFrame.Size = UDim2.new(0.7, 0, 0.22, 0)
-        shopFrame.AnchorPoint = Vector2.new(0.5, 1)
-        shopFrame.Position = UDim2.new(0.5, 0, 0.98, 0)
-        shopFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        shopFrame.BackgroundTransparency = 0.1
-        shopFrame.BorderSizePixel = 0
-        shopFrame.Parent = screenGui
+        hudRefs.shopFrame = Instance.new("Frame")
+        hudRefs.shopFrame.Name = "Shop"
+        hudRefs.shopFrame.Size = UDim2.new(0.7, 0, 0.22, 0)
+        hudRefs.shopFrame.AnchorPoint = Vector2.new(0.5, 1)
+        hudRefs.shopFrame.Position = UDim2.new(0.5, 0, 0.98, 0)
+        hudRefs.shopFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        hudRefs.shopFrame.BackgroundTransparency = 0.1
+        hudRefs.shopFrame.BorderSizePixel = 0
+        hudRefs.shopFrame.Parent = hudRefs.screenGui
 
         local shopCorner = Instance.new("UICorner")
         shopCorner.CornerRadius = UDim.new(0.05, 0)
-        shopCorner.Parent = shopFrame
+        shopCorner.Parent = hudRefs.shopFrame
 
         local slotLayout = Instance.new("UIListLayout")
         slotLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -2996,7 +3009,7 @@ local function createGui()
         slotLayout.VerticalAlignment = Enum.VerticalAlignment.Center
         slotLayout.SortOrder = Enum.SortOrder.LayoutOrder
         slotLayout.Padding = UDim.new(0.02, 0)
-        slotLayout.Parent = shopFrame
+        slotLayout.Parent = hudRefs.shopFrame
 
         shopSlotButtons = {}
         shopSlotOriginalText = {}
@@ -3008,7 +3021,7 @@ local function createGui()
                 slotContainer.BackgroundTransparency = 1
                 slotContainer.BorderSizePixel = 0
                 slotContainer.LayoutOrder = i
-                slotContainer.Parent = shopFrame
+                slotContainer.Parent = hudRefs.shopFrame
 
                 local priceLabel = Instance.new("TextLabel")
                 priceLabel.Name = "PriceLabel"
@@ -3065,291 +3078,291 @@ local function createGui()
                 applyScaledText(countLabel, 12, 24)
         end
 
-        statusFrame = Instance.new("Frame")
-        statusFrame.Name = "Status"
-        statusFrame.AnchorPoint = Vector2.new(0, 1)
-        statusFrame.Size = UDim2.new(0.22, 0, 0.34, 0)
-        statusFrame.Position = UDim2.new(0.02, 0, 0.98, 0)
-        statusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        statusFrame.BackgroundTransparency = 0.1
-        statusFrame.BorderSizePixel = 0
-        statusFrame.Parent = screenGui
+        hudRefs.statusFrame = Instance.new("Frame")
+        hudRefs.statusFrame.Name = "Status"
+        hudRefs.statusFrame.AnchorPoint = Vector2.new(0, 1)
+        hudRefs.statusFrame.Size = UDim2.new(0.22, 0, 0.34, 0)
+        hudRefs.statusFrame.Position = UDim2.new(0.02, 0, 0.98, 0)
+        hudRefs.statusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        hudRefs.statusFrame.BackgroundTransparency = 0.1
+        hudRefs.statusFrame.BorderSizePixel = 0
+        hudRefs.statusFrame.Parent = hudRefs.screenGui
 
         local statusCorner = Instance.new("UICorner")
         statusCorner.CornerRadius = UDim.new(0.05, 0)
-        statusCorner.Parent = statusFrame
+        statusCorner.Parent = hudRefs.statusFrame
 
         local statusConstraint = Instance.new("UISizeConstraint")
         statusConstraint.MinSize = Vector2.new(280, 200)
-        statusConstraint.Parent = statusFrame
+        statusConstraint.Parent = hudRefs.statusFrame
 
-        moneyLabel = Instance.new("TextLabel")
-        moneyLabel.Name = "MoneyLabel"
-        moneyLabel.BackgroundTransparency = 1
-        moneyLabel.AnchorPoint = Vector2.new(0, 0)
-        moneyLabel.Position = UDim2.new(0.04, 0, 0.05, 0)
-        moneyLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
-	moneyLabel.Font = Enum.Font.GothamBold
-        moneyLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
-        moneyLabel.TextSize = 20
-        moneyLabel.TextXAlignment = Enum.TextXAlignment.Left
-        moneyLabel.Text = "$0"
-        moneyLabel.Parent = statusFrame
-        applyScaledText(moneyLabel, 16, 36)
+        hudRefs.moneyLabel = Instance.new("TextLabel")
+        hudRefs.moneyLabel.Name = "MoneyLabel"
+        hudRefs.moneyLabel.BackgroundTransparency = 1
+        hudRefs.moneyLabel.AnchorPoint = Vector2.new(0, 0)
+        hudRefs.moneyLabel.Position = UDim2.new(0.04, 0, 0.05, 0)
+        hudRefs.moneyLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
+	hudRefs.moneyLabel.Font = Enum.Font.GothamBold
+        hudRefs.moneyLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
+        hudRefs.moneyLabel.TextSize = 20
+        hudRefs.moneyLabel.TextXAlignment = Enum.TextXAlignment.Left
+        hudRefs.moneyLabel.Text = "$0"
+        hudRefs.moneyLabel.Parent = hudRefs.statusFrame
+        applyScaledText(hudRefs.moneyLabel, 16, 36)
 
-        livesLabel = Instance.new("TextLabel")
-        livesLabel.Name = "LivesLabel"
-        livesLabel.BackgroundTransparency = 1
-        livesLabel.AnchorPoint = Vector2.new(0, 0)
-        livesLabel.Position = UDim2.new(0.04, 0, 0.24, 0)
-        livesLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
-	livesLabel.Font = Enum.Font.Gotham
-        livesLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
-        livesLabel.TextSize = 18
-        livesLabel.TextXAlignment = Enum.TextXAlignment.Left
-        livesLabel.Text = "Lives: 0"
-        livesLabel.Parent = statusFrame
-        applyScaledText(livesLabel, 14, 32)
+        hudRefs.livesLabel = Instance.new("TextLabel")
+        hudRefs.livesLabel.Name = "LivesLabel"
+        hudRefs.livesLabel.BackgroundTransparency = 1
+        hudRefs.livesLabel.AnchorPoint = Vector2.new(0, 0)
+        hudRefs.livesLabel.Position = UDim2.new(0.04, 0, 0.24, 0)
+        hudRefs.livesLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
+	hudRefs.livesLabel.Font = Enum.Font.Gotham
+        hudRefs.livesLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
+        hudRefs.livesLabel.TextSize = 18
+        hudRefs.livesLabel.TextXAlignment = Enum.TextXAlignment.Left
+        hudRefs.livesLabel.Text = "Lives: 0"
+        hudRefs.livesLabel.Parent = hudRefs.statusFrame
+        applyScaledText(hudRefs.livesLabel, 14, 32)
 
-        waveLabel = Instance.new("TextLabel")
-        waveLabel.Name = "WaveLabel"
-        waveLabel.BackgroundTransparency = 1
-        waveLabel.AnchorPoint = Vector2.new(0, 0)
-        waveLabel.Position = UDim2.new(0.04, 0, 0.43, 0)
-        waveLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
-	waveLabel.Font = Enum.Font.Gotham
-        waveLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-        waveLabel.TextSize = 18
-        waveLabel.TextXAlignment = Enum.TextXAlignment.Left
-        waveLabel.Text = "Wave: 1"
-        waveLabel.Parent = statusFrame
-        applyScaledText(waveLabel, 14, 32)
+        hudRefs.waveLabel = Instance.new("TextLabel")
+        hudRefs.waveLabel.Name = "WaveLabel"
+        hudRefs.waveLabel.BackgroundTransparency = 1
+        hudRefs.waveLabel.AnchorPoint = Vector2.new(0, 0)
+        hudRefs.waveLabel.Position = UDim2.new(0.04, 0, 0.43, 0)
+        hudRefs.waveLabel.Size = UDim2.new(0.92, 0, 0.12, 0)
+	hudRefs.waveLabel.Font = Enum.Font.Gotham
+        hudRefs.waveLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+        hudRefs.waveLabel.TextSize = 18
+        hudRefs.waveLabel.TextXAlignment = Enum.TextXAlignment.Left
+        hudRefs.waveLabel.Text = "Wave: 1"
+        hudRefs.waveLabel.Parent = hudRefs.statusFrame
+        applyScaledText(hudRefs.waveLabel, 14, 32)
 
-        playerTowerTotalLabel = Instance.new("TextLabel")
-        playerTowerTotalLabel.Name = "PlayerTowerTotal"
-        playerTowerTotalLabel.BackgroundTransparency = 1
-        playerTowerTotalLabel.AnchorPoint = Vector2.new(0, 0)
-        playerTowerTotalLabel.Position = UDim2.new(0.04, 0, 0.62, 0)
-        playerTowerTotalLabel.Size = UDim2.new(0.92, 0, 0.1, 0)
-        playerTowerTotalLabel.Font = Enum.Font.Gotham
-        playerTowerTotalLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        playerTowerTotalLabel.TextSize = 18
-        playerTowerTotalLabel.TextXAlignment = Enum.TextXAlignment.Left
-        playerTowerTotalLabel.Text = "Your Towers: 0 / ∞"
-        playerTowerTotalLabel.Parent = statusFrame
-        applyScaledText(playerTowerTotalLabel, 12, 28)
+        towerTotalsUi.playerLabel = Instance.new("TextLabel")
+        towerTotalsUi.playerLabel.Name = "PlayerTowerTotal"
+        towerTotalsUi.playerLabel.BackgroundTransparency = 1
+        towerTotalsUi.playerLabel.AnchorPoint = Vector2.new(0, 0)
+        towerTotalsUi.playerLabel.Position = UDim2.new(0.04, 0, 0.62, 0)
+        towerTotalsUi.playerLabel.Size = UDim2.new(0.92, 0, 0.1, 0)
+        towerTotalsUi.playerLabel.Font = Enum.Font.Gotham
+        towerTotalsUi.playerLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        towerTotalsUi.playerLabel.TextSize = 18
+        towerTotalsUi.playerLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerTotalsUi.playerLabel.Text = "Your Towers: 0 / ∞"
+        towerTotalsUi.playerLabel.Parent = hudRefs.statusFrame
+        applyScaledText(towerTotalsUi.playerLabel, 12, 28)
 
-        teamTowerTotalLabel = Instance.new("TextLabel")
-        teamTowerTotalLabel.Name = "TeamTowerTotal"
-        teamTowerTotalLabel.BackgroundTransparency = 1
-        teamTowerTotalLabel.AnchorPoint = Vector2.new(0, 0)
-        teamTowerTotalLabel.Position = UDim2.new(0.04, 0, 0.76, 0)
-        teamTowerTotalLabel.Size = UDim2.new(0.92, 0, 0.1, 0)
-        teamTowerTotalLabel.Font = Enum.Font.Gotham
-        teamTowerTotalLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        teamTowerTotalLabel.TextSize = 18
-        teamTowerTotalLabel.TextXAlignment = Enum.TextXAlignment.Left
-        teamTowerTotalLabel.Text = "Team Towers: 0 / ∞"
-        teamTowerTotalLabel.Parent = statusFrame
-        applyScaledText(teamTowerTotalLabel, 12, 28)
+        towerTotalsUi.teamLabel = Instance.new("TextLabel")
+        towerTotalsUi.teamLabel.Name = "TeamTowerTotal"
+        towerTotalsUi.teamLabel.BackgroundTransparency = 1
+        towerTotalsUi.teamLabel.AnchorPoint = Vector2.new(0, 0)
+        towerTotalsUi.teamLabel.Position = UDim2.new(0.04, 0, 0.76, 0)
+        towerTotalsUi.teamLabel.Size = UDim2.new(0.92, 0, 0.1, 0)
+        towerTotalsUi.teamLabel.Font = Enum.Font.Gotham
+        towerTotalsUi.teamLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        towerTotalsUi.teamLabel.TextSize = 18
+        towerTotalsUi.teamLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerTotalsUi.teamLabel.Text = "Team Towers: 0 / ∞"
+        towerTotalsUi.teamLabel.Parent = hudRefs.statusFrame
+        applyScaledText(towerTotalsUi.teamLabel, 12, 28)
 
-        preRoundCountdownLabel = Instance.new("TextLabel")
-        preRoundCountdownLabel.Name = "CountdownLabel"
-        preRoundCountdownLabel.BackgroundTransparency = 1
-        preRoundCountdownLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-        preRoundCountdownLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
-        preRoundCountdownLabel.Size = UDim2.new(0.5, 0, 0.12, 0)
-        preRoundCountdownLabel.Font = Enum.Font.GothamBold
-        preRoundCountdownLabel.TextSize = 18
-        preRoundCountdownLabel.TextColor3 = Color3.fromRGB(255, 220, 120)
-        preRoundCountdownLabel.TextXAlignment = Enum.TextXAlignment.Center
-        preRoundCountdownLabel.TextYAlignment = Enum.TextYAlignment.Center
-        preRoundCountdownLabel.Text = ""
-        preRoundCountdownLabel.Visible = false
-        preRoundCountdownLabel.ZIndex = 10
-        preRoundCountdownLabel.Parent = screenGui
-        applyScaledText(preRoundCountdownLabel, 18, 48)
+        hudRefs.preRoundCountdownLabel = Instance.new("TextLabel")
+        hudRefs.preRoundCountdownLabel.Name = "CountdownLabel"
+        hudRefs.preRoundCountdownLabel.BackgroundTransparency = 1
+        hudRefs.preRoundCountdownLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+        hudRefs.preRoundCountdownLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+        hudRefs.preRoundCountdownLabel.Size = UDim2.new(0.5, 0, 0.12, 0)
+        hudRefs.preRoundCountdownLabel.Font = Enum.Font.GothamBold
+        hudRefs.preRoundCountdownLabel.TextSize = 18
+        hudRefs.preRoundCountdownLabel.TextColor3 = Color3.fromRGB(255, 220, 120)
+        hudRefs.preRoundCountdownLabel.TextXAlignment = Enum.TextXAlignment.Center
+        hudRefs.preRoundCountdownLabel.TextYAlignment = Enum.TextYAlignment.Center
+        hudRefs.preRoundCountdownLabel.Text = ""
+        hudRefs.preRoundCountdownLabel.Visible = false
+        hudRefs.preRoundCountdownLabel.ZIndex = 10
+        hudRefs.preRoundCountdownLabel.Parent = hudRefs.screenGui
+        applyScaledText(hudRefs.preRoundCountdownLabel, 18, 48)
 
-        if not waveSkipButton then
-                waveSkipButton = Instance.new("TextButton")
-                waveSkipButton.Name = "SkipWaveButton"
-                waveSkipButton.AnchorPoint = Vector2.new(0.5, 0)
-                waveSkipButton.Position = waveSkipHiddenPosition
-                waveSkipButton.Size = UDim2.new(0.26, 0, 0.085, 0)
-                waveSkipButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-                waveSkipButton.BackgroundTransparency = 0.08
-                waveSkipButton.BorderSizePixel = 0
-                waveSkipButton.Text = "Skip Wave"
-                waveSkipButton.Font = Enum.Font.GothamBold
-                waveSkipButton.TextColor3 = Color3.new(1, 1, 1)
-                waveSkipButton.TextXAlignment = Enum.TextXAlignment.Center
-                waveSkipButton.TextYAlignment = Enum.TextYAlignment.Center
-                waveSkipButton.Visible = false
-                waveSkipButton.AutoButtonColor = true
-                waveSkipButton.ZIndex = 12
-                waveSkipButton.Parent = screenGui
-                applyScaledText(waveSkipButton, 18, 44)
+        if not waveSkipUi.button then
+                waveSkipUi.button = Instance.new("TextButton")
+                waveSkipUi.button.Name = "SkipWaveButton"
+                waveSkipUi.button.AnchorPoint = Vector2.new(0.5, 0)
+                waveSkipUi.button.Position = waveSkipUi.hiddenPosition
+                waveSkipUi.button.Size = UDim2.new(0.26, 0, 0.085, 0)
+                waveSkipUi.button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+                waveSkipUi.button.BackgroundTransparency = 0.08
+                waveSkipUi.button.BorderSizePixel = 0
+                waveSkipUi.button.Text = "Skip Wave"
+                waveSkipUi.button.Font = Enum.Font.GothamBold
+                waveSkipUi.button.TextColor3 = Color3.new(1, 1, 1)
+                waveSkipUi.button.TextXAlignment = Enum.TextXAlignment.Center
+                waveSkipUi.button.TextYAlignment = Enum.TextYAlignment.Center
+                waveSkipUi.button.Visible = false
+                waveSkipUi.button.AutoButtonColor = true
+                waveSkipUi.button.ZIndex = 12
+                waveSkipUi.button.Parent = hudRefs.screenGui
+                applyScaledText(waveSkipUi.button, 18, 44)
 
                 local skipCorner = Instance.new("UICorner")
                 skipCorner.CornerRadius = UDim.new(0.06, 0)
-                skipCorner.Parent = waveSkipButton
+                skipCorner.Parent = waveSkipUi.button
 
-                waveSkipButton.MouseButton1Click:Connect(function()
-                        if waveSkipRequestPending then
+                waveSkipUi.button.MouseButton1Click:Connect(function()
+                        if waveSkipUi.requestPending then
                                 return
                         end
-                        if not waveSkipOfferActive then
+                        if not waveSkipUi.offerActive then
                                 return
                         end
                         if not remotes.RequestWaveSkip then
                                 return
                         end
 
-                        waveSkipRequestPending = true
-                        waveSkipButton.Active = false
-                        waveSkipButton.AutoButtonColor = false
-                        waveSkipButton.Text = "Requesting..."
+                        waveSkipUi.requestPending = true
+                        waveSkipUi.button.Active = false
+                        waveSkipUi.button.AutoButtonColor = false
+                        waveSkipUi.button.Text = "Requesting..."
                         remotes.RequestWaveSkip:FireServer()
                 end)
         end
 
-        towerDetailsFrame = Instance.new("Frame")
-        towerDetailsFrame.Name = "TowerDetails"
-        towerDetailsFrame.AnchorPoint = Vector2.new(1, 0.5)
-        towerDetailsFrame.Size = UDim2.new(0.26, 0, 0.34, 0)
-        towerDetailsFrame.Position = UDim2.new(0.98, 0, 0.5, 0)
-        towerDetailsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        towerDetailsFrame.BackgroundTransparency = 0.1
-        towerDetailsFrame.BorderSizePixel = 0
-        towerDetailsFrame.Visible = false
-        towerDetailsFrame.Parent = screenGui
+        towerDetailsUi.frame = Instance.new("Frame")
+        towerDetailsUi.frame.Name = "TowerDetails"
+        towerDetailsUi.frame.AnchorPoint = Vector2.new(1, 0.5)
+        towerDetailsUi.frame.Size = UDim2.new(0.26, 0, 0.34, 0)
+        towerDetailsUi.frame.Position = UDim2.new(0.98, 0, 0.5, 0)
+        towerDetailsUi.frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        towerDetailsUi.frame.BackgroundTransparency = 0.1
+        towerDetailsUi.frame.BorderSizePixel = 0
+        towerDetailsUi.frame.Visible = false
+        towerDetailsUi.frame.Parent = hudRefs.screenGui
 
         local detailsCorner = Instance.new("UICorner")
         detailsCorner.CornerRadius = UDim.new(0.05, 0)
-	detailsCorner.Parent = towerDetailsFrame
+	detailsCorner.Parent = towerDetailsUi.frame
 
-        towerNameLabel = Instance.new("TextLabel")
-        towerNameLabel.Name = "TowerNameLabel"
-        towerNameLabel.BackgroundTransparency = 1
-        towerNameLabel.AnchorPoint = Vector2.new(0, 0)
-        towerNameLabel.Position = UDim2.new(0.05, 0, 0.08, 0)
-        towerNameLabel.Size = UDim2.new(0.9, 0, 0.16, 0)
-        towerNameLabel.Font = Enum.Font.GothamBold
-        towerNameLabel.TextColor3 = Color3.new(1, 1, 1)
-        towerNameLabel.TextSize = 20
-        towerNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-        towerNameLabel.Text = "Tower"
-        towerNameLabel.Parent = towerDetailsFrame
-        applyScaledText(towerNameLabel, 16, 36)
+        towerDetailsUi.nameLabel = Instance.new("TextLabel")
+        towerDetailsUi.nameLabel.Name = "TowerNameLabel"
+        towerDetailsUi.nameLabel.BackgroundTransparency = 1
+        towerDetailsUi.nameLabel.AnchorPoint = Vector2.new(0, 0)
+        towerDetailsUi.nameLabel.Position = UDim2.new(0.05, 0, 0.08, 0)
+        towerDetailsUi.nameLabel.Size = UDim2.new(0.9, 0, 0.16, 0)
+        towerDetailsUi.nameLabel.Font = Enum.Font.GothamBold
+        towerDetailsUi.nameLabel.TextColor3 = Color3.new(1, 1, 1)
+        towerDetailsUi.nameLabel.TextSize = 20
+        towerDetailsUi.nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerDetailsUi.nameLabel.Text = "Tower"
+        towerDetailsUi.nameLabel.Parent = towerDetailsUi.frame
+        applyScaledText(towerDetailsUi.nameLabel, 16, 36)
 
-        towerLevelLabel = Instance.new("TextLabel")
-        towerLevelLabel.Name = "TowerLevelLabel"
-        towerLevelLabel.BackgroundTransparency = 1
-        towerLevelLabel.AnchorPoint = Vector2.new(0, 0)
-        towerLevelLabel.Position = UDim2.new(0.05, 0, 0.26, 0)
-        towerLevelLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
-        towerLevelLabel.Font = Enum.Font.Gotham
-        towerLevelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        towerLevelLabel.TextSize = 16
-        towerLevelLabel.TextXAlignment = Enum.TextXAlignment.Left
-        towerLevelLabel.Text = "Level: 1"
-        towerLevelLabel.Parent = towerDetailsFrame
-        applyScaledText(towerLevelLabel, 14, 30)
+        towerDetailsUi.levelLabel = Instance.new("TextLabel")
+        towerDetailsUi.levelLabel.Name = "TowerLevelLabel"
+        towerDetailsUi.levelLabel.BackgroundTransparency = 1
+        towerDetailsUi.levelLabel.AnchorPoint = Vector2.new(0, 0)
+        towerDetailsUi.levelLabel.Position = UDim2.new(0.05, 0, 0.26, 0)
+        towerDetailsUi.levelLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
+        towerDetailsUi.levelLabel.Font = Enum.Font.Gotham
+        towerDetailsUi.levelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        towerDetailsUi.levelLabel.TextSize = 16
+        towerDetailsUi.levelLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerDetailsUi.levelLabel.Text = "Level: 1"
+        towerDetailsUi.levelLabel.Parent = towerDetailsUi.frame
+        applyScaledText(towerDetailsUi.levelLabel, 14, 30)
 
-        towerStatsLabel = Instance.new("TextLabel")
-        towerStatsLabel.Name = "TowerStatsLabel"
-        towerStatsLabel.BackgroundTransparency = 1
-        towerStatsLabel.AnchorPoint = Vector2.new(0, 0)
-        towerStatsLabel.Position = UDim2.new(0.05, 0, 0.4, 0)
-        towerStatsLabel.Size = UDim2.new(0.9, 0, 0.24, 0)
-        towerStatsLabel.Font = Enum.Font.Gotham
-        towerStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        towerStatsLabel.TextSize = 16
-        towerStatsLabel.TextXAlignment = Enum.TextXAlignment.Left
-        towerStatsLabel.TextYAlignment = Enum.TextYAlignment.Top
-        towerStatsLabel.TextWrapped = true
-        towerStatsLabel.Text = ""
-        towerStatsLabel.Parent = towerDetailsFrame
-        applyScaledText(towerStatsLabel, 12, 26)
+        towerDetailsUi.statsLabel = Instance.new("TextLabel")
+        towerDetailsUi.statsLabel.Name = "TowerStatsLabel"
+        towerDetailsUi.statsLabel.BackgroundTransparency = 1
+        towerDetailsUi.statsLabel.AnchorPoint = Vector2.new(0, 0)
+        towerDetailsUi.statsLabel.Position = UDim2.new(0.05, 0, 0.4, 0)
+        towerDetailsUi.statsLabel.Size = UDim2.new(0.9, 0, 0.24, 0)
+        towerDetailsUi.statsLabel.Font = Enum.Font.Gotham
+        towerDetailsUi.statsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        towerDetailsUi.statsLabel.TextSize = 16
+        towerDetailsUi.statsLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerDetailsUi.statsLabel.TextYAlignment = Enum.TextYAlignment.Top
+        towerDetailsUi.statsLabel.TextWrapped = true
+        towerDetailsUi.statsLabel.Text = ""
+        towerDetailsUi.statsLabel.Parent = towerDetailsUi.frame
+        applyScaledText(towerDetailsUi.statsLabel, 12, 26)
 
-        ownershipLabel = Instance.new("TextLabel")
-        ownershipLabel.Name = "OwnershipLabel"
-        ownershipLabel.BackgroundTransparency = 1
-        ownershipLabel.AnchorPoint = Vector2.new(0, 0)
-        ownershipLabel.Position = UDim2.new(0.05, 0, 0.64, 0)
-        ownershipLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
-        ownershipLabel.Font = Enum.Font.Gotham
-        ownershipLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        ownershipLabel.TextSize = 16
-        ownershipLabel.TextXAlignment = Enum.TextXAlignment.Left
-        ownershipLabel.Text = "Owner"
-        ownershipLabel.Parent = towerDetailsFrame
-        applyScaledText(ownershipLabel, 12, 26)
+        towerDetailsUi.ownershipLabel = Instance.new("TextLabel")
+        towerDetailsUi.ownershipLabel.Name = "OwnershipLabel"
+        towerDetailsUi.ownershipLabel.BackgroundTransparency = 1
+        towerDetailsUi.ownershipLabel.AnchorPoint = Vector2.new(0, 0)
+        towerDetailsUi.ownershipLabel.Position = UDim2.new(0.05, 0, 0.64, 0)
+        towerDetailsUi.ownershipLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
+        towerDetailsUi.ownershipLabel.Font = Enum.Font.Gotham
+        towerDetailsUi.ownershipLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        towerDetailsUi.ownershipLabel.TextSize = 16
+        towerDetailsUi.ownershipLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerDetailsUi.ownershipLabel.Text = "Owner"
+        towerDetailsUi.ownershipLabel.Parent = towerDetailsUi.frame
+        applyScaledText(towerDetailsUi.ownershipLabel, 12, 26)
 
-        upgradeDescriptionLabel = Instance.new("TextLabel")
-        upgradeDescriptionLabel.Name = "UpgradeDescriptionLabel"
-        upgradeDescriptionLabel.BackgroundTransparency = 1
-        upgradeDescriptionLabel.AnchorPoint = Vector2.new(0, 0)
-        upgradeDescriptionLabel.Position = UDim2.new(0.05, 0, 0.72, 0)
-        upgradeDescriptionLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
-        upgradeDescriptionLabel.Font = Enum.Font.Gotham
-        upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        upgradeDescriptionLabel.TextSize = 14
-        upgradeDescriptionLabel.TextWrapped = true
-        upgradeDescriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
-        upgradeDescriptionLabel.TextYAlignment = Enum.TextYAlignment.Top
-        upgradeDescriptionLabel.Text = ""
-        upgradeDescriptionLabel.Parent = towerDetailsFrame
-        applyScaledText(upgradeDescriptionLabel, 12, 24)
+        towerDetailsUi.upgradeDescriptionLabel = Instance.new("TextLabel")
+        towerDetailsUi.upgradeDescriptionLabel.Name = "UpgradeDescriptionLabel"
+        towerDetailsUi.upgradeDescriptionLabel.BackgroundTransparency = 1
+        towerDetailsUi.upgradeDescriptionLabel.AnchorPoint = Vector2.new(0, 0)
+        towerDetailsUi.upgradeDescriptionLabel.Position = UDim2.new(0.05, 0, 0.72, 0)
+        towerDetailsUi.upgradeDescriptionLabel.Size = UDim2.new(0.9, 0, 0.12, 0)
+        towerDetailsUi.upgradeDescriptionLabel.Font = Enum.Font.Gotham
+        towerDetailsUi.upgradeDescriptionLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        towerDetailsUi.upgradeDescriptionLabel.TextSize = 14
+        towerDetailsUi.upgradeDescriptionLabel.TextWrapped = true
+        towerDetailsUi.upgradeDescriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
+        towerDetailsUi.upgradeDescriptionLabel.TextYAlignment = Enum.TextYAlignment.Top
+        towerDetailsUi.upgradeDescriptionLabel.Text = ""
+        towerDetailsUi.upgradeDescriptionLabel.Parent = towerDetailsUi.frame
+        applyScaledText(towerDetailsUi.upgradeDescriptionLabel, 12, 24)
 
-        upgradeButton = Instance.new("TextButton")
-        upgradeButton.Name = "UpgradeButton"
-        upgradeButton.Size = UDim2.new(0.44, 0, 0.14, 0)
-        upgradeButton.AnchorPoint = Vector2.new(0, 1)
-        upgradeButton.Position = UDim2.new(0.05, 0, 0.98, 0)
-        upgradeButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
-        upgradeButton.BorderSizePixel = 0
-        upgradeButton.Font = Enum.Font.GothamBold
-        upgradeButton.TextSize = 16
-        upgradeButton.TextColor3 = Color3.new(1, 1, 1)
-        upgradeButton.Text = "Upgrade"
-        upgradeButton.AutoButtonColor = true
-        upgradeButton.Visible = false
-        upgradeButton.Parent = towerDetailsFrame
-        applyScaledText(upgradeButton, 14, 30)
+        towerDetailsUi.upgradeButton = Instance.new("TextButton")
+        towerDetailsUi.upgradeButton.Name = "UpgradeButton"
+        towerDetailsUi.upgradeButton.Size = UDim2.new(0.44, 0, 0.14, 0)
+        towerDetailsUi.upgradeButton.AnchorPoint = Vector2.new(0, 1)
+        towerDetailsUi.upgradeButton.Position = UDim2.new(0.05, 0, 0.98, 0)
+        towerDetailsUi.upgradeButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+        towerDetailsUi.upgradeButton.BorderSizePixel = 0
+        towerDetailsUi.upgradeButton.Font = Enum.Font.GothamBold
+        towerDetailsUi.upgradeButton.TextSize = 16
+        towerDetailsUi.upgradeButton.TextColor3 = Color3.new(1, 1, 1)
+        towerDetailsUi.upgradeButton.Text = "Upgrade"
+        towerDetailsUi.upgradeButton.AutoButtonColor = true
+        towerDetailsUi.upgradeButton.Visible = false
+        towerDetailsUi.upgradeButton.Parent = towerDetailsUi.frame
+        applyScaledText(towerDetailsUi.upgradeButton, 14, 30)
 
-	upgradeButtonOriginalColor = upgradeButton.BackgroundColor3
-	upgradeButtonOriginalTextColor = upgradeButton.TextColor3
-	upgradeButtonOriginalBackgroundTransparency = upgradeButton.BackgroundTransparency
-	upgradeButtonOriginalTextTransparency = upgradeButton.TextTransparency
-	upgradeButtonOriginalAutoButtonColor = upgradeButton.AutoButtonColor
+	towerDetailsUi.upgradeButtonOriginalColor = towerDetailsUi.upgradeButton.BackgroundColor3
+	towerDetailsUi.upgradeButtonOriginalTextColor = towerDetailsUi.upgradeButton.TextColor3
+	towerDetailsUi.upgradeButtonOriginalBackgroundTransparency = towerDetailsUi.upgradeButton.BackgroundTransparency
+	towerDetailsUi.upgradeButtonOriginalTextTransparency = towerDetailsUi.upgradeButton.TextTransparency
+	towerDetailsUi.upgradeButtonOriginalAutoButtonColor = towerDetailsUi.upgradeButton.AutoButtonColor
 
-        upgradeButton.MouseButton1Click:Connect(function()
+        towerDetailsUi.upgradeButton.MouseButton1Click:Connect(function()
                 local tower = selectionState.tower
                 if tower then
                         remotes.TowerUpgradeRequested:FireServer(tower)
                 end
         end)
 
-        sellButton = Instance.new("TextButton")
-        sellButton.Name = "SellButton"
-        sellButton.Size = UDim2.new(0.44, 0, 0.14, 0)
-        sellButton.AnchorPoint = Vector2.new(1, 1)
-        sellButton.Position = UDim2.new(0.95, 0, 0.98, 0)
-        sellButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
-        sellButton.BorderSizePixel = 0
-        sellButton.Font = Enum.Font.GothamBold
-        sellButton.TextSize = 16
-        sellButton.TextColor3 = Color3.new(1, 1, 1)
-        sellButton.Text = "Sell"
-        sellButton.AutoButtonColor = true
-        sellButton.Visible = false
-        sellButton.Parent = towerDetailsFrame
-        applyScaledText(sellButton, 14, 30)
+        towerDetailsUi.sellButton = Instance.new("TextButton")
+        towerDetailsUi.sellButton.Name = "SellButton"
+        towerDetailsUi.sellButton.Size = UDim2.new(0.44, 0, 0.14, 0)
+        towerDetailsUi.sellButton.AnchorPoint = Vector2.new(1, 1)
+        towerDetailsUi.sellButton.Position = UDim2.new(0.95, 0, 0.98, 0)
+        towerDetailsUi.sellButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+        towerDetailsUi.sellButton.BorderSizePixel = 0
+        towerDetailsUi.sellButton.Font = Enum.Font.GothamBold
+        towerDetailsUi.sellButton.TextSize = 16
+        towerDetailsUi.sellButton.TextColor3 = Color3.new(1, 1, 1)
+        towerDetailsUi.sellButton.Text = "Sell"
+        towerDetailsUi.sellButton.AutoButtonColor = true
+        towerDetailsUi.sellButton.Visible = false
+        towerDetailsUi.sellButton.Parent = towerDetailsUi.frame
+        applyScaledText(towerDetailsUi.sellButton, 14, 30)
 
-	sellButtonOriginalAutoButtonColor = sellButton.AutoButtonColor
+	towerDetailsUi.sellButtonOriginalAutoButtonColor = towerDetailsUi.sellButton.AutoButtonColor
 
-        sellButton.MouseButton1Click:Connect(function()
+        towerDetailsUi.sellButton.MouseButton1Click:Connect(function()
                 local tower = selectionState.tower
                 if tower then
                         remotes.TowerSellRequested:FireServer(tower)
@@ -3357,53 +3370,53 @@ local function createGui()
         end)
 
         local function applyHudConstraints()
-                if not screenGui then
+                if not hudRefs.screenGui then
                         return
                 end
 
-                local screenSize = screenGui.AbsoluteSize
+                local screenSize = hudRefs.screenGui.AbsoluteSize
                 local screenWidth = screenSize.X > 0 and screenSize.X or 1920
                 local screenHeight = screenSize.Y > 0 and screenSize.Y or 1080
 
-                if shopFrame then
-                        local aspect = shopFrame:FindFirstChild("AspectConstraint")
+                if hudRefs.shopFrame then
+                        local aspect = hudRefs.shopFrame:FindFirstChild("AspectConstraint")
                         if not aspect then
                                 aspect = Instance.new("UIAspectRatioConstraint")
                                 aspect.Name = "AspectConstraint"
-                                aspect.Parent = shopFrame
+                                aspect.Parent = hudRefs.shopFrame
                         end
                         local widthScale = math.clamp(0.55 + (screenWidth / 1920) * 0.25, 0.6, 0.85)
                         local heightScale = math.clamp(0.18 + (screenHeight / 1080) * 0.05, 0.18, 0.28)
-                        shopFrame.Size = UDim2.new(widthScale, 0, heightScale, 0)
+                        hudRefs.shopFrame.Size = UDim2.new(widthScale, 0, heightScale, 0)
                         aspect.AspectRatio = widthScale / math.max(heightScale, 0.01)
                         aspect.DominantAxis = Enum.DominantAxis.Width
 
-                        local sizeConstraint = shopFrame:FindFirstChild("SizeConstraint")
+                        local sizeConstraint = hudRefs.shopFrame:FindFirstChild("SizeConstraint")
                         if not sizeConstraint then
                                 sizeConstraint = Instance.new("UISizeConstraint")
                                 sizeConstraint.Name = "SizeConstraint"
-                                sizeConstraint.Parent = shopFrame
+                                sizeConstraint.Parent = hudRefs.shopFrame
                         end
                         sizeConstraint.MinSize = Vector2.new(math.max(screenSize.X * 0.35, 420), math.max(screenSize.Y * 0.1, 120))
                 end
 
-                if towerDetailsFrame then
-                        local aspect = towerDetailsFrame:FindFirstChild("AspectConstraint")
+                if towerDetailsUi.frame then
+                        local aspect = towerDetailsUi.frame:FindFirstChild("AspectConstraint")
                         if not aspect then
                                 aspect = Instance.new("UIAspectRatioConstraint")
                                 aspect.Name = "AspectConstraint"
-                                aspect.Parent = towerDetailsFrame
+                                aspect.Parent = towerDetailsUi.frame
                         end
                         local towerWidthScale = math.clamp(0.22 + (screenWidth / 3840) * 0.04, 0.22, 0.26)
-                        towerDetailsFrame.Size = UDim2.new(towerWidthScale, 0, 0.34, 0)
+                        towerDetailsUi.frame.Size = UDim2.new(towerWidthScale, 0, 0.34, 0)
                         aspect.AspectRatio = 0.76
                         aspect.DominantAxis = Enum.DominantAxis.Height
 
-                        local sizeConstraint = towerDetailsFrame:FindFirstChild("SizeConstraint")
+                        local sizeConstraint = towerDetailsUi.frame:FindFirstChild("SizeConstraint")
                         if not sizeConstraint then
                                 sizeConstraint = Instance.new("UISizeConstraint")
                                 sizeConstraint.Name = "SizeConstraint"
-                                sizeConstraint.Parent = towerDetailsFrame
+                                sizeConstraint.Parent = towerDetailsUi.frame
                         end
                         sizeConstraint.MinSize = Vector2.new(math.max(screenSize.X * 0.16, 280), math.max(screenSize.Y * 0.16, 220))
                 end
@@ -3411,7 +3424,7 @@ local function createGui()
 
         applyHudConstraints()
         task.defer(applyHudConstraints)
-        screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(applyHudConstraints)
+        hudRefs.screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(applyHudConstraints)
 
 	for _, button in pairs(shopSlotButtons) do
 		connectShopButton(button)
@@ -3420,7 +3433,7 @@ local function createGui()
         applyLoadoutToShop()
         updateOverallTowerTotals()
 
-        return screenGui
+        return hudRefs.screenGui
 end
 
 local function showTowerSelection()
@@ -3431,8 +3444,8 @@ local function showTowerSelection()
 
         for i = 1, LOADOUT_SLOT_COUNT do
                 loadoutSelection[i] = nil
-                if selectionSlotButtons[i] then
-                        selectionSlotButtons[i]:SetAttribute("TowerType", nil)
+                if selectionUi.slotButtons[i] then
+                        selectionUi.slotButtons[i]:SetAttribute("TowerType", nil)
                 end
         end
 
@@ -3462,14 +3475,14 @@ local function clearSelection(reason)
         selectionState.tower = nil
         disconnectSelectedConnections()
         destroyRangeIndicator()
-        if towerDetailsFrame then
-                towerDetailsFrame.Visible = false
+        if towerDetailsUi.frame then
+                towerDetailsUi.frame.Visible = false
         end
-	if upgradeDescriptionLabel then
-		upgradeDescriptionLabel.Text = ""
+	if towerDetailsUi.upgradeDescriptionLabel then
+		towerDetailsUi.upgradeDescriptionLabel.Text = ""
 	end
-        if sellButton then
-                sellButton.Visible = false
+        if towerDetailsUi.sellButton then
+                towerDetailsUi.sellButton.Visible = false
         end
 
         refreshBoostDisplayVisibility()
@@ -3555,7 +3568,7 @@ local function updatePreview()
                 end
 
                 local config = towerConfigs[placingTowerType]
-                if previewRangeRing and previewRangeAdornment and config and config.Range then
+                if hudRefs.previewRangeRing and hudRefs.previewRangeAdornment and config and config.Range then
                         local ringBase
                         if resolvedPosition then
                                 ringBase = resolvedPosition
@@ -3571,8 +3584,8 @@ local function updatePreview()
                         if ringBase then
                                 ringBase = resolveRangeRingPosition(ringBase)
                                 updateRangeRing(
-                                        previewRangeRing,
-                                        previewRangeAdornment,
+                                        hudRefs.previewRangeRing,
+                                        hudRefs.previewRangeAdornment,
                                         config.Range,
                                         Vector3.new(ringBase.X, ringBase.Y + 0.05, ringBase.Z)
                                 )
@@ -3581,21 +3594,21 @@ local function updatePreview()
 
                 local validColor = placementValid and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 100, 100)
                 previewPart.Color = validColor
-                if previewRangeAdornment then
+                if hudRefs.previewRangeAdornment then
                         if placementValid then
-                                previewRangeAdornment.Color3 = Color3.fromRGB(120, 220, 255)
-                                previewRangeAdornment.Transparency = 0.45
+                                hudRefs.previewRangeAdornment.Color3 = Color3.fromRGB(120, 220, 255)
+                                hudRefs.previewRangeAdornment.Transparency = 0.45
                         else
-                                previewRangeAdornment.Color3 = Color3.fromRGB(255, 150, 150)
-                                previewRangeAdornment.Transparency = 0.6
+                                hudRefs.previewRangeAdornment.Color3 = Color3.fromRGB(255, 150, 150)
+                                hudRefs.previewRangeAdornment.Transparency = 0.6
                         end
                 end
         else
                 placementValid = false
                 previewPart.Color = Color3.fromRGB(255, 100, 100)
-                if previewRangeAdornment then
-                        previewRangeAdornment.Color3 = Color3.fromRGB(255, 150, 150)
-                        previewRangeAdornment.Transparency = 0.6
+                if hudRefs.previewRangeAdornment then
+                        hudRefs.previewRangeAdornment.Color3 = Color3.fromRGB(255, 150, 150)
+                        hudRefs.previewRangeAdornment.Transparency = 0.6
                 end
         end
 end
@@ -3616,25 +3629,25 @@ local function updateEnemyHover()
 			currentHealth = math.max(0, math.floor(healthValue.Value + 0.5))
 		end
 
-		if hoverNameLabel then
-			hoverNameLabel.Text = displayName
+		if hoverUi.nameLabel then
+			hoverUi.nameLabel.Text = displayName
 		end
 
-		if hoverHealthLabel then
+		if hoverUi.healthLabel then
 			if currentHealth and typeof(maxHealth) == "number" then
-				hoverHealthLabel.Text = string.format("HP: %d / %d", currentHealth, maxHealth)
+				hoverUi.healthLabel.Text = string.format("HP: %d / %d", currentHealth, maxHealth)
 			elseif currentHealth then
-				hoverHealthLabel.Text = string.format("HP: %d", currentHealth)
+				hoverUi.healthLabel.Text = string.format("HP: %d", currentHealth)
 			else
-				hoverHealthLabel.Text = "HP: ???"
+				hoverUi.healthLabel.Text = "HP: ???"
 			end
-		elseif hoverCombinedLabel then
+		elseif hoverUi.combinedLabel then
 			if currentHealth and typeof(maxHealth) == "number" then
-				hoverCombinedLabel.Text = string.format("%s - HP: %d / %d", displayName, currentHealth, maxHealth)
+				hoverUi.combinedLabel.Text = string.format("%s - HP: %d / %d", displayName, currentHealth, maxHealth)
 			elseif currentHealth then
-				hoverCombinedLabel.Text = string.format("%s - HP: %d", displayName, currentHealth)
+				hoverUi.combinedLabel.Text = string.format("%s - HP: %d", displayName, currentHealth)
 			else
-				hoverCombinedLabel.Text = string.format("%s - HP: ???", displayName)
+				hoverUi.combinedLabel.Text = string.format("%s - HP: ???", displayName)
 			end
 		end
 
@@ -3652,8 +3665,8 @@ local function updateEnemyHover()
                 guiObject.Position = UDim2.new(relativeX, 0, relativeY, 0)
                 guiObject.Visible = true
 	else
-		if hoverGui and hoverGui:IsA("GuiObject") then
-			hoverGui.Visible = false
+		if hoverUi.frame and hoverUi.frame:IsA("GuiObject") then
+			hoverUi.frame.Visible = false
 		end
         end
 end
@@ -3662,9 +3675,9 @@ local towerCountsEvent = remotes:FindFirstChild("TowerCountsUpdated")
 if towerCountsEvent and towerCountsEvent:IsA("RemoteEvent") then
         towerCountsEvent.OnClientEvent:Connect(function(payload)
                 if typeof(payload) == "table" then
-                        towerCountSnapshot = payload
+                        towerTotalsUi.snapshot = payload
                 else
-                        towerCountSnapshot = nil
+                        towerTotalsUi.snapshot = nil
                 end
 
                 updateOverallTowerTotals()
@@ -3675,8 +3688,8 @@ end
 if remotes:FindFirstChild("MoneyChanged") then
         remotes.MoneyChanged.OnClientEvent:Connect(function(amount)
                 currentMoney = math.max(0, math.floor((amount or 0) + 0.5))
-                if moneyLabel then
-                        moneyLabel.Text = string.format("$%d", currentMoney)
+                if hudRefs.moneyLabel then
+                        hudRefs.moneyLabel.Text = string.format("$%d", currentMoney)
                 end
                 local tower = selectionState.tower
                 if tower then
@@ -3688,21 +3701,21 @@ end
 
 if remotes:FindFirstChild("LivesChanged") then
 	remotes.LivesChanged.OnClientEvent:Connect(function(lives)
-		if livesLabel then
-			livesLabel.Text = string.format("Lives: %d", math.floor(lives or 0))
+		if hudRefs.livesLabel then
+			hudRefs.livesLabel.Text = string.format("Lives: %d", math.floor(lives or 0))
 		end
 	end)
 end
 
 if remotes:FindFirstChild("WaveStarted") then
         remotes.WaveStarted.OnClientEvent:Connect(function(waveNumber)
-                if waveLabel then
-                        waveLabel.Text = string.format("Wave: %d", waveNumber or 1)
+                if hudRefs.waveLabel then
+                        hudRefs.waveLabel.Text = string.format("Wave: %d", waveNumber or 1)
                 end
                 gameEnded = false
-                if preRoundCountdownLabel then
-                        preRoundCountdownLabel.Visible = false
-                        preRoundCountdownLabel.Text = ""
+                if hudRefs.preRoundCountdownLabel then
+                        hudRefs.preRoundCountdownLabel.Visible = false
+                        hudRefs.preRoundCountdownLabel.Text = ""
                 end
                 hideWaveSkipButton({ Reason = "advance" })
         end)
@@ -3710,7 +3723,7 @@ end
 
 if remotes:FindFirstChild("WaveSkipOfferUpdated") then
         remotes.WaveSkipOfferUpdated.OnClientEvent:Connect(function(payload)
-                if lobbyPhase ~= "inRound" then
+                if lobbyUi.phase ~= "inRound" then
                         resetWaveSkipButton()
                         return
                 end
@@ -3733,9 +3746,9 @@ if remotes:FindFirstChild("GameEnded") then
                 gameEnded = true
                 lastVictoryState = victory
                 cancelPlacement()
-                if preRoundCountdownLabel then
-                        preRoundCountdownLabel.Visible = false
-                        preRoundCountdownLabel.Text = ""
+                if hudRefs.preRoundCountdownLabel then
+                        hudRefs.preRoundCountdownLabel.Visible = false
+                        hudRefs.preRoundCountdownLabel.Text = ""
                 end
                 if victory ~= nil then
                         hideWaveSkipButton({ Reason = victory and "victory" or "gameOver" })
@@ -3749,7 +3762,7 @@ if remotes:FindFirstChild("GameRestarted") then
         remotes.GameRestarted.OnClientEvent:Connect(function()
                 gameEnded = false
                 lastVictoryState = nil
-                lobbyPhase = "lobby"
+                lobbyUi.phase = "lobby"
                 updateInterfaceVisibility()
                 clearSelection()
                 showTowerSelection()
@@ -3764,7 +3777,7 @@ end
 
 if remotes:FindFirstChild("MapSelectionStarted") then
         remotes.MapSelectionStarted.OnClientEvent:Connect(function(payload)
-                lobbyPhase = "mapSelection"
+                lobbyUi.phase = "mapSelection"
                 updateInterfaceVisibility()
                 showMapSelection(payload and payload.Options or {}, payload and payload.TotalPlayers)
         end)
@@ -3787,7 +3800,7 @@ setTowerBaseVisibility(false)
 
 if remotes:FindFirstChild("RoundSetupComplete") then
         remotes.RoundSetupComplete.OnClientEvent:Connect(function(payload)
-                lobbyPhase = "inRound"
+                lobbyUi.phase = "inRound"
                 updateInterfaceVisibility()
                 if mapSelectionState.gui then
                         mapSelectionState.gui.Enabled = false
@@ -3795,26 +3808,26 @@ if remotes:FindFirstChild("RoundSetupComplete") then
                 createGui()
                 applyLoadoutToShop()
                 resetWaveSkipButton()
-                if payload and payload.MapName and preRoundCountdownLabel then
-                        preRoundCountdownLabel.Text = string.format("%s selected", payload.MapName)
-                        preRoundCountdownLabel.Visible = true
+                if payload and payload.MapName and hudRefs.preRoundCountdownLabel then
+                        hudRefs.preRoundCountdownLabel.Text = string.format("%s selected", payload.MapName)
+                        hudRefs.preRoundCountdownLabel.Visible = true
                 end
         end)
 end
 
 if remotes:FindFirstChild("RoundCountdownUpdated") then
         remotes.RoundCountdownUpdated.OnClientEvent:Connect(function(payload)
-                if not preRoundCountdownLabel then
+                if not hudRefs.preRoundCountdownLabel then
                         return
                 end
 
                 local remaining = payload and payload.Remaining or 0
                 if remaining and remaining > 0 then
-                        preRoundCountdownLabel.Text = string.format("Round starts in %ds", remaining)
-                        preRoundCountdownLabel.Visible = true
+                        hudRefs.preRoundCountdownLabel.Text = string.format("Round starts in %ds", remaining)
+                        hudRefs.preRoundCountdownLabel.Visible = true
                 else
-                        preRoundCountdownLabel.Visible = false
-                        preRoundCountdownLabel.Text = ""
+                        hudRefs.preRoundCountdownLabel.Visible = false
+                        hudRefs.preRoundCountdownLabel.Text = ""
                 end
         end)
 end
@@ -3830,9 +3843,9 @@ UserInputService.InputBegan:Connect(function(input, processed)
 
         local slotIndex = SLOT_KEY_CODES[input.KeyCode]
         if slotIndex then
-                if selectionScreenGui and selectionScreenGui.Enabled then
+                if selectionUi.screenGui and selectionUi.screenGui.Enabled then
                         setActiveSelectionSlot(math.clamp(slotIndex, 1, LOADOUT_SLOT_COUNT))
-                elseif lobbyPhase == "inRound" then
+                elseif lobbyUi.phase == "inRound" then
                         local button = shopSlotButtons[slotIndex]
                         if button and button.Active then
                                 local towerType = getTowerTypeForButton(button)
@@ -3845,7 +3858,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
         end
 
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                if lobbyPhase ~= "inRound" then
+                if lobbyUi.phase ~= "inRound" then
                         return
                 end
 		if placingTowerType then
@@ -3867,7 +3880,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 			end
 		end
         elseif input.KeyCode == Enum.KeyCode.X then
-                if lobbyPhase ~= "inRound" then
+                if lobbyUi.phase ~= "inRound" then
                         return
                 end
                 if placingTowerType then
@@ -3882,7 +3895,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
                         end
                 end
         elseif input.KeyCode == Enum.KeyCode.E then
-                if lobbyPhase ~= "inRound" then
+                if lobbyUi.phase ~= "inRound" then
                         return
                 end
                 if not placingTowerType then
