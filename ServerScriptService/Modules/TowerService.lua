@@ -24,6 +24,14 @@ local FARM_INCOME_FLOAT_TIME = 1.75
 local FARM_INCOME_FADE_DELAY = 0.95
 local FARM_INCOME_FADE_TIME = 0.4
 
+local BOOST_DISPLAY_NAME = "TowerBoostDisplay"
+local BOOST_LABEL_NAME = "TowerBoostLabel"
+local BOOST_TEXT_COLOR = Color3.fromRGB(120, 255, 170)
+local BOOST_TEXT_STROKE = Color3.new(0, 0, 0)
+local BOOST_OFFSET = Vector3.new(0, 6, 0)
+local BOOST_GUI_SIZE = UDim2.new(0, 180, 0, 60)
+local BOOST_MAX_DISTANCE = 200
+
 local function formatCurrency(amount)
     local numeric = tonumber(amount)
     if not numeric then
@@ -750,6 +758,18 @@ local function cloneTowerConfig(config)
     return newConfig
 end
 
+local function getEffectiveRangeValue(towerData)
+    if towerData and towerData.EffectiveRange ~= nil then
+        return towerData.EffectiveRange
+    end
+
+    if towerData and towerData.Config then
+        return towerData.Config.Range or 0
+    end
+
+    return 0
+end
+
 local function updateTowerAttributes(towerModel, towerData)
     if not towerModel then
         return
@@ -757,7 +777,7 @@ local function updateTowerAttributes(towerModel, towerData)
 
     towerModel:SetAttribute("TowerType", towerData.Type)
     towerModel:SetAttribute("Level", towerData.Level)
-    towerModel:SetAttribute("Range", towerData.Config.Range or 0)
+    towerModel:SetAttribute("Range", getEffectiveRangeValue(towerData))
     towerModel:SetAttribute("OwnerUserId", towerData.Player and towerData.Player.UserId or 0)
 
     if towerData.PlacementPosition then
@@ -814,6 +834,7 @@ function TowerService.new(mapModel, waveService, remotes)
     self.WaveService = waveService
     self.Remotes = remotes
     self.Towers = {}
+    self.Boosters = {}
 
     TowerLimits = {}
     OverallPlacementLimitCache = nil
@@ -831,6 +852,381 @@ function TowerService.new(mapModel, waveService, remotes)
     self:BroadcastTowerCounts()
 
     return self
+end
+
+function TowerService:GetTowerRange(towerData)
+    if not towerData then
+        return 0
+    end
+
+    if towerData.EffectiveRange ~= nil then
+        return towerData.EffectiveRange
+    end
+
+    local config = towerData.Config
+    if config then
+        return config.Range or 0
+    end
+
+    return 0
+end
+
+function TowerService:GetTowerFireRate(towerData)
+    if not towerData then
+        return 0
+    end
+
+    if towerData.EffectiveFireRate ~= nil then
+        return towerData.EffectiveFireRate
+    end
+
+    local config = towerData.Config
+    if config then
+        return config.FireRate or 0
+    end
+
+    return 0
+end
+
+function TowerService:DestroyTowerBoostDisplay(towerData)
+    if not towerData then
+        return
+    end
+
+    local display = towerData.BoostDisplay
+    if display then
+        towerData.BoostDisplay = nil
+        towerData.BoostDisplayLabel = nil
+        if display.Parent then
+            display:Destroy()
+        end
+    end
+end
+
+function TowerService:UpdateTowerBoostDisplay(towerData)
+    if not towerData then
+        return
+    end
+
+    local boosts = towerData.ActiveBoosts
+    if not boosts or not next(boosts) then
+        self:DestroyTowerBoostDisplay(towerData)
+        return
+    end
+
+    local primary = getTowerPrimaryPart(towerData.Model)
+    if not primary then
+        self:DestroyTowerBoostDisplay(towerData)
+        return
+    end
+
+    local rangeMultiplier = 1
+    local fireRateMultiplier = 1
+    for _, boost in pairs(boosts) do
+        if boost.RangeMultiplier then
+            rangeMultiplier *= boost.RangeMultiplier
+        end
+        if boost.FireRateMultiplier then
+            fireRateMultiplier *= boost.FireRateMultiplier
+        end
+    end
+
+    local infoLines = {}
+    if rangeMultiplier > 1.001 then
+        table.insert(infoLines, string.format("+%d%% Range", math.floor((rangeMultiplier - 1) * 100 + 0.5)))
+    end
+    if fireRateMultiplier < 0.999 then
+        local cooldownReduction = (1 - fireRateMultiplier) * 100
+        table.insert(infoLines, string.format("-%d%% Cooldown", math.floor(cooldownReduction + 0.5)))
+    end
+
+    if #infoLines == 0 then
+        self:DestroyTowerBoostDisplay(towerData)
+        return
+    end
+
+    local display = towerData.BoostDisplay
+    local label = towerData.BoostDisplayLabel
+    if not display or not display.Parent then
+        display = Instance.new("BillboardGui")
+        display.Name = BOOST_DISPLAY_NAME
+        display.AlwaysOnTop = true
+        display.LightInfluence = 0
+        display.MaxDistance = BOOST_MAX_DISTANCE
+        display.Size = BOOST_GUI_SIZE
+        display.StudsOffsetWorldSpace = BOOST_OFFSET
+        display.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        display.Parent = towerData.Model
+
+        label = Instance.new("TextLabel")
+        label.Name = BOOST_LABEL_NAME
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamBold
+        label.TextScaled = true
+        label.TextWrapped = true
+        label.TextColor3 = BOOST_TEXT_COLOR
+        label.TextStrokeColor3 = BOOST_TEXT_STROKE
+        label.TextStrokeTransparency = 0.3
+        label.AnchorPoint = Vector2.new(0.5, 0.5)
+        label.Position = UDim2.new(0.5, 0, 0.5, 0)
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.Parent = display
+
+        towerData.BoostDisplay = display
+        towerData.BoostDisplayLabel = label
+    else
+        if display.Parent ~= towerData.Model then
+            display.Parent = towerData.Model
+        end
+    end
+
+    display.Adornee = primary
+    display.Enabled = true
+    label.Text = table.concat(infoLines, "\n")
+end
+
+function TowerService:RecalculateTowerStats(towerData)
+    if not towerData then
+        return
+    end
+
+    local config = towerData.Config or {}
+    local baseRange = tonumber(config.Range) or 0
+    local baseFireRate = tonumber(config.FireRate) or 0
+
+    local rangeMultiplier = 1
+    local fireRateMultiplier = 1
+
+    if towerData.ActiveBoosts then
+        for _, boost in pairs(towerData.ActiveBoosts) do
+            if boost.RangeMultiplier then
+                rangeMultiplier *= boost.RangeMultiplier
+            end
+            if boost.FireRateMultiplier then
+                fireRateMultiplier *= boost.FireRateMultiplier
+            end
+        end
+    end
+
+    towerData.RangeMultiplier = rangeMultiplier
+    towerData.FireRateMultiplier = fireRateMultiplier
+
+    if baseRange ~= 0 then
+        towerData.EffectiveRange = baseRange * rangeMultiplier
+    else
+        towerData.EffectiveRange = baseRange
+    end
+
+    local computedFireRate = baseFireRate * fireRateMultiplier
+    if computedFireRate > 0 then
+        towerData.EffectiveFireRate = math.max(0.05, computedFireRate)
+    else
+        towerData.EffectiveFireRate = computedFireRate
+    end
+
+    updateTowerAttributes(towerData.Model, towerData)
+    self:UpdateTowerBoostDisplay(towerData)
+end
+
+function TowerService:SetTowerBoost(towerData, boosterModel, boostConfig)
+    if not towerData or not boosterModel then
+        return
+    end
+
+    local rangeMultiplier = 1
+    local fireRateMultiplier = 1
+
+    if boostConfig then
+        if boostConfig.RangeMultiplier ~= nil then
+            rangeMultiplier = tonumber(boostConfig.RangeMultiplier) or rangeMultiplier
+        end
+        if boostConfig.FireRateMultiplier ~= nil then
+            fireRateMultiplier = tonumber(boostConfig.FireRateMultiplier) or fireRateMultiplier
+        end
+    end
+
+    if rangeMultiplier <= 0 then
+        rangeMultiplier = 1
+    end
+    if fireRateMultiplier <= 0 then
+        fireRateMultiplier = 1
+    end
+
+    towerData.ActiveBoosts = towerData.ActiveBoosts or {}
+    local existing = towerData.ActiveBoosts[boosterModel]
+    if existing
+        and existing.RangeMultiplier == rangeMultiplier
+        and existing.FireRateMultiplier == fireRateMultiplier
+    then
+        return
+    end
+
+    towerData.ActiveBoosts[boosterModel] = {
+        RangeMultiplier = rangeMultiplier,
+        FireRateMultiplier = fireRateMultiplier,
+    }
+
+    self:RecalculateTowerStats(towerData)
+end
+
+function TowerService:RemoveBoostFromTower(towerData, boosterModel)
+    if not towerData or not towerData.ActiveBoosts then
+        return
+    end
+
+    if towerData.ActiveBoosts[boosterModel] then
+        towerData.ActiveBoosts[boosterModel] = nil
+        if not next(towerData.ActiveBoosts) then
+            towerData.ActiveBoosts = nil
+        end
+        self:RecalculateTowerStats(towerData)
+    end
+end
+
+function TowerService:IsBoosterActive(boosterData)
+    if not boosterData then
+        return false
+    end
+
+    if boosterData.StunActive then
+        return false
+    end
+
+    return true
+end
+
+function TowerService:EvaluateBoosterTargets(boosterModel, boosterData, targetModel, targetData)
+    if not boosterData then
+        return
+    end
+
+    boosterData.BoostedTowers = boosterData.BoostedTowers or {}
+
+    local config = boosterData.Config or {}
+    local radius = tonumber(config.BoostRadius or config.Range) or 0
+    local active = self:IsBoosterActive(boosterData)
+    local primary = getTowerPrimaryPart(boosterData.Model)
+
+    local function removeTarget(model, data)
+        if boosterData.BoostedTowers[model] then
+            boosterData.BoostedTowers[model] = nil
+            if data then
+                self:RemoveBoostFromTower(data, boosterModel)
+            end
+        end
+    end
+
+    if not primary then
+        if targetModel then
+            removeTarget(targetModel, targetData or self.Towers[targetModel])
+        else
+            for model in pairs(boosterData.BoostedTowers) do
+                removeTarget(model, self.Towers[model])
+            end
+        end
+        return
+    end
+
+    local boosts = config.Buffs or {}
+
+    local function evaluate(model, data)
+        if not data or model == boosterModel then
+            return
+        end
+
+        local currentlyBoosted = boosterData.BoostedTowers[model] == true
+        local shouldBoost = false
+
+        if active and radius > 0 then
+            local targetPrimary = getTowerPrimaryPart(model)
+            if targetPrimary then
+                local distance = (targetPrimary.Position - primary.Position).Magnitude
+                if distance <= radius then
+                    shouldBoost = true
+                end
+            end
+        end
+
+        if shouldBoost then
+            boosterData.BoostedTowers[model] = true
+            self:SetTowerBoost(data, boosterModel, boosts)
+        elseif currentlyBoosted then
+            boosterData.BoostedTowers[model] = nil
+            self:RemoveBoostFromTower(data, boosterModel)
+        end
+    end
+
+    if targetModel then
+        evaluate(targetModel, targetData or self.Towers[targetModel])
+    else
+        for model, data in pairs(self.Towers) do
+            evaluate(model, data)
+        end
+    end
+end
+
+function TowerService:RefreshBooster(boosterModel, boosterData)
+    boosterData = boosterData or self.Towers[boosterModel]
+    if not boosterData then
+        return
+    end
+
+    self:EvaluateBoosterTargets(boosterModel, boosterData)
+end
+
+function TowerService:RefreshBoostersForTower(towerModel, towerData)
+    if not self.Boosters then
+        return
+    end
+
+    for boosterModel, boosterData in pairs(self.Boosters) do
+        if boosterModel ~= towerModel then
+            self:EvaluateBoosterTargets(boosterModel, boosterData, towerModel, towerData)
+        end
+    end
+end
+
+function TowerService:DetachTowerFromBoosters(towerModel, towerData)
+    if not towerData then
+        return
+    end
+
+    if towerData.ActiveBoosts then
+        for boosterModel in pairs(towerData.ActiveBoosts) do
+            local boosterData = self.Towers[boosterModel]
+            if boosterData and boosterData.BoostedTowers then
+                boosterData.BoostedTowers[towerModel] = nil
+            end
+        end
+        towerData.ActiveBoosts = nil
+        self:RecalculateTowerStats(towerData)
+    end
+
+    self:DestroyTowerBoostDisplay(towerData)
+
+    if towerData.Type == "Booster" then
+        if towerData.BoostedTowers then
+            for boostedModel in pairs(towerData.BoostedTowers) do
+                local boostedData = self.Towers[boostedModel]
+                if boostedData then
+                    self:RemoveBoostFromTower(boostedData, towerModel)
+                end
+            end
+            towerData.BoostedTowers = nil
+        end
+
+        if self.Boosters then
+            self.Boosters[towerModel] = nil
+        end
+    else
+        if self.Boosters then
+            for _, boosterData in pairs(self.Boosters) do
+                if boosterData and boosterData.BoostedTowers then
+                    boosterData.BoostedTowers[towerModel] = nil
+                end
+            end
+        end
+    end
 end
 
 function TowerService:BuildTowerCountSnapshot(player)
@@ -1340,10 +1736,17 @@ function TowerService:AddTower(player, towerType, position)
 
     self.Towers[towerModel] = towerData
     ensureHeadGeometry(towerData)
-    updateTowerAttributes(towerModel, towerData)
+    self:RecalculateTowerStats(towerData)
     if towerType == "Farm" then
         towerData.FarmIncomeEarned = towerData.FarmIncomeEarned or 0
         self:UpdateFarmIncomeDisplay(towerModel, towerData, 0)
+    end
+    if towerType == "Booster" then
+        towerData.BoostedTowers = towerData.BoostedTowers or {}
+        self.Boosters[towerModel] = towerData
+        self:RefreshBooster(towerModel, towerData)
+    else
+        self:RefreshBoostersForTower(towerModel, towerData)
     end
     self:BroadcastTowerCounts()
     return towerModel
@@ -1457,6 +1860,10 @@ function TowerService:ClearTowerStun(towerModel, towerData, skipAttribute)
     if not skipAttribute and towerModel and towerModel.Parent then
         towerModel:SetAttribute("Stunned", false)
     end
+
+    if towerData.Type == "Booster" then
+        self:RefreshBooster(towerModel, towerData)
+    end
 end
 
 function TowerService:ActivateTowerStun(towerModel, towerData, config)
@@ -1516,13 +1923,17 @@ function TowerService:ActivateTowerStun(towerModel, towerData, config)
         towerData.StunSoundInstance:Play()
     end
 
-    local baseCooldown = towerData.Config and towerData.Config.FireRate
-    if baseCooldown then
-        towerData.Cooldown = math.max(towerData.Cooldown or 0, baseCooldown)
+    local baseCooldown = self:GetTowerFireRate(towerData)
+    if baseCooldown and baseCooldown > 0 then
+        towerData.Cooldown = math.max(towerData.Cooldown or 0, math.max(0.05, baseCooldown))
     end
 
     if towerData.StunFreeze and towerData.StunHeadCFrame then
         self:MaintainStunOrientation(towerData)
+    end
+
+    if towerData.Type == "Booster" then
+        self:RefreshBooster(towerModel, towerData)
     end
 end
 
@@ -1592,6 +2003,7 @@ function TowerService:Tick(dt)
         if not towerModel.Parent then
             self:ClearTowerStun(towerModel, towerData, true)
             self:DestroyFarmIncomeDisplay(towerData)
+            self:DetachTowerFromBoosters(towerModel, towerData)
             self.Towers[towerModel] = nil
             countsDirty = true
         else
@@ -1625,9 +2037,10 @@ function TowerService:Tick(dt)
                     local headInfo = ensureHeadGeometry(towerData)
                     local headPivot = headInfo and headInfo.HeadPivot
                     if headPivot then
+                        local towerRange = self:GetTowerRange(towerData)
                         local target = getFarthestEnemyInRange(
                             headPivot.Position,
-                            towerData.Config.Range,
+                            towerRange,
                             self.WaveService.Enemies,
                             self.WaveService,
                             towerData
@@ -1657,8 +2070,12 @@ function TowerService:Tick(dt)
                                 end
                             end
 
-                            local fireRate = towerData.Config.FireRate or 0
-                            towerData.Cooldown = math.max(0.05, fireRate)
+                            local fireRate = self:GetTowerFireRate(towerData)
+                            if fireRate > 0 then
+                                towerData.Cooldown = math.max(0.05, fireRate)
+                            else
+                                towerData.Cooldown = 0.1
+                            end
                             local splashRadius = towerData.Config.SplashRadius
                             if splashRadius and targetPrimary then
                                 self.WaveService:SplashDamage(
@@ -1799,10 +2216,35 @@ function TowerService:RebuildTowerModel(towerModel, towerData)
     towerData.HeadInfo = nil
     self.Towers[newModel] = towerData
 
-    updateTowerAttributes(newModel, towerData)
     ensureHeadGeometry(towerData)
+    self:RecalculateTowerStats(towerData)
     if towerData.Type == "Farm" then
         self:UpdateFarmIncomeDisplay(newModel, towerData, 0)
+    end
+
+    if towerData.Type == "Booster" then
+        if self.Boosters then
+            self.Boosters[towerModel] = nil
+            self.Boosters[newModel] = towerData
+        end
+
+        if towerData.BoostedTowers then
+            for boostedModel in pairs(towerData.BoostedTowers) do
+                local boostedData = self.Towers[boostedModel]
+                if boostedData and boostedData.ActiveBoosts then
+                    local boostEntry = boostedData.ActiveBoosts[towerModel]
+                    if boostEntry then
+                        boostedData.ActiveBoosts[towerModel] = nil
+                        boostedData.ActiveBoosts[newModel] = boostEntry
+                        self:RecalculateTowerStats(boostedData)
+                    end
+                end
+            end
+        end
+
+        self:RefreshBooster(newModel, towerData)
+    else
+        self:RefreshBoostersForTower(newModel, towerData)
     end
 
     if towerModel then
@@ -1848,8 +2290,17 @@ function TowerService:UpgradeTower(player, towerModel)
     if upgradeRequestsModelSwap(nextUpgrade) then
         towerModel = self:RebuildTowerModel(towerModel, towerData)
     else
-        updateTowerAttributes(towerModel, towerData)
         ensureHeadGeometry(towerData)
+        self:RecalculateTowerStats(towerData)
+        if towerData.Type == "Farm" then
+            self:UpdateFarmIncomeDisplay(towerModel, towerData, 0)
+        end
+    end
+
+    if towerData.Type == "Booster" then
+        self:RefreshBooster(towerModel, towerData)
+    else
+        self:RefreshBoostersForTower(towerModel, towerData)
     end
 
     if self.Remotes and self.Remotes.TowerUpgraded then
@@ -1869,6 +2320,7 @@ function TowerService:SellTower(player, towerModel)
 
     self:ClearTowerStun(towerModel, towerData, true)
     self:DestroyFarmIncomeDisplay(towerData)
+    self:DetachTowerFromBoosters(towerModel, towerData)
     self.Towers[towerModel] = nil
 
     if towerModel and towerModel.Parent then
@@ -1889,6 +2341,7 @@ function TowerService:Reset()
     for towerModel, towerData in pairs(self.Towers) do
         self:ClearTowerStun(towerModel, towerData, true)
         self:DestroyFarmIncomeDisplay(towerData)
+        self:DetachTowerFromBoosters(towerModel, towerData)
         if towerModel and towerModel.Parent then
             towerModel:Destroy()
         end
@@ -1898,6 +2351,7 @@ function TowerService:Reset()
         towersFolder:ClearAllChildren()
     end
     self.Towers = {}
+    self.Boosters = {}
 
     TowerLimits = {}
     OverallPlacementLimitCache = nil

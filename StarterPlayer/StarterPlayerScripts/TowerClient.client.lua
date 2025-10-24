@@ -2736,6 +2736,21 @@ local function updateTowerDetails(towerModel)
                 if stats.IncomePerWave and stats.IncomePerWave > 0 then
                         table.insert(lines, string.format("Income: %s per wave", formatCurrency(stats.IncomePerWave)))
                 end
+                if stats.BoostRadius and stats.BoostRadius > 0 then
+                        table.insert(lines, string.format("Boost Radius: %.1f", stats.BoostRadius))
+                end
+                local buffs = stats.Buffs
+                if buffs then
+                        local rangeMultiplier = tonumber(buffs.RangeMultiplier)
+                        if rangeMultiplier and math.abs(rangeMultiplier - 1) > 0.001 then
+                                table.insert(lines, string.format("Buff Range: +%d%%", math.floor((rangeMultiplier - 1) * 100 + 0.5)))
+                        end
+                        local fireRateMultiplier = tonumber(buffs.FireRateMultiplier)
+                        if fireRateMultiplier and math.abs(fireRateMultiplier - 1) > 0.001 then
+                                local cooldownReduction = (1 - fireRateMultiplier) * 100
+                                table.insert(lines, string.format("Buff Cooldown: -%d%%", math.floor(cooldownReduction + 0.5)))
+                        end
+                end
                 towerStatsLabel.Text = table.concat(lines, "\n")
         elseif towerStatsLabel then
                 towerStatsLabel.Text = ""

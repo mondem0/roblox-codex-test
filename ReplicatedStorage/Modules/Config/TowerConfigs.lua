@@ -149,6 +149,42 @@ local TowerConfigs = {
             }
         }
     },
+    Booster = {
+        Name = "Booster",
+        ModelName = "Booster",
+        Cost = 650,
+        PlacementLimit = 6,
+        BaseSize = Vector3.new(4.5, 1, 4.5),
+        Range = 0,
+        Damage = 0,
+        FireRate = 0,
+        BoostRadius = 18,
+        Buffs = {
+            RangeMultiplier = 1.15,
+            FireRateMultiplier = 0.85,
+        },
+        Description = "Support tower that extends the range and speeds up the shots of nearby allies.",
+        Upgrades = {
+            {
+                Cost = 450,
+                BoostRadius = 20,
+                Buffs = {
+                    RangeMultiplier = 1.25,
+                    FireRateMultiplier = 0.75,
+                },
+                Description = "+10% range boost, +10% cooldown reduction",
+            },
+            {
+                Cost = 650,
+                BoostRadius = 22,
+                Buffs = {
+                    RangeMultiplier = 1.35,
+                    FireRateMultiplier = 0.65,
+                },
+                Description = "Maximized support aura with huge boosts",
+            }
+        }
+    },
     Farm = {
         Name = "Farm",
         ModelName = "Farm",
