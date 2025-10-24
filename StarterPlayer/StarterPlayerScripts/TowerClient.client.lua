@@ -10,6 +10,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local towerConfigs = require(ReplicatedStorage.Modules.Config.TowerConfigs)
+local PlacementValidation = require(ReplicatedStorage.Modules.Client.TowerPlacementValidation)
 local enemiesFolder = workspace:WaitForChild("Enemies")
 
 local placingTowerType
@@ -343,6 +344,28 @@ local function isValidPlacementSurface(instance, mapModel, ground, placementSurf
 
         return false
 end
+
+local placementValidation = PlacementValidation.new({
+        player = player,
+        getPreviewPart = function()
+                return previewPart
+        end,
+        getPreviewRangeRing = function()
+                return previewRangeRing
+        end,
+        getRangeRing = function()
+                return rangeRing
+        end,
+        getPreviewFootprintSize = function()
+                return previewFootprintSize
+        end,
+        getPlacementSurface = getPlacementSurface,
+        getPlacementPartSet = getPlacementPartSet,
+        isValidPlacementSurface = isValidPlacementSurface,
+        CLIFF_PLACEMENT_SURFACE = CLIFF_PLACEMENT_SURFACE,
+        MAX_GROUND_RAYCAST_ATTEMPTS = MAX_GROUND_RAYCAST_ATTEMPTS,
+        PLACEMENT_EDGE_EPSILON = PLACEMENT_EDGE_EPSILON,
+})
 
 local function updateStartButtonVisual()
         -- The manual wave start button is no longer present in the HUD.
@@ -2710,7 +2733,7 @@ local function showRangeIndicator(towerModel, range)
         if typeof(storedPlacement) == "Vector3" then
                 groundPosition = storedPlacement
         else
-                local surfaceResult = findPlacementSurface(base.Position, towerType)
+                local surfaceResult = placementValidation:findPlacementSurface(base.Position, towerType)
                 if surfaceResult then
                         groundPosition = surfaceResult.Position
                 else
@@ -3499,145 +3522,12 @@ local function selectTower(towerModel)
         }
 end
 
-local function createPlacementValidationParams()
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.IgnoreWater = true
-
-	local ignoreList = { player.Character }
-	if previewPart then
-		table.insert(ignoreList, previewPart)
-	end
-	if previewRangeRing then
-		table.insert(ignoreList, previewRangeRing)
-	end
-	if rangeRing then
-		table.insert(ignoreList, rangeRing)
-	end
-
-	local towersFolder = workspace:FindFirstChild("Towers")
-	if towersFolder then
-		table.insert(ignoreList, towersFolder)
-	end
-
-        params.FilterDescendantsInstances = ignoreList
-        return params, ignoreList
-end
-
-local function findPlacementSurface(position, towerType)
-        local map = workspace:FindFirstChild("Map")
-        if not map then
-                return nil
-        end
-
-        local ground = map:FindFirstChild("PathGround")
-        local placementSurface = getPlacementSurface(towerType)
-        local allowedPlacementParts = getPlacementPartSet(towerType)
-        if (not allowedPlacementParts or not next(allowedPlacementParts)) and placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
-                return nil
-        end
-
-        local params, ignoreList = createPlacementValidationParams()
-        local origin = position + Vector3.new(0, 200, 0)
-        local direction = Vector3.new(0, -400, 0)
-
-        for _ = 1, MAX_GROUND_RAYCAST_ATTEMPTS do
-                local result = workspace:Raycast(origin, direction, params)
-                if not result then
-                        return nil
-                end
-
-                local instance = result.Instance
-                if instance and instance:IsA("BasePart") then
-                        if instance.CanCollide ~= false and (not instance.Transparency or instance.Transparency < 0.95) then
-                                if isValidPlacementSurface(instance, map, ground, placementSurface, allowedPlacementParts) then
-                                        return result
-                                end
-
-                                return nil
-                        end
-                end
-
-                if instance then
-                        table.insert(ignoreList, instance)
-                        params.FilterDescendantsInstances = ignoreList
-                end
-                origin = result.Position - Vector3.new(0, 0.05, 0)
-        end
-
-        return nil
-end
-
-local function isPositionClear(position)
-	local towersFolder = workspace:FindFirstChild("Towers")
-	if not towersFolder then
-		return true
-	end
-
-	local candidateHalfX = math.max(0.05, previewFootprintSize.X / 2)
-	local candidateHalfZ = math.max(0.05, previewFootprintSize.Z / 2)
-
-	for _, tower in ipairs(towersFolder:GetChildren()) do
-		local primary = tower.PrimaryPart or tower:FindFirstChild("Base")
-		if primary then
-			local towerPos = primary.Position
-			local otherHalfX = math.max(0.05, primary.Size.X / 2)
-			local otherHalfZ = math.max(0.05, primary.Size.Z / 2)
-			local deltaX = math.abs(towerPos.X - position.X)
-			local deltaZ = math.abs(towerPos.Z - position.Z)
-			local limitX = otherHalfX + candidateHalfX + PLACEMENT_EDGE_EPSILON
-			local limitZ = otherHalfZ + candidateHalfZ + PLACEMENT_EDGE_EPSILON
-			if deltaX <= limitX and deltaZ <= limitZ then
-				return false
-			end
-		end
-	end
-
-	return true
-end
 local function evaluatePlacement(rayResult)
         if not placingTowerType or not rayResult then
                 return false
         end
 
-        local hitInstance = rayResult.Instance
-        local hitPosition = rayResult.Position
-        if not hitInstance or not hitPosition then
-                return false
-        end
-
-        local map = workspace:FindFirstChild("Map")
-        if not map then
-                return false
-        end
-
-        local ground = map:FindFirstChild("PathGround")
-        local placementSurface = getPlacementSurface(placingTowerType)
-        local allowedPlacementParts = getPlacementPartSet(placingTowerType)
-
-        if (not allowedPlacementParts or not next(allowedPlacementParts)) and placementSurface ~= CLIFF_PLACEMENT_SURFACE and not ground then
-                return false
-        end
-
-        if not hitInstance:IsA("BasePart") then
-                return false
-        end
-
-        if hitInstance.CanCollide == false then
-                return false
-        end
-
-        if not isValidPlacementSurface(hitInstance, map, ground, placementSurface, allowedPlacementParts) then
-                return false
-        end
-
-        local placementPosition = Vector3.new(hitPosition.X, hitPosition.Y, hitPosition.Z)
-
-        if not isPositionClear(placementPosition) then
-                return false
-        end
-
-        return true, placementPosition
+        return placementValidation:evaluatePlacement(placingTowerType, rayResult)
 end
 
 local function updatePreview()
@@ -3670,7 +3560,7 @@ local function updatePreview()
                         if resolvedPosition then
                                 ringBase = resolvedPosition
                         else
-                                local surfaceResult = findPlacementSurface(rayResult.Position, placingTowerType)
+                                local surfaceResult = placementValidation:findPlacementSurface(rayResult.Position, placingTowerType)
                                 if surfaceResult then
                                         ringBase = surfaceResult.Position
                                 else
